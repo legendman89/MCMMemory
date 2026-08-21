@@ -1,0 +1,291 @@
+#pragma once
+
+#include "scheduler.hpp"
+#include "mcm_registry.hpp"
+#include "profile.hpp"
+#include "restore_defs.hpp"
+#include "settings.hpp"
+
+#define DECLARE_RESTORE_ACTION_ENUM(actionName, functionName, argumentType) actionName,
+#define DECLARE_RESTORE_FUNCTION_NAME(actionName, functionName, argumentType) #functionName,
+#define DECLARE_RESTORE_ARGUMENT_TYPE(actionName, functionName, argumentType) RestoreArgumentType::argumentType,
+
+namespace MCMMemory
+{
+    // Says which type of argument a restore script function expects.
+    enum class RestoreArgumentType
+    {
+        None,
+        Page,
+        OptionIndex,
+        IntegerValue,
+        FloatValue,
+        StringValue,
+        KeymapValue,
+        ToggleValue
+    };
+
+    // Gives every supported restore script call a C++ name.
+    enum class RestoreActionType
+    {
+        FOREACH_RESTORE_ACTION(DECLARE_RESTORE_ACTION_ENUM)
+        Count
+    };
+
+    // These names match the functions on the MCM config script.
+    inline constexpr std::array<std::string_view, static_cast<size_t>(RestoreActionType::Count)> restoreActionFunctionNames
+    {
+        FOREACH_RESTORE_ACTION(DECLARE_RESTORE_FUNCTION_NAME)
+    };
+
+    // Matches every restore action with the argument it needs.
+    inline constexpr std::array<RestoreArgumentType, static_cast<size_t>(RestoreActionType::Count)> restoreArgumentTypes
+    {
+        FOREACH_RESTORE_ACTION(DECLARE_RESTORE_ARGUMENT_TYPE)
+    };
+
+    // Returns the Papyrus function name for one restore action.
+    inline std::string_view RestoreActionFunctionName(RestoreActionType a_type)
+    {
+        return restoreActionFunctionNames[static_cast<size_t>(a_type)];
+    }
+
+    // Returns the argument type needed by one restore action.
+    inline RestoreArgumentType GetRestoreArgumentType(RestoreActionType a_type)
+    {
+        return restoreArgumentTypes[static_cast<size_t>(a_type)];
+    }
+
+    // One small description of a script call waiting to be dispatched.
+    struct RestoreAction
+    {
+        // Page name passed to SetPage.
+        std::string pageName;
+
+        // Text passed to a text-setting script call.
+        std::string stringValue;
+
+        // Index of the RestoreMCM that should receive this call.
+        size_t mcmIndex{};
+
+        // Says which MCM script function should be called.
+        RestoreActionType type{RestoreActionType::OpenConfig};
+
+        // Page index passed to SetPage.
+        int pageIndex{-1};
+
+        // Option index used by option, toggle and keymap calls.
+        int optionIndex{-1};
+
+        // Integer passed to menu, color or keymap calls.
+        int integerValue{};
+
+        // Number passed to a slider call.
+        float floatValue{};
+
+        // Desired state used when restoring a toggle.
+        bool boolValue{};
+    };
+
+    // Creates an action that does not need a value.
+    inline RestoreAction MakeRestoreAction(RestoreActionType a_type, size_t a_mcmIndex)
+    {
+        RestoreAction action;
+        action.type = a_type;
+        action.mcmIndex = a_mcmIndex;
+        return action;
+    }
+
+    // Creates a SetPage action from a captured selection.
+    inline RestoreAction MakePageAction(size_t a_mcmIndex, const MCMSelection& a_selection)
+    {
+        auto action = MakeRestoreAction(RestoreActionType::SetPage, a_mcmIndex);
+        action.pageName = a_selection.pageName;
+        action.pageIndex = a_selection.pageIndex;
+        return action;
+    }
+
+    // Creates an action that needs an option index.
+    inline RestoreAction MakeOptionAction(RestoreActionType a_type, size_t a_mcmIndex, int a_optionIndex)
+    {
+        auto action = MakeRestoreAction(a_type, a_mcmIndex);
+        action.optionIndex = a_optionIndex;
+        return action;
+    }
+
+    // Creates an action that needs one integer value.
+    inline RestoreAction MakeIntegerAction(RestoreActionType a_type, size_t a_mcmIndex, int a_value)
+    {
+        auto action = MakeRestoreAction(a_type, a_mcmIndex);
+        action.integerValue = a_value;
+        return action;
+    }
+
+    // Creates an action that needs one slider value.
+    inline RestoreAction MakeFloatAction(RestoreActionType a_type, size_t a_mcmIndex, float a_value)
+    {
+        auto action = MakeRestoreAction(a_type, a_mcmIndex);
+        action.floatValue = a_value;
+        return action;
+    }
+
+    // Creates an action that needs one text value.
+    inline RestoreAction MakeStringAction(RestoreActionType a_type, size_t a_mcmIndex, std::string_view a_value)
+    {
+        auto action = MakeRestoreAction(a_type, a_mcmIndex);
+        action.stringValue = a_value;
+        return action;
+    }
+
+    // Creates a RemapKey action with its option and key code.
+    inline RestoreAction MakeKeymapAction(size_t a_mcmIndex, int a_optionIndex, int a_keyCode)
+    {
+        auto action = MakeOptionAction(RestoreActionType::RemapKey, a_mcmIndex, a_optionIndex);
+        action.integerValue = a_keyCode;
+        return action;
+    }
+
+    // Creates a toggle action with its desired state.
+    inline RestoreAction MakeToggleAction(size_t a_mcmIndex, int a_optionIndex, bool a_value)
+    {
+        auto action = MakeOptionAction(RestoreActionType::ApplyToggle, a_mcmIndex, a_optionIndex);
+        action.boolValue = a_value;
+        return action;
+    }
+
+    struct RestoreMCM
+    {
+        // Identifies the profile MCM that will be matched with the registry.
+        MCMIdentity identity;
+
+        // Name of the last page added to this MCM action list.
+        std::string queuedPageName;
+
+        // Setting actions kept in their original profile order.
+        std::vector<RestoreAction> settingActions;
+
+        // MCM Registry gives us this live MCM script after registration.
+        RE::BSTSmartPointer<RE::BSScript::Object> mcmScript;
+
+        int queuedPageIndex{-1};
+
+        bool hasQueuedPage{};
+    };
+
+    struct RestoreTask
+    {
+        uint64_t loadedGameSession{};
+
+        void operator()() const;
+    };
+
+    class Restore final : public RE::BSTEventSink<SKSE::ModCallbackEvent>
+    {
+    public:
+
+        static Restore* GetSingleton()
+        {
+            static Restore singleton;
+            return std::addressof(singleton);
+        }
+
+        bool Install();
+
+        void Reset();
+
+        // Waits for a stable MCM registry before starting restoration.
+        RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;
+
+    private:
+
+        // Lets a scheduled RestoreTask call the private RunNextAction function.
+        friend struct RestoreTask;
+
+        // Finds the RestoreMCM for a setting or creates it.
+        size_t GetOrAddMCM(const CapturedSetting& a_setting);
+
+        bool LoadProfile();
+
+        // Validates one captured setting and converts it into restore actions.
+        bool AddSettingActions(const CapturedSetting& a_setting);
+
+        // Adds SetPage unless the previous setting already selected that page.
+        void AddPageAction(size_t a_mcmIndex, const MCMSelection& a_selection);
+
+        // Push the available MCM action lists into one final queue.
+        void BuildActionQueue();
+
+        // Sends one queued action to its matching MCM script.
+        bool RunAction(const RestoreAction& a_action);
+
+        // Calls one function on a live MCM script.
+        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments);
+
+        // Flips a toggle only when its current state differs from the profile.
+        bool RestoreToggle(const RestoreAction& a_action);
+
+        // Schedules the next action after the requested delay.
+        inline void QueueNextAction(float a_delaySeconds)
+        {
+            if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RestoreTask{ loadedGameSession }, a_delaySeconds)) {
+                logger::error("Persistent profile restore could not schedule action {}", currentActionIndex);
+            }
+        }
+
+        // Reads one toggle's current value from the MCM script.
+        bool ReadToggleValue(size_t a_mcmIndex, int a_optionIndex, bool& a_value) const;
+
+        // Matches profile MCM IDs with their live config scripts.
+        void MatchRegisteredMCMs(const std::vector<MCMRegistryEntry>& a_registeredMCMs);
+
+        // Runs one action if it still belongs to the loaded game.
+        void RunNextAction(uint64_t a_loadedGameSession);
+
+        // Builds the queue and schedules its first action.
+        void StartRestore();
+
+        // Stops registration events and scheduled tasks from changing restore state together.
+        std::mutex restoreMutex;
+
+        // Stores the previous sorted MCM list so registration can be checked for stability.
+        std::vector<std::string> lastRegistryModIDs;
+
+        // Holds each MCM and the actions prepared for it.
+        std::vector<RestoreMCM> restoreMCMs;
+
+        // Holds the final action queue currently being run.
+        std::vector<RestoreAction> actions;
+
+        // Points to the next action in the final queue.
+        size_t currentActionIndex{};
+
+        // Changes whenever a new game starts or another save is loaded.
+        uint64_t loadedGameSession{};
+
+        // Counts how many registration notifications have been checked.
+        // Ex. Check 1: 0 registered MCMs, Check 2: 14 registered MCMs ...
+        uint32_t registryCheckCount{};
+
+        // Prevents the registration listener from being installed twice.
+        bool installed{};
+
+        // Says whether Profile.json has already been read for this game.
+        bool configLoaded{};
+
+        // Says whether the loaded profile can be restored.
+        bool configValid{};
+
+        // Prevents the restore queue from starting more than once.
+        bool started{};
+    };
+
+    inline void RestoreTask::operator()() const
+    {
+        // Run one restore action on the game task scheduler.
+        Restore::GetSingleton()->RunNextAction(loadedGameSession);
+    }
+}
+
+#undef DECLARE_RESTORE_ACTION_ENUM
+#undef DECLARE_RESTORE_FUNCTION_NAME
+#undef DECLARE_RESTORE_ARGUMENT_TYPE

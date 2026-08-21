@@ -1,0 +1,48 @@
+#include "settings.hpp"
+#include "helper.hpp"
+#include "json.hpp"
+
+namespace MCMMemory
+{
+    bool SettingsStorage::Load()
+    {
+        Settings settings;
+        std::error_code error;
+        bool exists = std::filesystem::exists(Path(), error);
+        if (error) {
+            logger::error("Failed to check settings file {}: {}", ToUTF8(Path()), error.message());
+            return false;
+        }
+        if (!exists) {
+            GetSettings() = settings;
+            logger::info("Settings file does not exist at {}; using defaults", ToUTF8(Path()));
+            return true;
+        }
+
+        std::ifstream stream(Path());
+        if (!stream) {
+            logger::error("Failed to open settings file {}", ToUTF8(Path()));
+            return false;
+        }
+
+        try {
+            auto document = nlohmann::json::parse(stream);
+#define READ_SETTING(type, name, defaultValue) JSON::ReadValue(document, #name, settings.name);
+            FOREACH_SETTING(READ_SETTING)
+#undef READ_SETTING
+        }
+        catch (const std::exception& exception) {
+            logger::error("Failed to read settings file {}: {}", ToUTF8(Path()), exception.what());
+            return false;
+        }
+
+        if (settings.actionDelaySeconds < 0.05F || settings.actionDelaySeconds > 10.0F) {
+            logger::error("actionDelaySeconds {} is outside the supported range 0.05 through 10.0", settings.actionDelaySeconds);
+            return false;
+        }
+
+        GetSettings() = settings;
+        logger::info("Loaded settings: enabled={}, actionDelaySeconds={}, captureRawRecords={}", settings.enabled, settings.actionDelaySeconds, settings.captureRawRecords);
+        return true;
+    }
+}

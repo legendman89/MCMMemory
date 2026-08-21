@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "mcm-memory",
+  "version-string": "0.1.0",
+  "dependencies": [
+    "directxmath",
+    "directxtk",
+    "fmt",
+    "nlohmann-json",
+    "rapidcsv",
+    "simpleini",
+    "spdlog",
+    "xbyak"
+  ],
+  "builtin-baseline": "78b61582c9e093fda56a01ebb654be15a0033897"
+}

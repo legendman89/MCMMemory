@@ -172,6 +172,14 @@ namespace MCMMemory
         bool hasQueuedPage{};
     };
 
+    struct RegistryCheckTask
+    {
+        // Stops a check from an earlier loaded game from reading the new registry.
+        uint64_t loadedGameSession{};
+
+        void operator()() const;
+    };
+
     struct RestoreTask
     {
         uint64_t loadedGameSession{};
@@ -198,7 +206,9 @@ namespace MCMMemory
 
     private:
 
-        // Lets a scheduled RestoreTask call the private RunNextAction function.
+        // Lets scheduled tasks call the matching private restore functions.
+        friend struct RegistryCheckTask;
+
         friend struct RestoreTask;
 
         // Finds the RestoreMCM for a setting or creates it.
@@ -232,11 +242,24 @@ namespace MCMMemory
             }
         }
 
+        // Moves the registry read from the event callback to Skyrim task queue.
+        inline void QueueRegistryCheck()
+        {
+            registryCheckQueued = true;
+            if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RegistryCheckTask{ loadedGameSession }, 0.0F)) {
+                registryCheckQueued = false;
+                logger::error("Persistent profile restore could not schedule its registry check");
+            }
+        }
+
         // Reads one toggle's current value from the MCM script.
         bool ReadToggleValue(size_t a_mcmIndex, int a_optionIndex, bool& a_value) const;
 
         // Matches profile MCM IDs with their live config scripts.
         void MatchRegisteredMCMs(const std::vector<MCMRegistryEntry>& a_registeredMCMs);
+
+        // Reads the current registry on the game task queue.
+        void CheckRegistry(uint64_t a_loadedGameSession);
 
         // Runs one action if it still belongs to the loaded game.
         void RunNextAction(uint64_t a_loadedGameSession);
@@ -277,7 +300,15 @@ namespace MCMMemory
 
         // Prevents the restore queue from starting more than once.
         bool started{};
+
+        // Prevents repeated ready events from queuing the same registry check.
+        bool registryCheckQueued{};
     };
+
+    inline void RegistryCheckTask::operator()() const
+    {
+        Restore::GetSingleton()->CheckRegistry(loadedGameSession);
+    }
 
     inline void RestoreTask::operator()() const
     {

@@ -1,8 +1,9 @@
-#include "capture.hpp"
+
 #include "logger.hpp"
-#include "mcm_registry.hpp"
+#include "capture.hpp"
 #include "restore.hpp"
 #include "settings.hpp"
+#include "mcm_registry.hpp"
 
 namespace MCMMemory
 {
@@ -14,11 +15,10 @@ namespace MCMMemory
 
         switch (a_message->type) {
         case SKSE::MessagingInterface::kDataLoaded:
-            if (!MCMRegistry().IsMCMUnlockedAvailable()) {
-                logger::critical("MCM Unlocked is required, but MCM Unlocked.esp or its marker forms are unavailable");
+            if (!MCMRegistry::IsSkyUIAvailable()) {
+                logger::critical("SkyUI is required, but its MCM manager quest is unavailable");
                 break;
             }
-            logger::info("MCM Unlocked is detected");
             if (!SettingsStorage::Load()) {
                 logger::critical("MCM Memory settings could not be loaded");
                 break;

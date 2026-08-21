@@ -29,6 +29,7 @@ namespace MCMMemory
         configLoaded = false;
         configValid = false;
         started = false;
+        registryCheckQueued = false;
         currentActionIndex = 0;
         registryCheckCount = 0;
         lastRegistryModIDs.clear();
@@ -54,13 +55,31 @@ namespace MCMMemory
         if (!configValid) {
             return RE::BSEventNotifyControl::kContinue;
         }
+        if (!registryCheckQueued) {
+            QueueRegistryCheck();
+        }
+
+        return RE::BSEventNotifyControl::kContinue;
+    }
+
+    void Restore::CheckRegistry(uint64_t a_loadedGameSession)
+    {
+        std::lock_guard lock(restoreMutex);
+        if (a_loadedGameSession != loadedGameSession) {
+            return;
+        }
+
+        registryCheckQueued = false;
+        if (started || !configValid || !GetSettings().enabled) {
+            return;
+        }
 
         // Registration arrives in stages, so wait until the list stops changing.
         ++registryCheckCount;
         auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
         if (registeredMCMs.empty()) {
             logger::info("Persistent profile restore is waiting for MCM registry entries (check {})", registryCheckCount);
-            return RE::BSEventNotifyControl::kContinue;
+            return;
         }
 
         std::vector<std::string> registryModIDs;
@@ -74,14 +93,12 @@ namespace MCMMemory
         if (registryModIDs != lastRegistryModIDs) {
             lastRegistryModIDs = std::move(registryModIDs);
             logger::info("Persistent profile restore caught {} registered MCMs and is waiting for one stable registration round", registeredMCMs.size());
-            return RE::BSEventNotifyControl::kContinue;
+            return;
         }
 
         MatchRegisteredMCMs(registeredMCMs);
 
         StartRestore();
-
-        return RE::BSEventNotifyControl::kContinue;
     }
 
     void Restore::StartRestore()

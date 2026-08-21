@@ -49,6 +49,24 @@ namespace MCMMemory
         return std::string(value->GetString());
     }
 
+    RE::BSTSmartPointer<RE::BSScript::Object> MCMRegistry::ReadManagerScript()
+    {
+        // SkyUI stores its MCM manager on this quest.
+        auto* quest = RE::TESForm::LookupByEditorID<RE::TESQuest>("SKI_ConfigManagerInstance");
+        auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+        auto* policy = vm ? vm->GetObjectHandlePolicy() : nullptr;
+        if (!quest || !vm || !policy) {
+            return {};
+        }
+
+        auto handle = policy->GetHandleForObject(quest->GetFormType(), quest);
+        RE::BSTSmartPointer<RE::BSScript::Object> managerScript;
+        if (handle == policy->EmptyHandle() || !vm->FindBoundObject(handle, "SKI_ConfigManager", managerScript)) {
+            return {};
+        }
+        return managerScript;
+    }
+
     std::optional<MCMRegistryEntry> MCMRegistry::ReadMCMFromMarker(RE::TESObjectREFR* a_marker, RE::BSScript::Internal::VirtualMachine* a_vm, RE::BSScript::IObjectHandlePolicy* a_policy)
     {
         auto handle = a_policy->GetHandleForObject(a_marker->GetFormType(), a_marker);
@@ -67,10 +85,10 @@ namespace MCMMemory
             mcmScriptValue = markerScript->GetVariable("::InstanceScript_var");
         }
         auto mcmScript = mcmScriptValue && mcmScriptValue->IsObject() ? mcmScriptValue->GetObject() : RE::BSTSmartPointer<RE::BSScript::Object>();
-        return CreateRegistryEntry(mcmScript, a_marker->GetFormID());
+        return CreateRegistryEntry(mcmScript);
     }
 
-    std::optional<MCMRegistryEntry> MCMRegistry::CreateRegistryEntry(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript, RE::FormID a_markerFormID)
+    std::optional<MCMRegistryEntry> MCMRegistry::CreateRegistryEntry(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript)
     {
         auto mcmScript = a_mcmScript;
         auto modName = ReadModName(mcmScript);
@@ -83,10 +101,10 @@ namespace MCMMemory
             return std::nullopt;
         }
         MCMIdentity identity{ std::move(*modName), std::move(modID) };
-        return MCMRegistryEntry{ a_markerFormID, std::move(identity), std::move(mcmScript) };
+        return MCMRegistryEntry{ std::move(identity), std::move(mcmScript) };
     }
 
-    std::vector<MCMRegistryEntry> MCMRegistry::ReadRegisteredMCMs() const
+    std::vector<MCMRegistryEntry> MCMRegistry::ReadMCMUnlockedRegistry()
     {
         auto* dataHandler = RE::TESDataHandler::GetSingleton();
         auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
@@ -95,8 +113,8 @@ namespace MCMMemory
             return {};
         }
 
-        auto* markerBase = dataHandler->LookupForm<RE::TESObjectACTI>(markerBaseLocalFormID, pluginName);
-        auto* markerCell = dataHandler->LookupForm<RE::TESObjectCELL>(markerCellLocalFormID, pluginName);
+        auto* markerBase = dataHandler->LookupForm<RE::TESObjectACTI>(markerBaseLocalFormID, mcmUnlockedPluginName);
+        auto* markerCell = dataHandler->LookupForm<RE::TESObjectCELL>(markerCellLocalFormID, mcmUnlockedPluginName);
         if (!markerBase || !markerCell) {
             return {};
         }
@@ -110,29 +128,73 @@ namespace MCMMemory
                 registeredMCMs.push_back(std::move(*registeredMCM));
             }
         }
-        logger::info("MCM registry traced {} MCM scripts from {} marker references", registeredMCMs.size(), markers.size());
+        logger::info("MCM registry read {} MCM scripts from {} marker references", registeredMCMs.size(), markers.size());
         return registeredMCMs;
+    }
+
+    std::vector<MCMRegistryEntry> MCMRegistry::ReadSkyUIRegistry()
+    {
+        auto managerScript = ReadManagerScript();
+        if (!managerScript) {
+            return {};
+        }
+
+        // Stock SkyUI stores every registered SKI_ConfigBase script in this array.
+        const RE::BSScript::Variable* registeredMCMValue = managerScript->GetVariable("_modConfigs");
+        if (!registeredMCMValue || !registeredMCMValue->IsObjectArray()) {
+            logger::warn("SkyUI registry could not read _modConfigs; another SKI_ConfigManager script may be overriding stock SkyUI");
+            return {};
+        }
+
+        auto registeredMCMArray = registeredMCMValue->GetArray();
+        if (!registeredMCMArray) {
+            return {};
+        }
+
+        // Cache the live scripts before doing any extra work with their names.
+        std::vector<RE::BSTSmartPointer<RE::BSScript::Object>> mcmScripts;
+        mcmScripts.reserve(registeredMCMArray->size());
+        for (const auto& value : *registeredMCMArray) {
+            if (value.IsObject()) {
+                auto mcmScript = value.GetObject();
+                if (mcmScript) {
+                    mcmScripts.push_back(std::move(mcmScript));
+                }
+            }
+        }
+
+        std::vector<MCMRegistryEntry> registeredMCMs;
+        registeredMCMs.reserve(mcmScripts.size());
+        for (const auto& mcmScript : mcmScripts) {
+            auto registeredMCM = CreateRegistryEntry(mcmScript);
+            if (registeredMCM) {
+                logger::info("SkyUI registry found '{}' as '{}'", registeredMCM->identity.modID, registeredMCM->identity.modName);
+                registeredMCMs.push_back(std::move(*registeredMCM));
+            }
+        }
+
+        logger::info("SkyUI registry read {} MCM scripts from {} occupied entries", registeredMCMs.size(), mcmScripts.size());
+        return registeredMCMs;
+    }
+
+    std::vector<MCMRegistryEntry> MCMRegistry::ReadRegisteredMCMs() const
+    {
+        if (IsMCMUnlockedAvailable()) {
+            return ReadMCMUnlockedRegistry();
+        }
+        return ReadSkyUIRegistry();
     }
 
     std::optional<MCMRegistryEntry> MCMRegistry::ReadActiveMCM() const
     {
-        // SkyUI stores its MCM manager on a quest, so find that quest to access the active MCM script.
-        auto* quest = RE::TESForm::LookupByEditorID<RE::TESQuest>("SKI_ConfigManagerInstance");
-        auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
-        auto* policy = vm ? vm->GetObjectHandlePolicy() : nullptr;
-        if (!quest || !vm || !policy) {
-            return std::nullopt;
-        }
-
-        auto handle = policy->GetHandleForObject(quest->GetFormType(), quest);
-        RE::BSTSmartPointer<RE::BSScript::Object> managerScript;
-        if (handle == policy->EmptyHandle() || !vm->FindBoundObject(handle, "SKI_ConfigManager", managerScript) || !managerScript) {
+        auto managerScript = ReadManagerScript();
+        if (!managerScript) {
             return std::nullopt;
         }
 
         const RE::BSScript::Variable* activeMCMValue = managerScript->GetVariable("_activeConfig");
         auto mcmScript = activeMCMValue && activeMCMValue->IsObject() ? activeMCMValue->GetObject() : RE::BSTSmartPointer<RE::BSScript::Object>();
-        return CreateRegistryEntry(mcmScript, 0);
+        return CreateRegistryEntry(mcmScript);
     }
 
     std::optional<MCMRegistryEntry> MCMRegistry::FindRegisteredMCM(std::string_view a_modID) const
@@ -140,7 +202,7 @@ namespace MCMMemory
         const auto registeredMCMs = ReadRegisteredMCMs();
         for (const auto& mcm : registeredMCMs) {
             if (mcm.identity.modID == a_modID) {
-                logger::info("MCM registry found '{}' as '{}' using marker {:08X}", mcm.identity.modID, mcm.identity.modName, mcm.markerFormID);
+                logger::info("MCM registry found '{}' as '{}'", mcm.identity.modID, mcm.identity.modName);
                 return mcm;
             }
         }

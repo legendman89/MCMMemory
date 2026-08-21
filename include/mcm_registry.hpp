@@ -2,15 +2,14 @@
 
 #include "types.hpp"
 
-// Here we check and register MCM unlocked.
-// It gives us the live script for every registered MCM, which we need to restore its settings.
+// SkyUI and MCM Unlocked both keep the live scripts we need to restore registered MCMs.
 
 namespace MCMMemory
 {
 
     inline constexpr RE::FormID markerBaseLocalFormID{ 0x800 };
     inline constexpr RE::FormID markerCellLocalFormID{ 0x801 };
-    inline constexpr std::string_view pluginName{ "MCM Unlocked.esp" };
+    inline constexpr std::string_view mcmUnlockedPluginName{ "MCM Unlocked.esp" };
     inline constexpr std::string_view markerScriptName{ "MCMUnlockedMarkerScript" };
 
     struct MCMRegistryEntry
@@ -23,12 +22,8 @@ namespace MCMMemory
         // Live MCM script used by restore.
         RE::BSTSmartPointer<RE::BSScript::Object> mcmScript;
 
-        // A marker is a hidden Skyrim object created by MCM unlocked for every registered MCM.
-        // We need those to trace them back to their MCM script (mcmScript).
-        RE::FormID markerFormID{};
-
-        explicit MCMRegistryEntry(RE::FormID a_markerFormID, MCMIdentity a_identity, RE::BSTSmartPointer<RE::BSScript::Object> a_mcmScript) :
-            identity(std::move(a_identity)), mcmScript(std::move(a_mcmScript)), markerFormID(a_markerFormID) {}
+        explicit MCMRegistryEntry(MCMIdentity a_identity, RE::BSTSmartPointer<RE::BSScript::Object> a_mcmScript) :
+            identity(std::move(a_identity)), mcmScript(std::move(a_mcmScript)) {}
     };
 
     // Sorts marker references by FormID for a stable registry order.
@@ -45,13 +40,12 @@ namespace MCMMemory
 
     public:
 
-        inline bool IsMCMUnlockedAvailable() const
+        static bool IsSkyUIAvailable()
         {
-            auto* dataHandler = RE::TESDataHandler::GetSingleton();
-            return dataHandler && dataHandler->LookupForm<RE::TESObjectACTI>(markerBaseLocalFormID, pluginName) && dataHandler->LookupForm<RE::TESObjectCELL>(markerCellLocalFormID, pluginName);
+            return RE::TESForm::LookupByEditorID<RE::TESQuest>("SKI_ConfigManagerInstance") != nullptr;
         }
-        
-        // Trace back all registered MCMs through their markers.
+
+        // Reads MCM Unlocked markers when available, otherwise reads SkyUI's registry array.
         std::vector<MCMRegistryEntry> ReadRegisteredMCMs() const;
 
         std::optional<MCMRegistryEntry> ReadActiveMCM() const;
@@ -61,7 +55,13 @@ namespace MCMMemory
 
     private:
 
-        inline static std::string CreateModID(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript, std::string_view a_modName)
+        static bool IsMCMUnlockedAvailable()
+        {
+            auto* dataHandler = RE::TESDataHandler::GetSingleton();
+            return dataHandler && dataHandler->LookupForm<RE::TESObjectACTI>(markerBaseLocalFormID, mcmUnlockedPluginName) && dataHandler->LookupForm<RE::TESObjectCELL>(markerCellLocalFormID, mcmUnlockedPluginName);
+        }
+
+        static std::string CreateModID(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript, std::string_view a_modName)
         {
             auto* typeInfo = a_mcmScript ? a_mcmScript->GetTypeInfo() : nullptr;
             auto* scriptName = typeInfo ? typeInfo->GetName() : nullptr;
@@ -73,6 +73,12 @@ namespace MCMMemory
 
         static std::optional<std::string> ReadModName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript);
 
+        static RE::BSTSmartPointer<RE::BSScript::Object> ReadManagerScript();
+
+        static std::vector<MCMRegistryEntry> ReadMCMUnlockedRegistry();
+
+        static std::vector<MCMRegistryEntry> ReadSkyUIRegistry();
+
         // Follows an MCM Unlocked marker to the live MCM script it represents.
         static std::optional<MCMRegistryEntry> ReadMCMFromMarker(RE::TESObjectREFR* a_marker, RE::BSScript::Internal::VirtualMachine* a_vm, RE::BSScript::IObjectHandlePolicy* a_policy);
 
@@ -81,7 +87,7 @@ namespace MCMMemory
         static std::vector<RE::NiPointer<RE::TESObjectREFR>> CollectMCMMarkers(RE::TESObjectCELL* a_markerCell, const RE::TESBoundObject* a_markerBase);
 
         // Create an MCMRegistryEntry instance for each MCM.
-        static std::optional<MCMRegistryEntry> CreateRegistryEntry(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript, RE::FormID a_markerFormID);
+        static std::optional<MCMRegistryEntry> CreateRegistryEntry(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript);
         
     };
 }

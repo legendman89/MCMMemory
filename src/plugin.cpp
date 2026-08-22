@@ -35,6 +35,7 @@ namespace MCMMemory
                 break;
 
             case SKSE::MessagingInterface::kPreLoadGame:
+                SetGameLoaded(false);
                 HUD::GetSingleton()->Reset();
                 break;
 
@@ -44,6 +45,7 @@ namespace MCMMemory
                 Backup::GetSingleton()->Reset();
                 Capture::GetSingleton()->Reset();
                 Restore::GetSingleton()->Reset();
+                SetGameLoaded(true);
                 break;
 
             default:

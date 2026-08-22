@@ -20,6 +20,10 @@
     HUD_SETTING(float, notificationDurationSeconds, 4.0F, durationSeconds, 0.5F, 15.0F, "Display duration", "%.1f s") \
     HUD_SETTING(float, notificationFadeSeconds, 1.0F, fadeSeconds, 0.0F, 5.0F, "Fade duration", "%.1f s")
 
+#define FOREACH_HUD_WARNING_SETTING(HUD_SETTING) \
+    HUD_SETTING(float, restoreWarningDurationSeconds, 5.0F, warningDurationSeconds, 1.0F, 15.0F, "Warning duration", "%.1f s")
+
 #define FOREACH_HUD_SETTING(HUD_SETTING) \
     FOREACH_HUD_APPEARANCE_SETTING(HUD_SETTING) \
-    FOREACH_HUD_TIMING_SETTING(HUD_SETTING)
+    FOREACH_HUD_TIMING_SETTING(HUD_SETTING) \
+    FOREACH_HUD_WARNING_SETTING(HUD_SETTING)

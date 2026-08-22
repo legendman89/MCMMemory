@@ -10,15 +10,17 @@ namespace MCMMemory
             return true;
         }
 
-        auto* source = SKSE::GetModCallbackEventSource();
-        if (!source) {
-            logger::error("Persistent profile restore could not find the SKSE mod callback event source");
+        auto* modEvents = SKSE::GetModCallbackEventSource();
+        auto* ui = RE::UI::GetSingleton();
+        if (!modEvents || !ui) {
+            logger::error("Persistent profile restore could not find its event sources");
             return false;
         }
 
-        source->AddEventSink(this);
+        modEvents->AddEventSink(static_cast<RE::BSTEventSink<SKSE::ModCallbackEvent>*>(this));
+        ui->AddEventSink<RE::MenuOpenCloseEvent>(static_cast<RE::BSTEventSink<RE::MenuOpenCloseEvent>*>(this));
         installed = true;
-        logger::info("Persistent profile restore event installed");
+        logger::info("Persistent profile restore events installed");
         return true;
     }
 
@@ -28,6 +30,7 @@ namespace MCMMemory
         configLoaded = false;
         configValid = false;
         started = false;
+        restoring = false;
         registryCheckQueued = false;
         currentActionIndex = 0;
         registryWait.Reset();
@@ -36,6 +39,7 @@ namespace MCMMemory
         scheduledTaskID = 0;
         manualRequest = false;
         requestFailed = false;
+        journalMenuOpen = false;
         restoreMCMs.clear();
         actions.clear();
     }
@@ -96,6 +100,21 @@ namespace MCMMemory
         return RE::BSEventNotifyControl::kContinue;
     }
 
+    RE::BSEventNotifyControl Restore::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
+    {
+        if (!a_event || std::string_view(a_event->menuName.c_str()) != RE::JournalMenu::MENU_NAME) {
+            return RE::BSEventNotifyControl::kContinue;
+        }
+
+        std::lock_guard lock(restoreMutex);
+        journalMenuOpen = a_event->opening;
+        if (journalMenuOpen && restoring) {
+            CloseJournalMenu();
+        }
+
+        return RE::BSEventNotifyControl::kContinue;
+    }
+
     void Restore::CheckRegistry(uint64_t a_loadedGameSession)
     {
         std::lock_guard lock(restoreMutex);
@@ -149,11 +168,26 @@ namespace MCMMemory
             return;
         }
 
+        restoring = true;
+
         if (!manualRequest) {
             HUD::GetSingleton()->ShowRestoreStarted();
         }
+        if (auto* ui = RE::UI::GetSingleton()) {
+            journalMenuOpen = ui->IsMenuOpen(RE::JournalMenu::MENU_NAME);
+        }
+        if (journalMenuOpen) {
+            CloseJournalMenu();
+        }
         logger::info("Starting persistent profile restoration with {} actions", actions.size());
         QueueNextAction(0.0F);
+    }
+
+    void Restore::FinishRestore()
+    {
+        restoring = false;
+        logger::info("Persistent profile restoration completed: {} applied, {} unchanged, {} skipped", stats.appliedSettingCount, stats.unchangedSettingCount, stats.skippedSettingCount);
+        HUD::GetSingleton()->ShowRestoreSummary(stats);
     }
 
     void Restore::FinishMCMStats(size_t a_mcmIndex)
@@ -170,11 +204,36 @@ namespace MCMMemory
         mcmStats.Reset();
     }
 
+    void Restore::CloseJournalMenu()
+    {
+        auto* messages = RE::UIMessageQueue::GetSingleton();
+        if (!messages) {
+            logger::error("Persistent profile restore could not close the Journal Menu");
+            return;
+        }
+
+        messages->AddMessage(RE::JournalMenu::MENU_NAME.data(), RE::UI_MESSAGE_TYPE::kHide, nullptr);
+        HUD::GetSingleton()->ShowRestoreMenuWarning();
+        logger::warn("Journal Menu opened during profile restore and was closed");
+    }
+
     void Restore::RunNextAction(uint64_t a_loadedGameSession, uint64_t a_taskID)
     {
         std::lock_guard lock(restoreMutex);
         // Ignore callbacks from an older loaded game or an action that has already been replaced.
-        if (a_loadedGameSession != loadedGameSession || a_taskID != scheduledTaskID || currentActionIndex >= actions.size()) {
+        if (a_loadedGameSession != loadedGameSession || a_taskID != scheduledTaskID || !restoring) {
+            return;
+        }
+        if (currentActionIndex >= actions.size()) {
+            FinishRestore();
+            return;
+        }
+        if (auto* ui = RE::UI::GetSingleton()) {
+            journalMenuOpen = ui->IsMenuOpen(RE::JournalMenu::MENU_NAME);
+        }
+        if (journalMenuOpen) {
+            CloseJournalMenu();
+            QueueNextAction(GetSettings().actionTrialDelaySeconds);
             return;
         }
 
@@ -249,8 +308,9 @@ namespace MCMMemory
 
         ++currentActionIndex;
         if (currentActionIndex >= actions.size()) {
-            logger::info("Persistent profile restoration completed: {} applied, {} unchanged, {} skipped", stats.appliedSettingCount, stats.unchangedSettingCount, stats.skippedSettingCount);
-            HUD::GetSingleton()->ShowRestoreSummary(stats);
+            if (!dispatched) {
+                FinishRestore();
+            }
             return;
         }
 

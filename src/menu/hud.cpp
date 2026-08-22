@@ -7,6 +7,11 @@ namespace MCMMemory
     inline constexpr float HUDMargin{ 30.0F };
     inline constexpr float HUDHorizontalPadding{ 12.0F };
     inline constexpr float HUDVerticalPadding{ 7.0F };
+    inline constexpr float HUDWarningAccentWidth{ 6.0F };
+    inline constexpr float HUDWarningHorizontalPadding{ 20.0F };
+    inline constexpr float HUDWarningVerticalPadding{ 12.0F };
+    inline constexpr float HUDWarningLineGap{ 7.0F };
+    inline constexpr float HUDWarningScale{ 1.35F };
 
     void HUD::Configure(const Settings& a_settings)
     {
@@ -52,6 +57,7 @@ namespace MCMMemory
         std::lock_guard lock(hudMutex);
         notificationQueue.clear();
         display.Reset();
+        warning.Reset();
         menuResumeAt = {};
         gameMenuBlocked = false;
     }
@@ -167,6 +173,14 @@ namespace MCMMemory
             message.segments.push_back({ std::format("    {}", Trans::Tr(a_detail)), HUDColor::Muted });
         }
         QueueFailure(std::move(message));
+    }
+
+    void HUD::ShowRestoreMenuWarning()
+    {
+        std::lock_guard lock(hudMutex);
+        warning.startedAt = {};
+        warning.pausedAt = {};
+        warning.active = true;
     }
 
     void HUD::Preview()
@@ -359,6 +373,89 @@ namespace MCMMemory
         }
     }
 
+    void HUD::UpdateRestoreMenuWarning(bool a_blocked, const std::chrono::steady_clock::time_point& a_now)
+    {
+        if (!warning.active) {
+            return;
+        }
+        if (a_blocked) {
+            if (warning.startedAt.time_since_epoch().count() != 0 && warning.pausedAt.time_since_epoch().count() == 0) {
+                warning.pausedAt = a_now;
+            }
+            return;
+        }
+        if (warning.pausedAt.time_since_epoch().count() != 0) {
+            warning.startedAt += a_now - warning.pausedAt;
+            warning.pausedAt = {};
+        }
+        if (warning.startedAt.time_since_epoch().count() == 0) {
+            warning.startedAt = a_now;
+        }
+
+        const float age = std::chrono::duration<float>(a_now - warning.startedAt).count();
+        if (age >= options.warningDurationSeconds) {
+            warning.Reset();
+            return;
+        }
+
+        float alpha = 1.0F;
+        const float fadeSeconds = std::min(options.fadeSeconds, options.warningDurationSeconds);
+        const float fadeAt = options.warningDurationSeconds - fadeSeconds;
+        if (fadeSeconds > 0.0F && age > fadeAt) {
+            alpha = 1.0F - (age - fadeAt) / fadeSeconds;
+        }
+        DrawRestoreMenuWarning(alpha);
+    }
+
+    void HUD::DrawRestoreMenuWarning(float a_alpha) const
+    {
+        if (a_alpha <= 0.0F) {
+            return;
+        }
+
+        auto* drawList = GUI::GetForegroundDrawList();
+        auto* io = GUI::GetIO();
+        auto* font = GUI::GetFont();
+        if (!drawList || !io || !font || io->DisplaySize.x <= 0.0F || io->DisplaySize.y <= 0.0F) {
+            return;
+        }
+
+        const auto title = Trans::Tr("Game menu closed");
+        const auto detail = Trans::Tr("MCM restore is still running");
+        const GUI::ImVec2 titleSize = GUI::CalcTextSize(title.c_str(), nullptr, false, 0.0F);
+        const GUI::ImVec2 detailSize = GUI::CalcTextSize(detail.c_str(), nullptr, false, 0.0F);
+        const float textWidth = std::max(titleSize.x, detailSize.x);
+        const float availableWidth = io->DisplaySize.x - 2.0F * HUDMargin - 2.0F * HUDWarningHorizontalPadding;
+        if (textWidth <= 0.0F || availableWidth <= 0.0F) {
+            return;
+        }
+
+        const float requestedScale = static_cast<float>(options.fontScale) / 100.0F * HUDWarningScale;
+        const float fontScale = std::min(requestedScale, availableWidth / textWidth);
+        const float lineHeight = font->FontSize * fontScale;
+        const float scaledWidth = textWidth * fontScale;
+        const float cardWidth = scaledWidth + 2.0F * HUDWarningHorizontalPadding + HUDWarningAccentWidth;
+        const float cardHeight = 2.0F * lineHeight + HUDWarningLineGap + 2.0F * HUDWarningVerticalPadding;
+        const GUI::ImVec2 cardMin{ (io->DisplaySize.x - cardWidth) * 0.5F, (io->DisplaySize.y - cardHeight) * 0.5F };
+        const GUI::ImVec2 cardMax{ cardMin.x + cardWidth, cardMin.y + cardHeight };
+        const GUI::ImVec2 accentMax{ cardMin.x + HUDWarningAccentWidth, cardMax.y };
+        const float textX = cardMin.x + HUDWarningAccentWidth + HUDWarningHorizontalPadding;
+        const float titleY = cardMin.y + HUDWarningVerticalPadding;
+        const float detailY = titleY + lineHeight + HUDWarningLineGap;
+        const auto backgroundColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.04F, 0.04F, 0.05F, 0.90F * a_alpha });
+        const auto accentColor = GUI::ColorConvertFloat4ToU32(GetColor(HUDColor::Warning, a_alpha));
+        const auto titleColor = GUI::ColorConvertFloat4ToU32(GetColor(HUDColor::Warning, a_alpha));
+        const auto detailColor = GUI::ColorConvertFloat4ToU32(GetColor(HUDColor::Primary, a_alpha));
+        const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.85F * a_alpha });
+
+        GUI::ImDrawListManager::AddRectFilled(drawList, cardMin, cardMax, backgroundColor, 5.0F, 0);
+        GUI::ImDrawListManager::AddRectFilled(drawList, cardMin, accentMax, accentColor, 5.0F, 0);
+        GUI::ImDrawListManager::AddText(drawList, font, lineHeight, GUI::ImVec2{ textX + 1.0F, titleY + 1.0F }, shadowColor, title.c_str());
+        GUI::ImDrawListManager::AddText(drawList, font, lineHeight, GUI::ImVec2{ textX, titleY }, titleColor, title.c_str());
+        GUI::ImDrawListManager::AddText(drawList, font, lineHeight, GUI::ImVec2{ textX + 1.0F, detailY + 1.0F }, shadowColor, detail.c_str());
+        GUI::ImDrawListManager::AddText(drawList, font, lineHeight, GUI::ImVec2{ textX, detailY }, detailColor, detail.c_str());
+    }
+
     std::string HUD::GetDisplayModName(std::string_view a_modName) const
     {
         std::string modName{ a_modName };
@@ -378,16 +475,16 @@ namespace MCMMemory
 
     void HUD::Render()
     {
-        if (!enabled.load(std::memory_order_relaxed)) {
-            return;
-        }
-
         const auto now = std::chrono::steady_clock::now();
         const bool blocked = SKSEMenuFramework::IsAnyBlockingWindowOpened();
         const auto* menuWindow = SKSEMenuFramework::GetMainWindow();
         const bool menuOpen = menuWindow && menuWindow->IsOpen.load(std::memory_order_relaxed);
 
         std::lock_guard lock(hudMutex);
+        UpdateRestoreMenuWarning(blocked && !menuOpen, now);
+        if (!enabled.load(std::memory_order_relaxed)) {
+            return;
+        }
         if (UpdateMenuDelay(blocked && !menuOpen, now)) {
             return;
         }

@@ -17,6 +17,12 @@ namespace MCMMemory::Menu
         }
     }
 
+    inline void PushButtonColors(const Color::ButtonColors& a_colors)
+    {
+        GUI::PushStyleColor(GUI::ImGuiCol_ButtonHovered, a_colors.hover);
+        GUI::PushStyleColor(GUI::ImGuiCol_ButtonActive, a_colors.active);
+    }
+
     inline void PushCTAButtonColors(const Color::CTAColors& a_colors)
     {
         GUI::PushStyleColor(GUI::ImGuiCol_Button, a_colors.background);
@@ -115,6 +121,69 @@ namespace MCMMemory::Menu
         GUI::PopStyleColor(4);
         GUI::PopStyleVar();
         return clicked && a_enabled;
+    }
+
+    inline bool IconButton(const char* a_label, const unsigned a_icon, const Color::ButtonColors& a_colors)
+    {
+        constexpr float horizontalPadding{ 14.0F };
+        constexpr float verticalPadding{ 6.0F };
+        constexpr float iconSpacing{ 8.0F };
+
+        const auto iconText = FontAwesome::UnicodeToUtf8(a_icon);
+        const auto* labelFont = GUI::GetFont();
+        const float labelFontSize = GUI::GetFontSize();
+        const GUI::ImVec2 labelSize = GUI::CalcTextSize(a_label, nullptr, false, -1.0F);
+
+        FontAwesome::PushSolid();
+        const auto* iconFont = GUI::GetFont();
+        const float iconFontSize = GUI::GetFontSize();
+        const GUI::ImVec2 iconSize = GUI::CalcTextSize(iconText.c_str(), nullptr, false, -1.0F);
+        FontAwesome::Pop();
+
+        const float contentWidth = iconSize.x + iconSpacing + labelSize.x;
+        const float contentHeight = std::max(iconSize.y, labelSize.y);
+        const GUI::ImVec2 buttonSize{ contentWidth + horizontalPadding * 2.0F, contentHeight + verticalPadding * 2.0F };
+        const auto buttonID = std::format("##IconButton-{}", a_label);
+
+        GUI::PushStyleVar(GUI::ImGuiStyleVar_FrameRounding, 6.0F);
+
+        PushButtonColors(a_colors);
+
+        const bool clicked = GUI::Button(buttonID.c_str(), buttonSize);
+        const GUI::ImVec2 buttonMin = GUI::GetItemRectMin();
+        const GUI::ImVec2 buttonMax = GUI::GetItemRectMax();
+        const float contentX = buttonMin.x + ((buttonMax.x - buttonMin.x - contentWidth) * 0.5F);
+        const GUI::ImVec2 iconPosition{
+            contentX,
+            buttonMin.y + ((buttonMax.y - buttonMin.y - iconSize.y) * 0.5F)
+        };
+        const GUI::ImVec2 labelPosition{
+            contentX + iconSize.x + iconSpacing,
+            buttonMin.y + ((buttonMax.y - buttonMin.y - labelSize.y) * 0.5F)
+        };
+        const auto contentColor = GUI::GetColorU32(a_colors.text);
+
+        GUI::ImDrawListManager::AddText(
+            GUI::GetWindowDrawList(),
+            iconFont,
+            iconFontSize,
+            iconPosition,
+            contentColor,
+            iconText.c_str()
+        );
+        GUI::ImDrawListManager::AddText(
+            GUI::GetWindowDrawList(),
+            labelFont,
+            labelFontSize,
+            labelPosition,
+            contentColor,
+            a_label
+        );
+
+        GUI::PopStyleColor(4);
+        GUI::PopStyleVar();
+
+        return clicked;
     }
 
     void Register();

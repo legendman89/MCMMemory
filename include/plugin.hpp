@@ -34,6 +34,18 @@ namespace logger = SKSE::log;
 
 namespace MCMMemory
 {
+    inline std::atomic<bool> gameLoaded{};
+
+    inline bool IsGameLoaded()
+    {
+        return gameLoaded.load(std::memory_order_relaxed);
+    }
+
+    inline void SetGameLoaded(bool a_loaded)
+    {
+        gameLoaded.store(a_loaded, std::memory_order_relaxed);
+    }
+
     inline std::filesystem::path GetPluginDataPath()
     {
         auto executable = std::filesystem::path(REL::Module::get().filename());

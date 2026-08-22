@@ -77,6 +77,22 @@ namespace MCMMemory
         }
     };
 
+    struct HUDWarning
+    {
+        std::chrono::steady_clock::time_point startedAt{};
+
+        std::chrono::steady_clock::time_point pausedAt{};
+
+        bool active{};
+
+        void Reset()
+        {
+            startedAt = {};
+            pausedAt = {};
+            active = false;
+        }
+    };
+
     struct HUDOptions
     {
 #define DECLARE_HUD_OPTION(type, settingName, defaultValue, optionName, minimum, maximum, label, format) type optionName{ defaultValue };
@@ -117,6 +133,8 @@ namespace MCMMemory
         void ShowRestoreSummary(const RestoreStats& a_stats);
 
         void ShowFailure(std::string_view a_title, std::string_view a_detail);
+
+        void ShowRestoreMenuWarning();
 
         void Preview();
 
@@ -172,6 +190,10 @@ namespace MCMMemory
 
         void DrawMessage(const HUDMessage& a_message, float a_alpha) const;
 
+        void UpdateRestoreMenuWarning(bool a_blocked, const std::chrono::steady_clock::time_point& a_now);
+
+        void DrawRestoreMenuWarning(float a_alpha) const;
+
         std::string GetDisplayModName(std::string_view a_modName) const;
 
         std::mutex hudMutex;
@@ -180,6 +202,8 @@ namespace MCMMemory
         std::deque<HUDMessage> notificationQueue;
 
         HUDDisplay display;
+
+        HUDWarning warning;
 
         std::chrono::steady_clock::time_point menuResumeAt{};
 

@@ -211,7 +211,7 @@ namespace MCMMemory
         void operator()() const;
     };
 
-    class Restore : public RE::BSTEventSink<SKSE::ModCallbackEvent>
+    class Restore : public RE::BSTEventSink<SKSE::ModCallbackEvent>, public RE::BSTEventSink<RE::MenuOpenCloseEvent>
     {
     public:
 
@@ -224,7 +224,7 @@ namespace MCMMemory
         inline bool IsRunning()
         {
             std::lock_guard lock(restoreMutex);
-            return registryCheckQueued || (started && currentActionIndex < actions.size());
+            return registryCheckQueued || restoring;
         }
 
         bool Install();
@@ -235,6 +235,9 @@ namespace MCMMemory
 
         // Waits for a stable MCM registry before starting restoration.
         RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;
+
+        // Prevents the Journal Menu from opening while restore controls MCM scripts.
+        RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) override;
 
     private:
 
@@ -301,8 +304,13 @@ namespace MCMMemory
         // Builds the queue and schedules its first action.
         void StartRestore();
 
+        // Releases the menu only after the last script call returns.
+        void FinishRestore();
+
         // Adds the current MCM result to the full restore result.
         void FinishMCMStats(size_t a_mcmIndex);
+
+        void CloseJournalMenu();
 
         void Clear();
 
@@ -341,12 +349,17 @@ namespace MCMMemory
         // Prevents the restore queue from starting more than once.
         bool started{};
 
+        // Keeps the Journal Menu closed until the final script call finishes.
+        bool restoring{};
+
         // Prevents repeated ready events from queuing the same registry check.
         bool registryCheckQueued{};
 
         bool manualRequest{};
 
         bool requestFailed{};
+
+        bool journalMenuOpen{};
     };
 
     inline void RegistryCheckTask::operator()() const

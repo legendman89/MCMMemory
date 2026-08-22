@@ -26,14 +26,15 @@ namespace MCMMemory::Menu
     void __stdcall RenderProfile()
     {
         const bool operationRunning = Backup::GetSingleton()->IsRunning() || Restore::GetSingleton()->IsRunning();
+        const bool operationAvailable = IsGameLoaded() && !operationRunning;
 
-        if (IconCTAButton(Trans::Tr("Back Up Now").c_str(), !operationRunning, Icons::kSave, Color::kBackupButtonColors)) {
+        if (IconCTAButton(Trans::Tr("Back Up Now").c_str(), operationAvailable, Icons::kSave, Color::kBackupButtonColors)) {
             Backup::GetSingleton()->Start();
         }
 
         GUI::SameLine();
 
-        if (IconCTAButton(Trans::Tr("Restore Now").c_str(), !operationRunning, Icons::kRestore, Color::kRestoreButtonColors)) {
+        if (IconCTAButton(Trans::Tr("Restore Now").c_str(), operationAvailable, Icons::kRestore, Color::kRestoreButtonColors)) {
             Restore::GetSingleton()->Start();
         }
 
@@ -42,7 +43,7 @@ namespace MCMMemory::Menu
         auto& settings = GetSettings();
         bool settingsChanged{};
 
-        if (GUI::CollapsingHeader(Trans::Tr("Automation").c_str(), 0)) {
+        if (GUI::CollapsingHeader(Trans::Tr("Automation").c_str(), GUI::ImGuiTreeNodeFlags_DefaultOpen)) {
             if (GUI::Checkbox(Trans::Tr("Automatic backup").c_str(), std::addressof(settings.autoBackup))) {
                 settingsChanged = true;
             }
@@ -53,16 +54,21 @@ namespace MCMMemory::Menu
 
         GUI::Spacing();
 
-        if (GUI::CollapsingHeader(Trans::Tr("HUD Notifications").c_str(), 0)) {
+        if (GUI::CollapsingHeader(Trans::Tr("HUD Notifications").c_str(), GUI::ImGuiTreeNodeFlags_DefaultOpen)) {
+
             if (GUI::Checkbox(Trans::Tr("Show backup and restore notifications").c_str(), std::addressof(settings.notifications))) {
                 settingsChanged = true;
             }
+
             GUI::BeginDisabled(!settings.notifications);
+
             if (GUI::Checkbox(Trans::Tr("Show individual MCM results").c_str(), std::addressof(settings.individualMCMNotifications))) {
                 settingsChanged = true;
             }
-            GUI::SameLine();
-            if (GUI::Button(Trans::Tr("Preview").c_str())) {
+
+            GUI::SameLine(0.0F, 18.0F);
+
+            if (IconButton(Trans::Tr("Preview").c_str(), Icons::kPreview, Color::kPreviewButtonColors)) {
                 HUD::GetSingleton()->Preview();
             }
 
@@ -82,6 +88,14 @@ namespace MCMMemory::Menu
             FOREACH_HUD_APPEARANCE_SETTING(DRAW_HUD_APPEARANCE_SETTING)
 #undef DRAW_HUD_APPEARANCE_SETTING
             GUI::EndDisabled();
+
+            GUI::SeparatorText(Trans::Tr("Restore Warning").c_str());
+#define DRAW_HUD_WARNING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+            if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
+                settingsChanged = true; \
+            }
+            FOREACH_HUD_WARNING_SETTING(DRAW_HUD_WARNING_SETTING)
+#undef DRAW_HUD_WARNING_SETTING
         }
 
         if (settingsChanged) {

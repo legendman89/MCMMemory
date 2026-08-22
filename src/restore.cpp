@@ -71,12 +71,6 @@ namespace MCMMemory
         logger::info("Persistent profile restore event reset");
     }
 
-    bool Restore::IsRunning()
-    {
-        std::lock_guard lock(restoreMutex);
-        return registryCheckQueued || (started && currentActionIndex < actions.size());
-    }
-
     RE::BSEventNotifyControl Restore::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
     {
         // SkyUI sends this after its config manager has started registering MCMs.
@@ -155,6 +149,9 @@ namespace MCMMemory
             return;
         }
 
+        if (!manualRequest) {
+            HUD::GetSingleton()->ShowRestoreStarted();
+        }
         logger::info("Starting persistent profile restoration with {} actions", actions.size());
         QueueNextAction(0.0F);
     }

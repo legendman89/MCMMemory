@@ -23,6 +23,12 @@ namespace MCMMemory
         Finish
     };
 
+    enum class BackupRequestType
+    {
+        Manual,
+        Automatic
+    };
+
     struct BackupPage
     {
         std::string name;
@@ -49,13 +55,20 @@ namespace MCMMemory
             return std::addressof(singleton);
         }
 
+        inline bool Start()
+        {
+            return Begin(BackupRequestType::Manual);
+        }
+
+        inline bool IsRunning()
+        {
+            std::lock_guard lock(backupMutex);
+            return running;
+        }
+
         bool Install();
 
-        bool Start();
-
         void Reset();
-
-        bool IsRunning();
 
         RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;
 
@@ -71,6 +84,8 @@ namespace MCMMemory
                 running = false;
             }
         }
+
+        bool Begin(BackupRequestType a_requestType);
 
         void RunNextStep(uint64_t a_loadedGameSession, uint64_t a_taskID);
 
@@ -135,6 +150,8 @@ namespace MCMMemory
         uint32_t scriptWaitCount{};
 
         BackupStep step{ BackupStep::Registry };
+
+        BackupRequestType requestType{ BackupRequestType::Manual };
 
         bool installed{};
 

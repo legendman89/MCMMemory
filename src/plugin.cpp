@@ -28,7 +28,7 @@ namespace MCMMemory
                     logger::critical("MCM Memory settings could not be loaded");
                     break;
                 }
-                HUD::GetSingleton()->Configure(GetSettings().notifications, GetSettings().individualMCMNotifications);
+                HUD::GetSingleton()->Configure(GetSettings());
                 Backup::GetSingleton()->Install();
                 Capture::GetSingleton()->Install();
                 Restore::GetSingleton()->Install();

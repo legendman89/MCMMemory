@@ -7,7 +7,7 @@ namespace MCMMemory
 {
     struct Settings
     {
-#define DECLARE_SETTING(type, name, defaultValue) type name{ defaultValue };
+#define DECLARE_SETTING(type, name, defaultValue, ...) type name{ defaultValue };
         FOREACH_SETTING(DECLARE_SETTING)
 #undef DECLARE_SETTING
     };

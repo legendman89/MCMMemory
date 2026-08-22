@@ -7,7 +7,7 @@ namespace MCMMemory
     bool SettingsStorage::Save()
     {
         nlohmann::json document;
-#define WRITE_SETTING(type, name, defaultValue) document[#name] = GetSettings().name;
+#define WRITE_SETTING(type, name, defaultValue, ...) document[#name] = GetSettings().name;
         FOREACH_SETTING(WRITE_SETTING)
 #undef WRITE_SETTING
 
@@ -37,7 +37,7 @@ namespace MCMMemory
 
         try {
             auto document = nlohmann::json::parse(stream);
-#define READ_SETTING(type, name, defaultValue) JSON::ReadValue(document, #name, settings.name);
+#define READ_SETTING(type, name, defaultValue, ...) JSON::ReadValue(document, #name, settings.name);
             FOREACH_SETTING(READ_SETTING)
 #undef READ_SETTING
         }
@@ -50,21 +50,16 @@ namespace MCMMemory
             logger::error("actionTrialDelaySeconds {} is outside the supported range 0.05 through 10.0", settings.actionTrialDelaySeconds);
             return false;
         }
-        if (settings.notificationFontScale < 50 || settings.notificationFontScale > 200) {
-            logger::error("notificationFontScale {} is outside the supported range 50 through 200", settings.notificationFontScale);
-            return false;
+#define VALIDATE_HUD_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+        if (settings.settingName < minimum || settings.settingName > maximum) { \
+            logger::error(#settingName " {} is outside the supported range {} through {}", settings.settingName, minimum, maximum); \
+            return false; \
         }
-        if (settings.notificationDurationSeconds < 0.5F || settings.notificationDurationSeconds > 15.0F) {
-            logger::error("notificationDurationSeconds {} is outside the supported range 0.5 through 15.0", settings.notificationDurationSeconds);
-            return false;
-        }
-        if (settings.notificationFadeSeconds < 0.0F || settings.notificationFadeSeconds > 5.0F) {
-            logger::error("notificationFadeSeconds {} is outside the supported range 0.0 through 5.0", settings.notificationFadeSeconds);
-            return false;
-        }
+        FOREACH_HUD_SETTING(VALIDATE_HUD_SETTING)
+#undef VALIDATE_HUD_SETTING
 
         GetSettings() = settings;
-        logger::info("Loaded settings: autoBackup={}, autoRestore={}, notifications={}, individualMCMNotifications={}, actionTrialDelaySeconds={}, captureRawRecords={}", settings.autoBackup, settings.autoRestore, settings.notifications, settings.individualMCMNotifications, settings.actionTrialDelaySeconds, settings.captureRawRecords);
+        logger::info("Loaded settings: autoBackup={}, autoRestore={}, notifications={}, individualMCMNotifications={}, startDelay={}, menuCloseDelay={}, summaryDelay={}, messageGap={}, actionTrialDelaySeconds={}, captureRawRecords={}", settings.autoBackup, settings.autoRestore, settings.notifications, settings.individualMCMNotifications, settings.notificationStartDelaySeconds, settings.notificationMenuCloseDelaySeconds, settings.notificationSummaryDelaySeconds, settings.notificationGapSeconds, settings.actionTrialDelaySeconds, settings.captureRawRecords);
         return true;
     }
 }

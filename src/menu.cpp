@@ -24,8 +24,6 @@ namespace MCMMemory::Menu
 
     void __stdcall RenderProfile()
     {
-        GUI::TextUnformatted(Trans::Tr(BEAUTIFUL_NAME).c_str());
-
         const bool operationRunning = Backup::GetSingleton()->IsRunning() || Restore::GetSingleton()->IsRunning();
         GUI::BeginDisabled(operationRunning);
         if (GUI::Button(Trans::Tr("Back Up Now").c_str())) {
@@ -38,47 +36,54 @@ namespace MCMMemory::Menu
         GUI::EndDisabled();
 
         GUI::Spacing();
-        GUI::SeparatorText(Trans::Tr("Automation").c_str());
 
         auto& settings = GetSettings();
         bool settingsChanged{};
-        if (GUI::Checkbox(Trans::Tr("Automatic backup").c_str(), std::addressof(settings.autoBackup))) {
-            settingsChanged = true;
-        }
-        if (GUI::Checkbox(Trans::Tr("Automatic restore").c_str(), std::addressof(settings.autoRestore))) {
-            settingsChanged = true;
+
+        if (GUI::CollapsingHeader(Trans::Tr("Automation").c_str(), 0)) {
+            if (GUI::Checkbox(Trans::Tr("Automatic backup").c_str(), std::addressof(settings.autoBackup))) {
+                settingsChanged = true;
+            }
+            if (GUI::Checkbox(Trans::Tr("Automatic restore").c_str(), std::addressof(settings.autoRestore))) {
+                settingsChanged = true;
+            }
         }
 
         GUI::Spacing();
-        GUI::SeparatorText(Trans::Tr("HUD Notifications").c_str());
 
-        if (GUI::Checkbox(Trans::Tr("Show backup and restore notifications").c_str(), std::addressof(settings.notifications))) {
-            settingsChanged = true;
-        }
-        GUI::BeginDisabled(!settings.notifications);
-        if (GUI::Checkbox(Trans::Tr("Show individual MCM results").c_str(), std::addressof(settings.individualMCMNotifications))) {
-            settingsChanged = true;
-        }
-        GUI::SameLine();
-        if (GUI::Button(Trans::Tr("Preview").c_str())) {
-            HUD::GetSingleton()->Preview();
-        }
+        if (GUI::CollapsingHeader(Trans::Tr("HUD Notifications").c_str(), 0)) {
+            if (GUI::Checkbox(Trans::Tr("Show backup and restore notifications").c_str(), std::addressof(settings.notifications))) {
+                settingsChanged = true;
+            }
+            GUI::BeginDisabled(!settings.notifications);
+            if (GUI::Checkbox(Trans::Tr("Show individual MCM results").c_str(), std::addressof(settings.individualMCMNotifications))) {
+                settingsChanged = true;
+            }
+            GUI::SameLine();
+            if (GUI::Button(Trans::Tr("Preview").c_str())) {
+                HUD::GetSingleton()->Preview();
+            }
 
-        if (GUI::CollapsingHeader(Trans::Tr("Appearance").c_str(), 0)) {
-            if (GUI::SliderInt(Trans::Tr("Font scale").c_str(), std::addressof(settings.notificationFontScale), 50, 200, "%d%%")) {
-                settingsChanged = true;
+            GUI::SeparatorText(Trans::Tr("Timing").c_str());
+#define DRAW_HUD_TIMING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+            if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
+                settingsChanged = true; \
             }
-            if (GUI::SliderFloat(Trans::Tr("Display duration").c_str(), std::addressof(settings.notificationDurationSeconds), 0.5F, 15.0F, "%.1f s")) {
-                settingsChanged = true;
+            FOREACH_HUD_TIMING_SETTING(DRAW_HUD_TIMING_SETTING)
+#undef DRAW_HUD_TIMING_SETTING
+
+            GUI::SeparatorText(Trans::Tr("Appearance").c_str());
+#define DRAW_HUD_APPEARANCE_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+            if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
+                settingsChanged = true; \
             }
-            if (GUI::SliderFloat(Trans::Tr("Fade duration").c_str(), std::addressof(settings.notificationFadeSeconds), 0.0F, 5.0F, "%.1f s")) {
-                settingsChanged = true;
-            }
+            FOREACH_HUD_APPEARANCE_SETTING(DRAW_HUD_APPEARANCE_SETTING)
+#undef DRAW_HUD_APPEARANCE_SETTING
+            GUI::EndDisabled();
         }
-        GUI::EndDisabled();
 
         if (settingsChanged) {
-            HUD::GetSingleton()->Configure(settings.notifications, settings.individualMCMNotifications);
+            HUD::GetSingleton()->Configure(settings);
             if (!SettingsStorage::Save()) {
                 logger::error("MCM Memory menu could not save its settings");
             }

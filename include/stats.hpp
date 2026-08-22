@@ -3,17 +3,25 @@
 #include <cstdint>
 #include <cstring>
 
+#define FOREACH_BACKUP_STAT(STAT) \
+    STAT(MCMCount) \
+    STAT(settingCount) \
+    STAT(skippedSettingCount) \
+    STAT(failedMCMCount)
+
+#define FOREACH_RESTORE_STAT(STAT) \
+    STAT(MCMCount) \
+    STAT(appliedSettingCount) \
+    STAT(unchangedSettingCount) \
+    STAT(skippedSettingCount)
+
 namespace MCMMemory
 {
     struct BackupStats
     {
-        uint32_t MCMCount{};
-
-        uint32_t settingCount{};
-
-        uint32_t skippedSettingCount{};
-
-        uint32_t failedMCMCount{};
+#define DECLARE_STAT(name) uint32_t name{};
+        FOREACH_BACKUP_STAT(DECLARE_STAT)
+#undef DECLARE_STAT
 
         void Reset()
         {
@@ -22,23 +30,18 @@ namespace MCMMemory
 
         BackupStats& operator+=(const BackupStats& a_other)
         {
-            MCMCount += a_other.MCMCount;
-            settingCount += a_other.settingCount;
-            skippedSettingCount += a_other.skippedSettingCount;
-            failedMCMCount += a_other.failedMCMCount;
+#define ADD_STAT(name) name += a_other.name;
+            FOREACH_BACKUP_STAT(ADD_STAT)
+#undef ADD_STAT
             return *this;
         }
     };
 
     struct RestoreStats
     {
-        uint32_t MCMCount{};
-
-        uint32_t appliedSettingCount{};
-
-        uint32_t unchangedSettingCount{};
-
-        uint32_t skippedSettingCount{};
+#define DECLARE_STAT(name) uint32_t name{};
+        FOREACH_RESTORE_STAT(DECLARE_STAT)
+#undef DECLARE_STAT
 
         void Reset()
         {
@@ -47,11 +50,13 @@ namespace MCMMemory
 
         RestoreStats& operator+=(const RestoreStats& a_other)
         {
-            MCMCount += a_other.MCMCount;
-            appliedSettingCount += a_other.appliedSettingCount;
-            unchangedSettingCount += a_other.unchangedSettingCount;
-            skippedSettingCount += a_other.skippedSettingCount;
+#define ADD_STAT(name) name += a_other.name;
+            FOREACH_RESTORE_STAT(ADD_STAT)
+#undef ADD_STAT
             return *this;
         }
     };
 }
+
+#undef FOREACH_BACKUP_STAT
+#undef FOREACH_RESTORE_STAT

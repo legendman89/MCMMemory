@@ -26,7 +26,7 @@ namespace MCMMemory
         return true;
     }
 
-    bool Backup::Start()
+    bool Backup::Begin(BackupRequestType a_requestType)
     {
         std::lock_guard lock(backupMutex);
         if (running) {
@@ -44,11 +44,12 @@ namespace MCMMemory
         }
 
         Clear();
+        requestType = a_requestType;
         profile = std::move(existingProfile);
         running = true;
         logger::info("Full MCM backup is waiting for a stable registry");
         QueueNext(0.0F);
-        if (running) {
+        if (running && requestType == BackupRequestType::Manual) {
             HUD::GetSingleton()->ShowBackupStarted();
         }
         return running;
@@ -71,6 +72,7 @@ namespace MCMMemory
         scriptWaitCount = 0;
         scheduledTaskID = 0;
         step = BackupStep::Registry;
+        requestType = BackupRequestType::Manual;
         mcmFailed = false;
         running = false;
     }
@@ -82,12 +84,6 @@ namespace MCMMemory
         Clear();
         initialBackupChecked = false;
         logger::info("Full MCM backup reset");
-    }
-
-    bool Backup::IsRunning()
-    {
-        std::lock_guard lock(backupMutex);
-        return running;
     }
 
     RE::BSEventNotifyControl Backup::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
@@ -116,7 +112,7 @@ namespace MCMMemory
             std::lock_guard lock(backupMutex);
             initialBackupChecked = false;
         }
-        else if (!profileExists && !Start()) {
+        else if (!profileExists && !Begin(BackupRequestType::Automatic)) {
             std::lock_guard lock(backupMutex);
             initialBackupChecked = false;
         }
@@ -185,6 +181,9 @@ namespace MCMMemory
             registeredMCMs = std::move(currentMCMs);
             step = BackupStep::OpenMCM;
             logger::info("Full MCM backup found {} stable registered MCMs", registeredMCMs.size());
+            if (requestType == BackupRequestType::Automatic) {
+                HUD::GetSingleton()->ShowBackupStarted();
+            }
             QueueNext(0.0F);
             return;
         }

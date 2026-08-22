@@ -4,21 +4,46 @@
 
 namespace MCMMemory
 {
-
-    // HUD drawing based on Log Watcher code.
-
-    inline constexpr float HUDGapSeconds{ 0.5F };
-    inline constexpr float HUDNotificationDelaySeconds{ 2.0F };
     inline constexpr float HUDMargin{ 30.0F };
     inline constexpr float HUDHorizontalPadding{ 12.0F };
     inline constexpr float HUDVerticalPadding{ 7.0F };
 
-    void HUD::Configure(bool a_enabled, bool a_individualMCMs)
+    void HUD::Configure(const Settings& a_settings)
     {
-        enabled.store(a_enabled, std::memory_order_relaxed);
-        individualMCMs.store(a_individualMCMs, std::memory_order_relaxed);
-        if (!a_enabled) {
-            Reset();
+        enabled.store(a_settings.notifications, std::memory_order_relaxed);
+        individualMCMs.store(a_settings.individualMCMNotifications, std::memory_order_relaxed);
+
+        std::lock_guard lock(hudMutex);
+#define COPY_HUD_OPTION(type, settingName, defaultValue, optionName, minimum, maximum, label, format) options.optionName = a_settings.settingName;
+        FOREACH_HUD_SETTING(COPY_HUD_OPTION)
+#undef COPY_HUD_OPTION
+
+        if (!a_settings.notifications) {
+            notificationQueue.clear();
+            display.Reset();
+            menuResumeAt = {};
+            gameMenuBlocked = false;
+            return;
+        }
+
+        for (auto& message : notificationQueue) {
+            const auto delay = std::chrono::duration<float>(GetDelaySeconds(message.type));
+            message.showAt = message.createdAt + std::chrono::duration_cast<std::chrono::steady_clock::duration>(delay);
+        }
+
+        if (!a_settings.individualMCMNotifications) {
+            auto message = notificationQueue.begin();
+            while (message != notificationQueue.end()) {
+                if (message->type == HUDMessageType::MCMResult) {
+                    message = notificationQueue.erase(message);
+                }
+                else {
+                    ++message;
+                }
+            }
+            if (display.active && display.message.type == HUDMessageType::MCMResult) {
+                display.Reset();
+            }
         }
     }
 
@@ -27,28 +52,20 @@ namespace MCMMemory
         std::lock_guard lock(hudMutex);
         notificationQueue.clear();
         display.Reset();
+        menuResumeAt = {};
+        gameMenuBlocked = false;
     }
 
-    void HUD::ShowBackupStarted()
+    void HUD::ShowOperationStarted(std::string_view a_text)
     {
         if (!enabled.load(std::memory_order_relaxed)) {
             return;
         }
 
         HUDMessage message;
-        message.segments.push_back({ Trans::Tr("Backing up MCM settings"), HUDColor::Accent });
-        ShowNow(std::move(message));
-    }
-
-    void HUD::ShowRestoreStarted()
-    {
-        if (!enabled.load(std::memory_order_relaxed)) {
-            return;
-        }
-
-        HUDMessage message;
-        message.segments.push_back({ Trans::Tr("Restoring MCM settings"), HUDColor::Accent });
-        ShowNow(std::move(message));
+        message.type = HUDMessageType::OperationStarted;
+        message.segments.push_back({ Trans::Tr(a_text), HUDColor::Accent });
+        BeginOperation(std::move(message));
     }
 
     void HUD::ShowBackupMCM(std::string_view a_modName, const BackupStats& a_stats)
@@ -58,6 +75,7 @@ namespace MCMMemory
         }
 
         HUDMessage message;
+        message.type = HUDMessageType::MCMResult;
         const auto modName = GetDisplayModName(a_modName);
         if (a_stats.failedMCMCount > 0) {
             message.segments.push_back({ Trans::Format("{} backup failed", modName), HUDColor::Error });
@@ -80,6 +98,7 @@ namespace MCMMemory
         }
 
         HUDMessage message;
+        message.type = HUDMessageType::MCMResult;
         const auto modName = GetDisplayModName(a_modName);
         if (a_stats.appliedSettingCount == 0 && a_stats.unchangedSettingCount == 0 && a_stats.skippedSettingCount > 0) {
             message.segments.push_back({ Trans::Format("{} restore skipped", modName), HUDColor::Warning });
@@ -106,7 +125,7 @@ namespace MCMMemory
         }
 
         HUDMessage message;
-        message.showBackupAge = true;
+        message.type = HUDMessageType::BackupSummary;
         message.segments.push_back({ Trans::Format("{} MCMs backed up", a_stats.MCMCount), HUDColor::Success });
         message.segments.push_back({ Trans::Format("    {} settings", a_stats.settingCount), HUDColor::Accent });
         if (a_stats.skippedSettingCount > 0) {
@@ -115,7 +134,7 @@ namespace MCMMemory
         if (a_stats.failedMCMCount > 0) {
             message.segments.push_back({ Trans::Format("    {} MCMs failed", a_stats.failedMCMCount), HUDColor::Error });
         }
-        QueueSummary(std::move(message));
+        QueueMessage(std::move(message));
     }
 
     void HUD::ShowRestoreSummary(const RestoreStats& a_stats)
@@ -125,13 +144,14 @@ namespace MCMMemory
         }
 
         HUDMessage message;
+        message.type = HUDMessageType::RestoreSummary;
         message.segments.push_back({ Trans::Format("{} MCMs restored", a_stats.MCMCount), HUDColor::Success });
         message.segments.push_back({ Trans::Format("    {} changed", a_stats.appliedSettingCount), HUDColor::Accent });
         message.segments.push_back({ Trans::Format("    {} already set", a_stats.unchangedSettingCount), HUDColor::Muted });
         if (a_stats.skippedSettingCount > 0) {
             message.segments.push_back({ Trans::Format("    {} skipped", a_stats.skippedSettingCount), HUDColor::Warning });
         }
-        QueueSummary(std::move(message));
+        QueueMessage(std::move(message));
     }
 
     void HUD::ShowFailure(std::string_view a_title, std::string_view a_detail)
@@ -141,11 +161,12 @@ namespace MCMMemory
         }
 
         HUDMessage message;
+        message.type = HUDMessageType::Failure;
         message.segments.push_back({ Trans::Tr(a_title), HUDColor::Error });
         if (!a_detail.empty()) {
             message.segments.push_back({ std::format("    {}", Trans::Tr(a_detail)), HUDColor::Muted });
         }
-        QueueSummary(std::move(message));
+        QueueFailure(std::move(message));
     }
 
     void HUD::Preview()
@@ -155,53 +176,121 @@ namespace MCMMemory
         }
 
         HUDMessage message;
-        message.showBackupAge = true;
-        message.allowWhileBlocked = true;
+        message.type = HUDMessageType::Preview;
         message.segments.push_back({ Trans::Tr("42 MCMs backed up"), HUDColor::Success });
         message.segments.push_back({ Trans::Tr("    318 settings"), HUDColor::Accent });
 
         const auto now = std::chrono::steady_clock::now();
         std::lock_guard lock(hudMutex);
+        gameMenuBlocked = false;
+        menuResumeAt = {};
         StartMessage(std::move(message), now);
         logger::info("HUD notification preview started");
     }
 
-    void HUD::ShowNow(HUDMessage a_message)
+    void HUD::BeginOperation(HUDMessage a_message)
     {
-        const auto now = std::chrono::steady_clock::now();
         std::lock_guard lock(hudMutex);
+        const auto delay = std::chrono::duration<float>(GetDelaySeconds(a_message.type));
+        a_message.showAt = a_message.createdAt + std::chrono::duration_cast<std::chrono::steady_clock::duration>(delay);
         notificationQueue.clear();
-        StartMessage(std::move(a_message), now);
+        display.Reset();
+        notificationQueue.push_back(std::move(a_message));
     }
 
     void HUD::QueueMessage(HUDMessage a_message)
     {
         std::lock_guard lock(hudMutex);
+        const auto delay = std::chrono::duration<float>(GetDelaySeconds(a_message.type));
+        a_message.showAt = a_message.createdAt + std::chrono::duration_cast<std::chrono::steady_clock::duration>(delay);
         notificationQueue.push_back(std::move(a_message));
     }
 
-    void HUD::QueueSummary(HUDMessage a_message)
+    void HUD::QueueFailure(HUDMessage a_message)
     {
-        const auto now = std::chrono::steady_clock::now();
-        a_message.showAt = now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(HUDNotificationDelaySeconds));
-
-        QueueMessage(std::move(a_message));
-        logger::info("HUD notification queued with a {:.1f} second delay", HUDNotificationDelaySeconds);
+        std::lock_guard lock(hudMutex);
+        a_message.showAt = a_message.createdAt;
+        notificationQueue.clear();
+        notificationQueue.push_back(std::move(a_message));
     }
 
-    void HUD::StartMessage(HUDMessage a_message, const std::chrono::steady_clock::time_point& a_now)
+    bool HUD::UpdateMenuDelay(bool a_blocked, const std::chrono::steady_clock::time_point& a_now)
     {
-        AppendBackupAge(a_message, a_now);
-        display.message = std::move(a_message);
-        display.startedAt = a_now;
-        display.pausedAt = {};
-        display.active = true;
-        display.paused = false;
+        const bool previewActive = display.active && display.message.type == HUDMessageType::Preview;
+        if (a_blocked && !previewActive) {
+            gameMenuBlocked = true;
+            if (display.active && display.pausedAt.time_since_epoch().count() == 0) {
+                display.pausedAt = a_now;
+            }
+            return true;
+        }
+        if (previewActive) {
+            gameMenuBlocked = false;
+            menuResumeAt = {};
+            return false;
+        }
+
+        if (gameMenuBlocked) {
+            gameMenuBlocked = false;
+            if (display.active || !notificationQueue.empty()) {
+                const auto delay = std::chrono::duration<float>(options.menuCloseDelaySeconds);
+                menuResumeAt = a_now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(delay);
+            }
+        }
+        if (menuResumeAt.time_since_epoch().count() != 0 && a_now < menuResumeAt) {
+            return true;
+        }
+        if (menuResumeAt.time_since_epoch().count() != 0) {
+            menuResumeAt = {};
+            if (display.pausedAt.time_since_epoch().count() != 0) {
+                display.startedAt += a_now - display.pausedAt;
+                display.pausedAt = {};
+            }
+        }
+        return false;
+    }
+
+    bool HUD::UpdateActiveMessage(const std::chrono::steady_clock::time_point& a_now)
+    {
+        if (!display.active) {
+            return false;
+        }
+
+        const float age = std::chrono::duration<float>(a_now - display.startedAt).count();
+        if (age >= options.durationSeconds + options.fadeSeconds) {
+            display.active = false;
+            const auto gap = std::chrono::duration<float>(options.gapSeconds);
+            display.nextAt = a_now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(gap);
+            return true;
+        }
+
+        float alpha = 1.0F;
+        if (options.fadeSeconds > 0.0F && age > options.durationSeconds) {
+            alpha = 1.0F - (age - options.durationSeconds) / options.fadeSeconds;
+        }
+        DrawMessage(display.message, alpha);
+        return true;
+    }
+
+    bool HUD::StartNextMessage(const std::chrono::steady_clock::time_point& a_now)
+    {
+        if (display.nextAt.time_since_epoch().count() != 0 && a_now < display.nextAt) {
+            return false;
+        }
+        if (notificationQueue.empty() || a_now < notificationQueue.front().showAt) {
+            return false;
+        }
+
+        auto message = std::move(notificationQueue.front());
+        notificationQueue.pop_front();
+        StartMessage(std::move(message), a_now);
+        DrawMessage(display.message, 1.0F);
+        return true;
     }
 
     void HUD::AppendBackupAge(HUDMessage& a_message, const std::chrono::steady_clock::time_point& a_now) const
     {
-        if (!a_message.showBackupAge) {
+        if (a_message.type != HUDMessageType::BackupSummary && a_message.type != HUDMessageType::Preview) {
             return;
         }
 
@@ -216,14 +305,58 @@ namespace MCMMemory
             const auto elapsedHours = elapsedMinutes / 60;
             a_message.segments.push_back({ Trans::Format("    Last backup: {}h ago", elapsedHours), HUDColor::Muted });
         }
-        a_message.showBackupAge = false;
     }
 
-    GUI::ImVec4 HUD::GetColor(HUDColor a_color, float a_alpha) const
+    void HUD::DrawMessage(const HUDMessage& a_message, float a_alpha) const
     {
-        auto color = HUDColors[static_cast<size_t>(a_color)];
-        color.w *= a_alpha;
-        return color;
+        if (a_message.segments.empty() || a_alpha <= 0.0F) {
+            return;
+        }
+
+        auto* drawList = GUI::GetForegroundDrawList();
+        auto* io = GUI::GetIO();
+        auto* font = GUI::GetFont();
+        if (!drawList || !io || !font) {
+            return;
+        }
+
+        float totalWidth{};
+        for (const auto& segment : a_message.segments) {
+            const GUI::ImVec2 size = GUI::CalcTextSize(segment.text.c_str(), nullptr, false, 0.0F);
+            totalWidth += size.x;
+        }
+        if (totalWidth <= 0.0F || io->DisplaySize.x <= 0.0F) {
+            return;
+        }
+
+        const float requestedScale = static_cast<float>(options.fontScale) / 100.0F;
+        const float availableWidth = io->DisplaySize.x - 2.0F * HUDMargin - 2.0F * HUDHorizontalPadding;
+        if (availableWidth <= 0.0F) {
+            return;
+        }
+        const float fontScale = std::min(requestedScale, availableWidth / totalWidth);
+        const float scaledWidth = totalWidth * fontScale;
+        const float scaledHeight = font->FontSize * fontScale;
+        const float textX = io->DisplaySize.x - HUDMargin - HUDHorizontalPadding - scaledWidth;
+        const float textY = HUDMargin + HUDVerticalPadding;
+
+        // Draw a dark background behind the notification.
+        const GUI::ImVec2 backgroundMin{ textX - HUDHorizontalPadding, textY - HUDVerticalPadding };
+        const GUI::ImVec2 backgroundMax{ textX + scaledWidth + HUDHorizontalPadding, textY + scaledHeight + HUDVerticalPadding };
+        const auto backgroundColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.04F, 0.04F, 0.05F, 0.78F * a_alpha });
+        GUI::ImDrawListManager::AddRectFilled(drawList, backgroundMin, backgroundMax, backgroundColor, 5.0F, 0);
+
+        float positionX = textX;
+        for (const auto& segment : a_message.segments) {
+            const GUI::ImVec2 size = GUI::CalcTextSize(segment.text.c_str(), nullptr, false, 0.0F);
+            const GUI::ImVec2 shadowPosition{ positionX + 1.0F, textY + 1.0F };
+            const GUI::ImVec2 textPosition{ positionX, textY };
+            const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.85F * a_alpha });
+            const auto textColor = GUI::ColorConvertFloat4ToU32(GetColor(segment.color, a_alpha));
+            GUI::ImDrawListManager::AddText(drawList, font, scaledHeight, shadowPosition, shadowColor, segment.text.c_str());
+            GUI::ImDrawListManager::AddText(drawList, font, scaledHeight, textPosition, textColor, segment.text.c_str());
+            positionX += size.x * fontScale;
+        }
     }
 
     std::string HUD::GetDisplayModName(std::string_view a_modName) const
@@ -243,59 +376,6 @@ namespace MCMMemory
         return modName;
     }
 
-    void HUD::DrawMessage(const HUDMessage& a_message, float a_alpha) const
-    {
-        if (a_message.segments.empty() || a_alpha <= 0.0F) {
-            return;
-        }
-
-        auto* drawList = GUI::GetForegroundDrawList();
-        auto* io = GUI::GetIO();
-        auto* font = GUI::GetFont();
-        if (!drawList || !io || !font) {
-            return;
-        }
-
-        float totalWidth{};
-        for (const auto& segment : a_message.segments) {
-            GUI::ImVec2 size = GUI::CalcTextSize(segment.text.c_str(), nullptr, false, 0.0F);
-            totalWidth += size.x;
-        }
-        if (totalWidth <= 0.0F || io->DisplaySize.x <= 0.0F) {
-            return;
-        }
-
-        const float requestedScale = static_cast<float>(GetSettings().notificationFontScale) / 100.0F;
-        const float availableWidth = io->DisplaySize.x - 2.0F * HUDMargin - 2.0F * HUDHorizontalPadding;
-        if (availableWidth <= 0.0F) {
-            return;
-        }
-        const float fontScale = std::min(requestedScale, availableWidth / totalWidth);
-        const float scaledWidth = totalWidth * fontScale;
-        const float scaledHeight = font->FontSize * fontScale;
-        const float textX = io->DisplaySize.x - HUDMargin - HUDHorizontalPadding - scaledWidth;
-        const float textY = HUDMargin + HUDVerticalPadding;
-
-        // Draw background box with round edges.
-        const GUI::ImVec2 backgroundMin{ textX - HUDHorizontalPadding, textY - HUDVerticalPadding };
-        const GUI::ImVec2 backgroundMax{ textX + scaledWidth + HUDHorizontalPadding, textY + scaledHeight + HUDVerticalPadding };
-        const auto backgroundColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.04F, 0.04F, 0.05F, 0.78F * a_alpha });
-        GUI::ImDrawListManager::AddRectFilled(drawList, backgroundMin, backgroundMax, backgroundColor, 5.0F, 0);
-
-        // Draw each segment of text with a shadow.
-        float positionX = textX;
-        for (const auto& segment : a_message.segments) {
-            GUI::ImVec2 size = GUI::CalcTextSize(segment.text.c_str(), nullptr, false, 0.0F);
-            const GUI::ImVec2 shadowPosition{ positionX + 1.0F, textY + 1.0F };
-            const GUI::ImVec2 textPosition{ positionX, textY };
-            const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.85F * a_alpha });
-            const auto textColor = GUI::ColorConvertFloat4ToU32(GetColor(segment.color, a_alpha));
-            GUI::ImDrawListManager::AddText(drawList, font, scaledHeight, shadowPosition, shadowColor, segment.text.c_str());
-            GUI::ImDrawListManager::AddText(drawList, font, scaledHeight, textPosition, textColor, segment.text.c_str());
-            positionX += size.x * fontScale;
-        }
-    }
-
     void HUD::Render()
     {
         if (!enabled.load(std::memory_order_relaxed)) {
@@ -308,63 +388,13 @@ namespace MCMMemory
         const bool menuOpen = menuWindow && menuWindow->IsOpen.load(std::memory_order_relaxed);
 
         std::lock_guard lock(hudMutex);
-
-        if (!rendererSeen) {
-            rendererSeen = true;
-            logger::info("HUD renderer is active");
-        }
-
-        if (blocked && !menuOpen && (!display.active || !display.message.allowWhileBlocked)) {
-            if (display.active && !display.paused) {
-                display.pausedAt = now;
-                display.paused = true;
-            }
+        if (UpdateMenuDelay(blocked && !menuOpen, now)) {
             return;
         }
-        if (display.active && display.paused) {
-            display.startedAt += now - display.pausedAt;
-            display.pausedAt = {};
-            display.paused = false;
-        }
-
-        if (display.active) {
-            const float age = std::chrono::duration<float>(now - display.startedAt).count();
-            const float duration = GetSettings().notificationDurationSeconds;
-            const float fade = GetSettings().notificationFadeSeconds;
-            if (age >= duration + fade) {
-                display.active = false;
-                display.nextAt = now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(HUDGapSeconds));
-                return;
-            }
-
-            float alpha = 1.0F;
-            if (fade > 0.0F && age > duration) {
-                alpha = 1.0F - (age - duration) / fade;
-            }
-            DrawMessage(display.message, alpha);
+        if (UpdateActiveMessage(now)) {
             return;
         }
-
-        if (display.nextAt.time_since_epoch().count() != 0 && now < display.nextAt) {
-            return;
-        }
-        if (!notificationQueue.empty()) {
-            if (now < notificationQueue.front().showAt) {
-                return;
-            }
-            auto message = std::move(notificationQueue.front());
-            notificationQueue.pop_front();
-            StartMessage(std::move(message), now);
-        }
-        else {
-            return;
-        }
-
-        DrawMessage(display.message, 1.0F);
+        StartNextMessage(now);
     }
 
-    void __stdcall RenderHUD()
-    {
-        HUD::GetSingleton()->Render();
-    }
 }

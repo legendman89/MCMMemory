@@ -221,13 +221,17 @@ namespace MCMMemory
             return std::addressof(singleton);
         }
 
+        inline bool IsRunning()
+        {
+            std::lock_guard lock(restoreMutex);
+            return registryCheckQueued || (started && currentActionIndex < actions.size());
+        }
+
         bool Install();
 
         bool Start();
 
         void Reset();
-
-        bool IsRunning();
 
         // Waits for a stable MCM registry before starting restoration.
         RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;

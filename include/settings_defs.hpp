@@ -2,7 +2,7 @@
 
 #define FOREACH_SETTING(SETTING) \
     /* Controls how often backup checks a script that has not finished updating its buffers. */ \
-    SETTING(float, actionDelaySeconds, 0.5F) \
+    SETTING(float, actionTrialDelaySeconds, 0.5F) \
     /* Keeps the profile updated and creates the first full backup when needed. */ \
     SETTING(bool, autoBackup, true) \
     /* Restores the profile after MCM registration finishes. */ \

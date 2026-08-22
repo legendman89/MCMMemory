@@ -46,13 +46,13 @@ namespace MCMMemory
             return false;
         }
 
-        if (settings.actionDelaySeconds < 0.05F || settings.actionDelaySeconds > 10.0F) {
-            logger::error("actionDelaySeconds {} is outside the supported range 0.05 through 10.0", settings.actionDelaySeconds);
+        if (settings.actionTrialDelaySeconds < 0.05F || settings.actionTrialDelaySeconds > 10.0F) {
+            logger::error("actionTrialDelaySeconds {} is outside the supported range 0.05 through 10.0", settings.actionTrialDelaySeconds);
             return false;
         }
 
         GetSettings() = settings;
-        logger::info("Loaded settings: autoBackup={}, autoRestore={}, notifications={}, actionDelaySeconds={}, captureRawRecords={}", settings.autoBackup, settings.autoRestore, settings.notifications, settings.actionDelaySeconds, settings.captureRawRecords);
+        logger::info("Loaded settings: autoBackup={}, autoRestore={}, notifications={}, actionTrialDelaySeconds={}, captureRawRecords={}", settings.autoBackup, settings.autoRestore, settings.notifications, settings.actionTrialDelaySeconds, settings.captureRawRecords);
         return true;
     }
 }

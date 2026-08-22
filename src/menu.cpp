@@ -46,6 +46,14 @@ namespace MCMMemory::Menu
         if (GUI::Checkbox(Trans::Tr("Automatic restore").c_str(), std::addressof(settings.autoRestore))) {
             settingsChanged = true;
         }
+
+        GUI::Spacing();
+        GUI::SeparatorText(Trans::Tr("HUD Notifications").c_str());
+
+        if (GUI::Checkbox(Trans::Tr("Show backup and restore summaries").c_str(), std::addressof(settings.notifications))) {
+            settingsChanged = true;
+        }
+
         if (settingsChanged && !SettingsStorage::Save()) {
             logger::error("MCM Memory menu could not save its settings");
         }

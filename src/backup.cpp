@@ -115,7 +115,7 @@ namespace MCMMemory
             std::lock_guard lock(backupMutex);
             initialBackupChecked = false;
         }
-        
+
         return RE::BSEventNotifyControl::kContinue;
     }
 
@@ -216,6 +216,7 @@ namespace MCMMemory
         mcmStats.Reset();
         pageIndex = 0;
         menuIndex = 0;
+        scriptWaitCount = 0;
         mcmFailed = false;
 
         MCMScript script(registeredMCMs[mcmIndex].mcmScript);
@@ -233,7 +234,7 @@ namespace MCMMemory
         MCMScript script(registeredMCMs[mcmIndex].mcmScript);
         if (!script.IsConfigOpen()) {
             if (++scriptWaitCount < maximumScriptWaitChecks) {
-                QueueNext(GetSettings().actionDelaySeconds);
+                QueueNext(GetSettings().actionTrialDelaySeconds);
             }
             else {
                 logger::error("Full MCM backup timed out while opening '{}'", registeredMCMs[mcmIndex].identity.modID);
@@ -251,6 +252,7 @@ namespace MCMMemory
             pages.push_back(BackupPage{ std::move(pageNames[index]), static_cast<int>(index) });
         }
 
+        scriptWaitCount = 0;
         step = BackupStep::ReadPage;
         QueueNext(0.0F);
     }
@@ -286,7 +288,7 @@ namespace MCMMemory
         MCMScript script(registeredMCMs[mcmIndex].mcmScript);
         if (!script.IsPageReady(page.index)) {
             if (++scriptWaitCount < maximumScriptWaitChecks) {
-                QueueNext(GetSettings().actionDelaySeconds);
+                QueueNext(GetSettings().actionTrialDelaySeconds);
             }
             else {
                 logger::error("Full MCM backup timed out while reading page '{}' from '{}'", page.name, registeredMCMs[mcmIndex].identity.modID);
@@ -347,7 +349,7 @@ namespace MCMMemory
         MCMScript script(registeredMCMs[mcmIndex].mcmScript);
         if (!script.IsMenuReady(setting.selection.optionIndex)) {
             if (++scriptWaitCount < maximumScriptWaitChecks) {
-                QueueNext(GetSettings().actionDelaySeconds);
+                QueueNext(GetSettings().actionTrialDelaySeconds);
                 return;
             }
             setting.identityComplete = false;

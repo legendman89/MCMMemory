@@ -1,5 +1,6 @@
 #include "capture.hpp"
 #include "json.hpp"
+#include "mcm_script.hpp"
 
 namespace MCMMemory
 {
@@ -10,6 +11,13 @@ namespace MCMMemory
         setting.sourceEventID = a_record.eventID;
         setting.type = ControlTypeForEvent(a_record.type);
         setting.selection = a_record.selection;
+        auto activeMCM = MCMRegistry().ReadActiveMCM();
+        if (activeMCM && activeMCM->identity.modID == setting.selection.identity.modID) {
+            auto stateName = MCMScript(activeMCM->mcmScript).ReadStateName(setting.selection.optionIndex);
+            if (stateName) {
+                setting.stateName = std::move(*stateName);
+            }
+        }
 
         // Dialog controls show their label in a different place from normal rows.
         const auto& state = a_record.stateAfter;
@@ -90,7 +98,7 @@ namespace MCMMemory
 
         // Incomplete settings stay in Capture.json but not saved in Profile.json.
         setting.identityComplete = !setting.selection.identity.modName.empty() && !setting.selection.identity.modID.empty() && setting.selection.optionIndex >= 0 && !setting.optionLabel.empty() && setting.type != ControlType::Unknown && !setting.valueSource.empty();
-        if (setting.identityComplete && !ProfileStorage::UpdateSetting(setting)) {
+        if (setting.identityComplete && GetSettings().autoBackup && !ProfileStorage::UpdateSetting(setting)) {
             logger::error("Failed to update captured setting '{}' in the persistent profile", setting.optionLabel);
         }
 

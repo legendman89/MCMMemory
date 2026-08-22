@@ -6,6 +6,7 @@ namespace MCMMemory
 {
     bool ProfileStorage::Load(Profile& a_profile)
     {
+        a_profile.clear();
         std::ifstream stream(Path());
         if (!stream) {
             return false;
@@ -13,13 +14,19 @@ namespace MCMMemory
 
         try {
             auto document = nlohmann::json::parse(stream);
+            if (!document.is_object()) {
+                logger::error("Profile root is not an object in {}", ToUTF8(Path()));
+                return false;
+            }
             auto settings = document.find("settings");
-            if (settings != document.end() && settings->is_array()) {
-                for (const auto& settingDocument : *settings) {
-                    CapturedSetting setting;
-                    if (FromJson(settingDocument, setting) && setting.identityComplete) {
-                        a_profile.push_back(std::move(setting));
-                    }
+            if (settings == document.end() || !settings->is_array()) {
+                logger::error("Profile settings are missing or invalid in {}", ToUTF8(Path()));
+                return false;
+            }
+            for (const auto& settingDocument : *settings) {
+                CapturedSetting setting;
+                if (FromJson(settingDocument, setting) && setting.identityComplete) {
+                    a_profile.push_back(std::move(setting));
                 }
             }
         } catch (const std::exception& error) {
@@ -50,19 +57,9 @@ namespace MCMMemory
 
     bool ProfileStorage::Save(const Profile& a_profile)
     {
-        std::error_code error;
-        std::filesystem::create_directories(GetPluginDataPath(), error);
-        if (error) {
-            logger::error("Failed to create profile directory: {}", error.message());
+        if (!JSON::WriteFile(Path(), ToJson(a_profile))) {
             return false;
         }
-
-        std::ofstream stream(Path(), std::ios::trunc);
-        if (!stream) {
-            logger::error("Failed to open profile file: {}", ToUTF8(Path()));
-            return false;
-        }
-        stream << ToJson(a_profile).dump(2);
         logger::info("Saved {} persistent profile settings to {}", a_profile.size(), ToUTF8(Path()));
         return true;
     }
@@ -83,6 +80,7 @@ namespace MCMMemory
         JSON::ReadValue(a_document, "pageName", a_setting.selection.pageName);
         JSON::ReadValue(a_document, "optionIndex", a_setting.selection.optionIndex);
         JSON::ReadValue(a_document, "optionLabel", a_setting.optionLabel);
+        JSON::ReadValue(a_document, "stateName", a_setting.stateName);
         JSON::ReadValue(a_document, "valueSource", a_setting.valueSource);
         JSON::ReadValue(a_document, "identityComplete", a_setting.identityComplete);
         JSON::ReadValue(a_document, "value", a_setting.value);

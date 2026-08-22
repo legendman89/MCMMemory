@@ -10,7 +10,7 @@ namespace MCMMemory
             for (const auto& registeredMCM : a_registeredMCMs) {
                 if (registeredMCM.identity.modID == mcm.identity.modID) {
                     mcm.mcmScript = registeredMCM.mcmScript;
-                    logger::info("Found profile MCM '{}' as '{}' in the active registry", mcm.identity.modID, registeredMCM.identity.modName);
+                    logger::debug("Found profile MCM '{}' as '{}' in the active registry", mcm.identity.modID, registeredMCM.identity.modName);
                     break;
                 }
             }

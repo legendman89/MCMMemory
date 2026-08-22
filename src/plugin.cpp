@@ -1,9 +1,12 @@
 
+#include "menu.hpp"
 #include "logger.hpp"
+#include "backup.hpp"
 #include "capture.hpp"
 #include "restore.hpp"
 #include "settings.hpp"
 #include "mcm_registry.hpp"
+
 
 namespace MCMMemory
 {
@@ -23,11 +26,13 @@ namespace MCMMemory
                 logger::critical("MCM Memory settings could not be loaded");
                 break;
             }
+            Backup::GetSingleton()->Install();
             Capture::GetSingleton()->Install();
             Restore::GetSingleton()->Install();
             break;
         case SKSE::MessagingInterface::kNewGame:
         case SKSE::MessagingInterface::kPostLoadGame:
+            Backup::GetSingleton()->Reset();
             Capture::GetSingleton()->Reset();
             Restore::GetSingleton()->Reset();
             break;
@@ -48,6 +53,8 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
         logger::critical("Failed to register SKSE message listener");
         return false;
     }
+
+    MCMMemory::Menu::Register();
 
     logger::info("{} plugin is loaded", BEAUTIFUL_NAME);
 

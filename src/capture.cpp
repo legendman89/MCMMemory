@@ -49,6 +49,16 @@ namespace MCMMemory
         logger::info("Capture session reset");
     }
 
+    void Capture::MergeSettings(Profile& a_profile)
+    {
+        std::scoped_lock lock(captureMutex);
+        for (const auto& setting : settings) {
+            if (setting.identityComplete) {
+                Deduplicate(a_profile, setting);
+            }
+        }
+    }
+
     RE::BSEventNotifyControl Capture::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
     {
         if (!a_event) {

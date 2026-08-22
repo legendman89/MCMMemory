@@ -2,6 +2,32 @@
 
 namespace MCMMemory
 {
+    RegistryWaitResult RegistryWait::Update(const std::vector<MCMRegistryEntry>& a_registeredMCMs)
+    {
+        ++checkCount;
+        std::vector<std::string> currentModIDs;
+        currentModIDs.reserve(a_registeredMCMs.size());
+        for (const auto& mcm : a_registeredMCMs) {
+            currentModIDs.push_back(mcm.identity.modID);
+        }
+        std::sort(currentModIDs.begin(), currentModIDs.end());
+
+        if (currentModIDs.empty()) {
+            quietCheckCount = 0;
+            return checkCount >= maximumRegistryChecks ? RegistryWaitResult::Expired : RegistryWaitResult::Empty;
+        }
+        if (currentModIDs != modIDs) {
+            modIDs = std::move(currentModIDs);
+            quietCheckCount = 0;
+            return checkCount >= maximumRegistryChecks ? RegistryWaitResult::Expired : RegistryWaitResult::Changed;
+        }
+
+        ++quietCheckCount;
+        if (quietCheckCount >= requiredStableRegistryChecks) {
+            return RegistryWaitResult::Ready;
+        }
+        return checkCount >= maximumRegistryChecks ? RegistryWaitResult::Expired : RegistryWaitResult::Waiting;
+    }
 
     void MCMRegistry::TryAddMarker(std::vector<RE::NiPointer<RE::TESObjectREFR>>& a_markers, RE::TESObjectREFR* a_reference, const RE::TESBoundObject* a_markerBase)
     {
@@ -168,7 +194,7 @@ namespace MCMMemory
         for (const auto& mcmScript : mcmScripts) {
             auto registeredMCM = CreateRegistryEntry(mcmScript);
             if (registeredMCM) {
-                logger::info("SkyUI registry found '{}' as '{}'", registeredMCM->identity.modID, registeredMCM->identity.modName);
+                logger::debug("SkyUI registry found '{}' as '{}'", registeredMCM->identity.modID, registeredMCM->identity.modName);
                 registeredMCMs.push_back(std::move(*registeredMCM));
             }
         }
@@ -197,15 +223,4 @@ namespace MCMMemory
         return CreateRegistryEntry(mcmScript);
     }
 
-    std::optional<MCMRegistryEntry> MCMRegistry::FindRegisteredMCM(std::string_view a_modID) const
-    {
-        const auto registeredMCMs = ReadRegisteredMCMs();
-        for (const auto& mcm : registeredMCMs) {
-            if (mcm.identity.modID == a_modID) {
-                logger::info("MCM registry found '{}' as '{}'", mcm.identity.modID, mcm.identity.modName);
-                return mcm;
-            }
-        }
-        return std::nullopt;
-    }
 }

@@ -23,7 +23,7 @@ set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory("$ENV{COMMONLIB_SSE_FOLDER}" ${CMAKE_CURRENT_BINARY_DIR}/_deps/clib-build)
 get_target_property(COMMONLIB_SRC_DIR CommonLibSSE SOURCE_DIR)
 
-file(GLOB_RECURSE headers CONFIGURE_DEPENDS include/*.hpp)
+file(GLOB_RECURSE headers CONFIGURE_DEPENDS include/*.h include/*.hpp)
 file(GLOB_RECURSE sources CONFIGURE_DEPENDS src/*.cpp)
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${headers} ${sources})

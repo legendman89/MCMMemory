@@ -1,32 +1,26 @@
 #pragma once
 
+#include "control_defs.hpp"
 #include "event_defs.hpp"
+
+#define DECLARE_CONTROL_TYPE(name, text) name,
+#define DECLARE_CONTROL_TYPE_NAME(name, text) text,
 
 namespace MCMMemory
 {
     enum class ControlType
     {
-        Unknown,
-        Option,
-        Slider,
-        Menu,
-        Color,
-        Input,
-        Keymap,
+        FOREACH_CONTROL_TYPE(DECLARE_CONTROL_TYPE)
         Count
     };
 
-    inline constexpr std::array<std::string_view, static_cast<size_t>(ControlType::Count)> controlTypeNames{
-        "unknown",
-        "option",
-        "slider",
-        "menu",
-        "color",
-        "input",
-        "keymap"
+    inline constexpr std::array<std::string_view, static_cast<size_t>(ControlType::Count)> controlTypeNames
+    {
+        FOREACH_CONTROL_TYPE(DECLARE_CONTROL_TYPE_NAME)
     };
 
-    inline constexpr std::array<ControlType, static_cast<size_t>(EventType::Count)> eventControlTypes{
+    inline constexpr std::array<ControlType, static_cast<size_t>(EventType::Count)> eventControlTypes
+    {
         ControlType::Unknown,
 #define DECLARE_EVENT_CONTROL_TYPE(name, eventName, role, controlType) ControlType::controlType,
         FOREACH_MCM_EVENT(DECLARE_EVENT_CONTROL_TYPE)
@@ -69,7 +63,7 @@ namespace MCMMemory
 
         // The name of the selected MCM page.
         std::string pageName;
-        
+
         // The selected row in the MCM list.
         int modIndex{-1};
 
@@ -80,12 +74,15 @@ namespace MCMMemory
         int optionIndex{-1};
     };
 
-    // This is the seetings we store in Profile.json.
+    // One setting stored in Profile.json.
     struct CapturedSetting
     {
         MCMSelection selection;
 
         std::string optionLabel;
+
+        // Stable Papyrus state used by state-based MCM options.
+        std::string stateName;
 
         nlohmann::json value;
 
@@ -98,11 +95,16 @@ namespace MCMMemory
         bool identityComplete{};
 
         // Checks whether another captured setting refers to the same MCM option.
-        // This avoids duplications and cheap to do.
+        // This avoids duplicate profile entries.
         bool IsSameSetting(const CapturedSetting& a_other) const
         {
-            return type == a_other.type && selection.identity.modID == a_other.selection.identity.modID && selection.pageIndex == a_other.selection.pageIndex &&
-                   selection.pageName == a_other.selection.pageName && selection.optionIndex == a_other.selection.optionIndex;
+            if (type != a_other.type || selection.identity.modID != a_other.selection.identity.modID) {
+                return false;
+            }
+            if (!stateName.empty() && !a_other.stateName.empty() && stateName == a_other.stateName) {
+                return true;
+            }
+            return selection.pageIndex == a_other.selection.pageIndex && selection.pageName == a_other.selection.pageName && selection.optionIndex == a_other.selection.optionIndex;
         }
     };
 
@@ -145,3 +147,6 @@ namespace MCMMemory
         RE::FormID senderFormID{};
     };
 }
+
+#undef DECLARE_CONTROL_TYPE
+#undef DECLARE_CONTROL_TYPE_NAME

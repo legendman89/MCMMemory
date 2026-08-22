@@ -2,13 +2,16 @@
 
 #include "scheduler.hpp"
 #include "mcm_registry.hpp"
+#include "mcm_script.hpp"
 #include "profile.hpp"
 #include "restore_defs.hpp"
 #include "settings.hpp"
+#include "stats.hpp"
 
-#define DECLARE_RESTORE_ACTION_ENUM(actionName, functionName, argumentType) actionName,
-#define DECLARE_RESTORE_FUNCTION_NAME(actionName, functionName, argumentType) #functionName,
-#define DECLARE_RESTORE_ARGUMENT_TYPE(actionName, functionName, argumentType) RestoreArgumentType::argumentType,
+#define DECLARE_RESTORE_ACTION_ENUM(actionName, functionName, argumentType, applyAction) actionName,
+#define DECLARE_RESTORE_FUNCTION_NAME(actionName, functionName, argumentType, applyAction) #functionName,
+#define DECLARE_RESTORE_ARGUMENT_TYPE(actionName, functionName, argumentType, applyAction) RestoreArgumentType::argumentType,
+#define DECLARE_RESTORE_APPLY_ACTION(actionName, functionName, argumentType, applyAction) applyAction,
 
 namespace MCMMemory
 {
@@ -44,6 +47,11 @@ namespace MCMMemory
         FOREACH_RESTORE_ACTION(DECLARE_RESTORE_ARGUMENT_TYPE)
     };
 
+    inline constexpr std::array<bool, static_cast<size_t>(RestoreActionType::Count)> restoreApplyActions
+    {
+        FOREACH_RESTORE_ACTION(DECLARE_RESTORE_APPLY_ACTION)
+    };
+
     // Returns the Papyrus function name for one restore action.
     inline std::string_view RestoreActionFunctionName(RestoreActionType a_type)
     {
@@ -56,6 +64,11 @@ namespace MCMMemory
         return restoreArgumentTypes[static_cast<size_t>(a_type)];
     }
 
+    inline bool IsRestoreApplyAction(RestoreActionType a_type)
+    {
+        return restoreApplyActions[static_cast<size_t>(a_type)];
+    }
+
     // One small description of a script call waiting to be dispatched.
     struct RestoreAction
     {
@@ -65,11 +78,20 @@ namespace MCMMemory
         // Text passed to a text-setting script call.
         std::string stringValue;
 
+        // Visible label used to verify the current control before changing it.
+        std::string optionLabel;
+
+        // Stable Papyrus state used to verify state-based controls.
+        std::string stateName;
+
         // Index of the RestoreMCM that should receive this call.
         size_t mcmIndex{};
 
         // Says which MCM script function should be called.
-        RestoreActionType type{RestoreActionType::OpenConfig};
+        RestoreActionType type{ RestoreActionType::OpenConfig };
+
+        // Says which control this action belongs to.
+        ControlType controlType{ ControlType::Unknown };
 
         // Page index passed to SetPage.
         int pageIndex{-1};
@@ -184,10 +206,12 @@ namespace MCMMemory
     {
         uint64_t loadedGameSession{};
 
+        uint64_t taskID{};
+
         void operator()() const;
     };
 
-    class Restore final : public RE::BSTEventSink<SKSE::ModCallbackEvent>
+    class Restore : public RE::BSTEventSink<SKSE::ModCallbackEvent>
     {
     public:
 
@@ -199,7 +223,11 @@ namespace MCMMemory
 
         bool Install();
 
+        bool Start();
+
         void Reset();
+
+        bool IsRunning();
 
         // Waits for a stable MCM registry before starting restoration.
         RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;
@@ -226,34 +254,36 @@ namespace MCMMemory
         void BuildActionQueue();
 
         // Sends one queued action to its matching MCM script.
-        bool RunAction(const RestoreAction& a_action);
+        bool RunAction(const RestoreAction& a_action, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result);
+
+        bool IsActionNeeded(const RestoreAction& a_action) const;
+
+        bool IsActionValid(const RestoreAction& a_action) const;
 
         // Calls one function on a live MCM script.
-        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments);
+        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result);
 
         // Flips a toggle only when its current state differs from the profile.
-        bool RestoreToggle(const RestoreAction& a_action);
+        bool RestoreToggle(const RestoreAction& a_action, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result);
 
         // Schedules the next action after the requested delay.
         inline void QueueNextAction(float a_delaySeconds)
         {
-            if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RestoreTask{ loadedGameSession }, a_delaySeconds)) {
+            const uint64_t taskID = ++scheduledTaskID;
+            if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RestoreTask{ loadedGameSession, taskID }, a_delaySeconds)) {
                 logger::error("Persistent profile restore could not schedule action {}", currentActionIndex);
             }
         }
 
         // Moves the registry read from the event callback to Skyrim task queue.
-        inline void QueueRegistryCheck()
+        inline void QueueRegistryCheck(float a_delaySeconds = 0.0F)
         {
             registryCheckQueued = true;
-            if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RegistryCheckTask{ loadedGameSession }, 0.0F)) {
+            if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RegistryCheckTask{ loadedGameSession }, a_delaySeconds)) {
                 registryCheckQueued = false;
                 logger::error("Persistent profile restore could not schedule its registry check");
             }
         }
-
-        // Reads one toggle's current value from the MCM script.
-        bool ReadToggleValue(size_t a_mcmIndex, int a_optionIndex, bool& a_value) const;
 
         // Matches profile MCM IDs with their live config scripts.
         void MatchRegisteredMCMs(const std::vector<MCMRegistryEntry>& a_registeredMCMs);
@@ -262,16 +292,18 @@ namespace MCMMemory
         void CheckRegistry(uint64_t a_loadedGameSession);
 
         // Runs one action if it still belongs to the loaded game.
-        void RunNextAction(uint64_t a_loadedGameSession);
+        void RunNextAction(uint64_t a_loadedGameSession, uint64_t a_taskID);
 
         // Builds the queue and schedules its first action.
         void StartRestore();
 
+        // Adds the current MCM result to the full restore result.
+        void FinishMCMStats(size_t a_mcmIndex);
+
+        void Clear();
+
         // Stops registration events and scheduled tasks from changing restore state together.
         std::mutex restoreMutex;
-
-        // Stores the previous sorted MCM list so registration can be checked for stability.
-        std::vector<std::string> lastRegistryModIDs;
 
         // Holds each MCM and the actions prepared for it.
         std::vector<RestoreMCM> restoreMCMs;
@@ -279,15 +311,19 @@ namespace MCMMemory
         // Holds the final action queue currently being run.
         std::vector<RestoreAction> actions;
 
+        RegistryWait registryWait;
+
         // Points to the next action in the final queue.
         size_t currentActionIndex{};
 
         // Changes whenever a new game starts or another save is loaded.
         uint64_t loadedGameSession{};
 
-        // Counts how many registration notifications have been checked.
-        // Ex. Check 1: 0 registered MCMs, Check 2: 14 registered MCMs ...
-        uint32_t registryCheckCount{};
+        uint64_t scheduledTaskID{};
+
+        RestoreStats stats;
+
+        RestoreStats mcmStats;
 
         // Prevents the registration listener from being installed twice.
         bool installed{};
@@ -303,6 +339,10 @@ namespace MCMMemory
 
         // Prevents repeated ready events from queuing the same registry check.
         bool registryCheckQueued{};
+
+        bool manualRequest{};
+
+        bool requestFailed{};
     };
 
     inline void RegistryCheckTask::operator()() const
@@ -313,10 +353,11 @@ namespace MCMMemory
     inline void RestoreTask::operator()() const
     {
         // Run one restore action on the game task scheduler.
-        Restore::GetSingleton()->RunNextAction(loadedGameSession);
+        Restore::GetSingleton()->RunNextAction(loadedGameSession, taskID);
     }
 }
 
 #undef DECLARE_RESTORE_ACTION_ENUM
 #undef DECLARE_RESTORE_FUNCTION_NAME
 #undef DECLARE_RESTORE_ARGUMENT_TYPE
+#undef DECLARE_RESTORE_APPLY_ACTION

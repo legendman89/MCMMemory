@@ -4,6 +4,16 @@
 
 namespace MCMMemory
 {
+    bool SettingsStorage::Save()
+    {
+        nlohmann::json document;
+#define WRITE_SETTING(type, name, defaultValue) document[#name] = GetSettings().name;
+        FOREACH_SETTING(WRITE_SETTING)
+#undef WRITE_SETTING
+
+        return JSON::WriteFile(Path(), document);
+    }
+
     bool SettingsStorage::Load()
     {
         Settings settings;
@@ -42,7 +52,7 @@ namespace MCMMemory
         }
 
         GetSettings() = settings;
-        logger::info("Loaded settings: enabled={}, actionDelaySeconds={}, captureRawRecords={}", settings.enabled, settings.actionDelaySeconds, settings.captureRawRecords);
+        logger::info("Loaded settings: autoBackup={}, autoRestore={}, notifications={}, actionDelaySeconds={}, captureRawRecords={}", settings.autoBackup, settings.autoRestore, settings.notifications, settings.actionDelaySeconds, settings.captureRawRecords);
         return true;
     }
 }

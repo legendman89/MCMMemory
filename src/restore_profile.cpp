@@ -128,6 +128,14 @@ namespace MCMMemory
         size_t mcmIndex = GetOrAddMCM(a_setting);
         requestAction.mcmIndex = mcmIndex;
         applyAction.mcmIndex = mcmIndex;
+        requestAction.controlType = a_setting.type;
+        applyAction.controlType = a_setting.type;
+        requestAction.optionIndex = a_setting.selection.optionIndex;
+        applyAction.optionIndex = a_setting.selection.optionIndex;
+        requestAction.optionLabel = a_setting.optionLabel;
+        applyAction.optionLabel = a_setting.optionLabel;
+        requestAction.stateName = a_setting.stateName;
+        applyAction.stateName = a_setting.stateName;
         AddPageAction(mcmIndex, a_setting.selection);
         if (hasRequest) {
             restoreMCMs[mcmIndex].settingActions.push_back(std::move(requestAction));

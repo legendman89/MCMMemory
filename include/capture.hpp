@@ -41,6 +41,9 @@ namespace MCMMemory
         // Clears capture data when a game is started or loaded.
         void Reset();
 
+        // Applies settings changed during a full scan before the profile is written.
+        void MergeSettings(Profile& a_profile);
+
         // Receives MCM callbacks such as sliderAccepted and optionSelected.
         RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;
 

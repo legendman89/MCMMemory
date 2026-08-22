@@ -1,9 +1,13 @@
 #pragma once
 
 #define FOREACH_SETTING(SETTING) \
-    /* Gives MCM scripts time to process one restore call before receiving the next one. */ \
+    /* Controls how often backup checks a script that has not finished updating its buffers. */ \
     SETTING(float, actionDelaySeconds, 0.5F) \
-    /* Enables automatic restoration. */ \
-    SETTING(bool, enabled, true) \
+    /* Keeps the profile updated and creates the first full backup when needed. */ \
+    SETTING(bool, autoBackup, true) \
+    /* Restores the profile after MCM registration finishes. */ \
+    SETTING(bool, autoRestore, true) \
+    /* Shows operation summaries through SKSE Menu Framework. */ \
+    SETTING(bool, notifications, true) \
     /* Controls whether Capture.json includes extra MCM menu data for debugging. */ \
     SETTING(bool, captureRawRecords, false)

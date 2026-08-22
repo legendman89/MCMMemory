@@ -24,6 +24,8 @@ namespace MCMMemory
 
         static bool Load();
 
+        static bool Save();
+
         static inline std::filesystem::path Path() { return GetPluginDataPath() / "Settings.json"; }
     };
 }

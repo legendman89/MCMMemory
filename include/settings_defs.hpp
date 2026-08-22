@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hud_defs.hpp"
+#include "menu/hud_defs.hpp"
 
 #define FOREACH_SETTING(SETTING) \
     /* Controls how often backup checks a script that has not finished updating its buffers. */ \

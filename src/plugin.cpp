@@ -1,12 +1,12 @@
 
-#include "menu.hpp"
-#include "logger.hpp"
-#include "backup.hpp"
-#include "capture.hpp"
-#include "hud.hpp"
-#include "restore.hpp"
+#include "menu/hud.hpp"
+#include "menu/menu.hpp"
+#include "mcm/mcm_registry.hpp"
+#include "profile/backup.hpp"
+#include "profile/capture.hpp"
+#include "profile/restore.hpp"
 #include "settings.hpp"
-#include "mcm_registry.hpp"
+#include "utils/logger.hpp"
 
 
 namespace MCMMemory

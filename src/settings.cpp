@@ -1,6 +1,6 @@
 #include "settings.hpp"
-#include "helper.hpp"
-#include "json.hpp"
+#include "utils/helper.hpp"
+#include "utils/json.hpp"
 
 namespace MCMMemory
 {

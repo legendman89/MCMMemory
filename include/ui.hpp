@@ -3,7 +3,7 @@
 #include "plugin.hpp"
 #include "SKSEMenuFramework.h"
 
-namespace MCMMemory::Menu
+namespace MCMMemory
 {
     namespace GUI = ImGuiMCP;
 }

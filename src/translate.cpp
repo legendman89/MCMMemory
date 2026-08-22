@@ -7,6 +7,7 @@ namespace MCMMemory::Trans
 {
     bool Translator::Load()
     {
+        std::lock_guard lock(translatorMutex);
         const auto path = GetTranslationPath();
         table.clear();
         missing.clear();
@@ -50,8 +51,9 @@ namespace MCMMemory::Trans
         return true;
     }
 
-    const std::string& Translator::Get(std::string_view a_key)
+    std::string Translator::Get(std::string_view a_key)
     {
+        std::lock_guard lock(translatorMutex);
         const auto found = table.find(std::string(a_key));
         if (found != table.end()) {
             return found->second;

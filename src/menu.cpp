@@ -1,5 +1,6 @@
 #include "menu.hpp"
 #include "backup.hpp"
+#include "hud.hpp"
 #include "restore.hpp"
 #include "settings.hpp"
 #include "translate.hpp"
@@ -17,6 +18,7 @@ namespace MCMMemory::Menu
         Trans::GetTranslator().Load();
         SKSEMenuFramework::SetSection(BEAUTIFUL_NAME);
         SKSEMenuFramework::AddSectionItem("Profile", RenderProfile);
+        SKSEMenuFramework::AddHudElement(RenderHUD);
         logger::info("MCM Memory menu registered with SKSE Menu Framework {}", version);
     }
 
@@ -50,12 +52,36 @@ namespace MCMMemory::Menu
         GUI::Spacing();
         GUI::SeparatorText(Trans::Tr("HUD Notifications").c_str());
 
-        if (GUI::Checkbox(Trans::Tr("Show backup and restore summaries").c_str(), std::addressof(settings.notifications))) {
+        if (GUI::Checkbox(Trans::Tr("Show backup and restore notifications").c_str(), std::addressof(settings.notifications))) {
             settingsChanged = true;
         }
+        GUI::BeginDisabled(!settings.notifications);
+        if (GUI::Checkbox(Trans::Tr("Show individual MCM results").c_str(), std::addressof(settings.individualMCMNotifications))) {
+            settingsChanged = true;
+        }
+        GUI::SameLine();
+        if (GUI::Button(Trans::Tr("Preview").c_str())) {
+            HUD::GetSingleton()->Preview();
+        }
 
-        if (settingsChanged && !SettingsStorage::Save()) {
-            logger::error("MCM Memory menu could not save its settings");
+        if (GUI::CollapsingHeader(Trans::Tr("Appearance").c_str(), 0)) {
+            if (GUI::SliderInt(Trans::Tr("Font scale").c_str(), std::addressof(settings.notificationFontScale), 50, 200, "%d%%")) {
+                settingsChanged = true;
+            }
+            if (GUI::SliderFloat(Trans::Tr("Display duration").c_str(), std::addressof(settings.notificationDurationSeconds), 0.5F, 15.0F, "%.1f s")) {
+                settingsChanged = true;
+            }
+            if (GUI::SliderFloat(Trans::Tr("Fade duration").c_str(), std::addressof(settings.notificationFadeSeconds), 0.0F, 5.0F, "%.1f s")) {
+                settingsChanged = true;
+            }
+        }
+        GUI::EndDisabled();
+
+        if (settingsChanged) {
+            HUD::GetSingleton()->Configure(settings.notifications, settings.individualMCMNotifications);
+            if (!SettingsStorage::Save()) {
+                logger::error("MCM Memory menu could not save its settings");
+            }
         }
     }
 }

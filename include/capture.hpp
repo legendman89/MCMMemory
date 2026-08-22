@@ -5,6 +5,7 @@
 #include "mcm_registry.hpp"
 #include "profile.hpp"
 #include "settings.hpp"
+#include "stats.hpp"
 #include "storage.hpp"
 
 namespace MCMMemory
@@ -23,6 +24,13 @@ namespace MCMMemory
         FinishCaptureTask(uint64_t a_eventID, uint64_t a_loadedGameSession, bool a_persist) : eventID(a_eventID), loadedGameSession(a_loadedGameSession), persist(a_persist) {}
 
         void operator()() const;
+    };
+
+    struct AutoBackupResult
+    {
+        MCMIdentity identity;
+
+        BackupStats stats;
     };
 
     class Capture final : public RE::BSTEventSink<SKSE::ModCallbackEvent>, public RE::BSTEventSink<RE::MenuOpenCloseEvent>
@@ -75,6 +83,9 @@ namespace MCMMemory
 
         // Takes the second menu read and finishes one capture.
         void CompleteCapture(uint64_t a_eventID, bool a_persist);
+
+        // Queues one result per changed MCM when the Journal Menu closes.
+        void ShowAutoBackupResults();
         
         // Converts a raw record into a setting that can enter the profile.
         void ProcessCapturedEvent(CaptureRecord& a_record);
@@ -109,6 +120,9 @@ namespace MCMMemory
 
         // Holds the latest cleaned settings captured in this game session.
         std::vector<CapturedSetting> settings;
+
+        // Holds settings automatically saved during the current Journal Menu visit.
+        std::vector<CapturedSetting> pendingAutoBackupSettings;
 
         // Gives each new callback its eventID.
         uint64_t eventCount{};

@@ -32,6 +32,8 @@ namespace MCMMemory
 
     struct RestoreStats
     {
+        uint32_t MCMCount{};
+
         uint32_t appliedSettingCount{};
 
         uint32_t unchangedSettingCount{};
@@ -45,6 +47,7 @@ namespace MCMMemory
 
         RestoreStats& operator+=(const RestoreStats& a_other)
         {
+            MCMCount += a_other.MCMCount;
             appliedSettingCount += a_other.appliedSettingCount;
             unchangedSettingCount += a_other.unchangedSettingCount;
             skippedSettingCount += a_other.skippedSettingCount;

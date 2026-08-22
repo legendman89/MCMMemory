@@ -50,9 +50,21 @@ namespace MCMMemory
             logger::error("actionTrialDelaySeconds {} is outside the supported range 0.05 through 10.0", settings.actionTrialDelaySeconds);
             return false;
         }
+        if (settings.notificationFontScale < 50 || settings.notificationFontScale > 200) {
+            logger::error("notificationFontScale {} is outside the supported range 50 through 200", settings.notificationFontScale);
+            return false;
+        }
+        if (settings.notificationDurationSeconds < 0.5F || settings.notificationDurationSeconds > 15.0F) {
+            logger::error("notificationDurationSeconds {} is outside the supported range 0.5 through 15.0", settings.notificationDurationSeconds);
+            return false;
+        }
+        if (settings.notificationFadeSeconds < 0.0F || settings.notificationFadeSeconds > 5.0F) {
+            logger::error("notificationFadeSeconds {} is outside the supported range 0.0 through 5.0", settings.notificationFadeSeconds);
+            return false;
+        }
 
         GetSettings() = settings;
-        logger::info("Loaded settings: autoBackup={}, autoRestore={}, notifications={}, actionTrialDelaySeconds={}, captureRawRecords={}", settings.autoBackup, settings.autoRestore, settings.notifications, settings.actionTrialDelaySeconds, settings.captureRawRecords);
+        logger::info("Loaded settings: autoBackup={}, autoRestore={}, notifications={}, individualMCMNotifications={}, actionTrialDelaySeconds={}, captureRawRecords={}", settings.autoBackup, settings.autoRestore, settings.notifications, settings.individualMCMNotifications, settings.actionTrialDelaySeconds, settings.captureRawRecords);
         return true;
     }
 }

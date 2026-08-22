@@ -1,4 +1,5 @@
 #include "restore.hpp"
+#include "hud.hpp"
 
 namespace MCMMemory
 {
@@ -48,11 +49,15 @@ namespace MCMMemory
         configLoaded = true;
         configValid = LoadProfile();
         if (!configValid) {
+            HUD::GetSingleton()->ShowFailure("Restore failed", "Profile could not be loaded");
             return false;
         }
 
         manualRequest = true;
         QueueRegistryCheck();
+        if (registryCheckQueued) {
+            HUD::GetSingleton()->ShowRestoreStarted();
+        }
         logger::info("Manual persistent profile restoration requested");
         return registryCheckQueued;
     }
@@ -120,6 +125,7 @@ namespace MCMMemory
         if (result == RegistryWaitResult::Expired) {
             configValid = false;
             logger::error("Persistent profile restore stopped because the MCM registry did not become stable");
+            HUD::GetSingleton()->ShowFailure("Restore failed", "MCM registration did not finish");
             return;
         }
         if (result == RegistryWaitResult::Empty) {
@@ -143,6 +149,9 @@ namespace MCMMemory
         currentActionIndex = 0;
         if (actions.empty()) {
             logger::warn("Persistent profile restoration has no actions after finding available MCMs");
+            if (manualRequest) {
+                HUD::GetSingleton()->ShowFailure("Restore stopped", "No matching MCMs were available");
+            }
             return;
         }
 
@@ -157,6 +166,8 @@ namespace MCMMemory
         }
 
         // Keep one short result for the MCM and add it to the final result.
+        mcmStats.MCMCount = 1;
+        HUD::GetSingleton()->ShowRestoreMCM(restoreMCMs[a_mcmIndex].identity.modName, mcmStats);
         stats += mcmStats;
         logger::info("Restored '{}': {} applied, {} unchanged, {} skipped", restoreMCMs[a_mcmIndex].identity.modName, mcmStats.appliedSettingCount, mcmStats.unchangedSettingCount, mcmStats.skippedSettingCount);
         mcmStats.Reset();
@@ -242,6 +253,7 @@ namespace MCMMemory
         ++currentActionIndex;
         if (currentActionIndex >= actions.size()) {
             logger::info("Persistent profile restoration completed: {} applied, {} unchanged, {} skipped", stats.appliedSettingCount, stats.unchangedSettingCount, stats.skippedSettingCount);
+            HUD::GetSingleton()->ShowRestoreSummary(stats);
             return;
         }
 

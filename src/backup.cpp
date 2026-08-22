@@ -1,6 +1,7 @@
 #include "backup.hpp"
 #include "capture.hpp"
 #include "helper.hpp"
+#include "hud.hpp"
 
 namespace MCMMemory
 {
@@ -38,6 +39,7 @@ namespace MCMMemory
         const bool profileExists = std::filesystem::exists(ProfileStorage::Path(), error);
         if (error || (profileExists && !ProfileStorage::Load(existingProfile))) {
             logger::error("Full MCM backup refuses to replace an unreadable profile at {}", ToUTF8(ProfileStorage::Path()));
+            HUD::GetSingleton()->ShowFailure("Backup failed", "Existing profile could not be read");
             return false;
         }
 
@@ -46,6 +48,9 @@ namespace MCMMemory
         running = true;
         logger::info("Full MCM backup is waiting for a stable registry");
         QueueNext(0.0F);
+        if (running) {
+            HUD::GetSingleton()->ShowBackupStarted();
+        }
         return running;
     }
 
@@ -185,6 +190,7 @@ namespace MCMMemory
         }
         if (result == RegistryWaitResult::Expired) {
             logger::error("Full MCM backup stopped because the registry did not become stable");
+            HUD::GetSingleton()->ShowFailure("Backup failed", "MCM registration did not finish");
             running = false;
             return;
         }
@@ -431,6 +437,7 @@ namespace MCMMemory
             logger::warn("Full MCM backup kept the previous settings for '{}' after the MCM failed", modID);
         }
 
+        HUD::GetSingleton()->ShowBackupMCM(registeredMCMs[mcmIndex].identity.modName, mcmStats);
         stats += mcmStats;
 
         ++mcmIndex;
@@ -443,11 +450,13 @@ namespace MCMMemory
         Capture::GetSingleton()->MergeSettings(profile);
         if (!ProfileStorage::Save(profile)) {
             logger::error("Full MCM backup failed to save its completed profile");
+            HUD::GetSingleton()->ShowFailure("Backup failed", "Existing profile was not changed");
             running = false;
             return;
         }
 
         logger::info("Full MCM backup completed: {} settings from {} MCMs, {} skipped, {} MCMs failed", stats.settingCount, stats.MCMCount, stats.skippedSettingCount, stats.failedMCMCount);
+        HUD::GetSingleton()->ShowBackupSummary(stats);
         running = false;
     }
 }

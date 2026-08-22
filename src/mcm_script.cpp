@@ -2,6 +2,9 @@
 
 namespace MCMMemory
 {
+    // Variable is the value return by Papyrus but we don't care about it.
+    // () allows the created object to be called like a function. 
+    // See new MCMCallResult in RunNextAction.
     void MCMCallResult::operator()(RE::BSScript::Variable)
     {
         auto* tasks = SKSE::GetTaskInterface();

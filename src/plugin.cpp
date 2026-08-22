@@ -3,6 +3,7 @@
 #include "logger.hpp"
 #include "backup.hpp"
 #include "capture.hpp"
+#include "hud.hpp"
 #include "restore.hpp"
 #include "settings.hpp"
 #include "mcm_registry.hpp"
@@ -17,27 +18,36 @@ namespace MCMMemory
         }
 
         switch (a_message->type) {
-        case SKSE::MessagingInterface::kDataLoaded:
-            if (!MCMRegistry::IsSkyUIAvailable()) {
-                logger::critical("SkyUI is required, but its MCM manager quest is unavailable");
+
+            case SKSE::MessagingInterface::kDataLoaded:
+                if (!MCMRegistry::IsSkyUIAvailable()) {
+                    logger::critical("SkyUI is required, but its MCM manager quest is unavailable");
+                    break;
+                }
+                if (!SettingsStorage::Load()) {
+                    logger::critical("MCM Memory settings could not be loaded");
+                    break;
+                }
+                HUD::GetSingleton()->Configure(GetSettings().notifications, GetSettings().individualMCMNotifications);
+                Backup::GetSingleton()->Install();
+                Capture::GetSingleton()->Install();
+                Restore::GetSingleton()->Install();
                 break;
-            }
-            if (!SettingsStorage::Load()) {
-                logger::critical("MCM Memory settings could not be loaded");
+
+            case SKSE::MessagingInterface::kPreLoadGame:
+                HUD::GetSingleton()->Reset();
                 break;
-            }
-            Backup::GetSingleton()->Install();
-            Capture::GetSingleton()->Install();
-            Restore::GetSingleton()->Install();
-            break;
-        case SKSE::MessagingInterface::kNewGame:
-        case SKSE::MessagingInterface::kPostLoadGame:
-            Backup::GetSingleton()->Reset();
-            Capture::GetSingleton()->Reset();
-            Restore::GetSingleton()->Reset();
-            break;
-        default:
-            break;
+
+            case SKSE::MessagingInterface::kNewGame:
+            case SKSE::MessagingInterface::kPostLoadGame:
+                HUD::GetSingleton()->Reset();
+                Backup::GetSingleton()->Reset();
+                Capture::GetSingleton()->Reset();
+                Restore::GetSingleton()->Reset();
+                break;
+
+            default:
+                break;
         }
     }
 }

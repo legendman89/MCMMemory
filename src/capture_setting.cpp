@@ -98,8 +98,13 @@ namespace MCMMemory
 
         // Incomplete settings stay in Capture.json but not saved in Profile.json.
         setting.identityComplete = !setting.selection.identity.modName.empty() && !setting.selection.identity.modID.empty() && setting.selection.optionIndex >= 0 && !setting.optionLabel.empty() && setting.type != ControlType::Unknown && !setting.valueSource.empty();
-        if (setting.identityComplete && GetSettings().autoBackup && !ProfileStorage::UpdateSetting(setting)) {
-            logger::error("Failed to update captured setting '{}' in the persistent profile", setting.optionLabel);
+        if (setting.identityComplete && GetSettings().autoBackup) {
+            if (ProfileStorage::UpdateSetting(setting)) {
+                Deduplicate(pendingAutoBackupSettings, setting);
+            }
+            else {
+                logger::error("Failed to update captured setting '{}' in the persistent profile", setting.optionLabel);
+            }
         }
 
         Deduplicate(settings, std::move(setting));

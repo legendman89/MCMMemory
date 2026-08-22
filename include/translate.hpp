@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <format>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -21,13 +22,15 @@ namespace MCMMemory::Trans
 
         bool Load();
 
-        const std::string& Get(std::string_view a_key);
+        std::string Get(std::string_view a_key);
 
     private:
 
         std::unordered_map<std::string, std::string> table;
 
         std::unordered_map<std::string, std::string> missing;
+
+        std::mutex translatorMutex;
     };
 
     inline Translator& GetTranslator()
@@ -36,7 +39,7 @@ namespace MCMMemory::Trans
         return translator;
     }
 
-    inline const std::string& Tr(std::string_view a_key)
+    inline std::string Tr(std::string_view a_key)
     {
         return GetTranslator().Get(a_key);
     }

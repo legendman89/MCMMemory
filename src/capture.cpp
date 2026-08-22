@@ -1,4 +1,5 @@
 #include "capture.hpp"
+#include "hud.hpp"
 
 namespace MCMMemory
 {
@@ -46,6 +47,7 @@ namespace MCMMemory
         mcmIdentities.clear();
         records.clear();
         settings.clear();
+        pendingAutoBackupSettings.clear();
         logger::info("Capture session reset");
     }
 
@@ -116,13 +118,49 @@ namespace MCMMemory
 
         std::scoped_lock lock(captureMutex);
         if (a_event->opening) {
+            pendingAutoBackupSettings.clear();
             logger::info("Journal Menu opened; watching for MCM configuration events");
         }
-        else if (!records.empty()) {
-            CaptureStorage::Save(records, settings, GetSettings().captureRawRecords);
+        else {
+            if (!records.empty()) {
+                CaptureStorage::Save(records, settings, GetSettings().captureRawRecords);
+            }
+            ShowAutoBackupResults();
         }
 
         return RE::BSEventNotifyControl::kContinue;
+    }
+
+    void Capture::ShowAutoBackupResults()
+    {
+        if (!GetSettings().autoBackup || pendingAutoBackupSettings.empty()) {
+            pendingAutoBackupSettings.clear();
+            return;
+        }
+
+        std::vector<AutoBackupResult> results;
+        for (const auto& setting : pendingAutoBackupSettings) {
+            auto result = results.begin();
+            for (; result != results.end() && result->identity.modID != setting.selection.identity.modID; ++result) {}
+            if (result == results.end()) {
+                AutoBackupResult newResult;
+                newResult.identity = setting.selection.identity;
+                results.push_back(std::move(newResult));
+                result = results.end();
+                --result;
+            }
+            ++result->stats.settingCount;
+        }
+
+        BackupStats total;
+        for (auto& result : results) {
+            result.stats.MCMCount = 1;
+            total += result.stats;
+            HUD::GetSingleton()->ShowBackupMCM(result.identity.modName, result.stats);
+        }
+        HUD::GetSingleton()->ShowBackupSummary(total);
+        logger::info("Automatic backup updated {} settings from {} MCMs", total.settingCount, total.MCMCount);
+        pendingAutoBackupSettings.clear();
     }
 
     uint64_t Capture::RecordEvent(EventType a_type, const SKSE::ModCallbackEvent& a_event, nlohmann::json a_state)

@@ -32,8 +32,7 @@ namespace MCMMemory
         }
 
         for (auto& message : notificationQueue) {
-            const auto delay = std::chrono::duration<float>(GetDelaySeconds(message.type));
-            message.showAt = message.createdAt + std::chrono::duration_cast<std::chrono::steady_clock::duration>(delay);
+            message.showAt = TimeAfter(message.createdAt, GetDelaySeconds(message.type));
         }
 
         if (!a_settings.individualMCMNotifications) {
@@ -205,8 +204,7 @@ namespace MCMMemory
     void HUD::BeginOperation(HUDMessage a_message)
     {
         std::lock_guard lock(hudMutex);
-        const auto delay = std::chrono::duration<float>(GetDelaySeconds(a_message.type));
-        a_message.showAt = a_message.createdAt + std::chrono::duration_cast<std::chrono::steady_clock::duration>(delay);
+        a_message.showAt = TimeAfter(a_message.createdAt, GetDelaySeconds(a_message.type));
         notificationQueue.clear();
         display.Reset();
         notificationQueue.push_back(std::move(a_message));
@@ -215,8 +213,7 @@ namespace MCMMemory
     void HUD::QueueMessage(HUDMessage a_message)
     {
         std::lock_guard lock(hudMutex);
-        const auto delay = std::chrono::duration<float>(GetDelaySeconds(a_message.type));
-        a_message.showAt = a_message.createdAt + std::chrono::duration_cast<std::chrono::steady_clock::duration>(delay);
+        a_message.showAt = TimeAfter(a_message.createdAt, GetDelaySeconds(a_message.type));
         notificationQueue.push_back(std::move(a_message));
     }
 
@@ -233,7 +230,7 @@ namespace MCMMemory
         const bool previewActive = display.active && display.message.type == HUDMessageType::Preview;
         if (a_blocked && !previewActive) {
             gameMenuBlocked = true;
-            if (display.active && display.pausedAt.time_since_epoch().count() == 0) {
+            if (display.active && !IsTimeSet(display.pausedAt)) {
                 display.pausedAt = a_now;
             }
             return true;
@@ -247,16 +244,15 @@ namespace MCMMemory
         if (gameMenuBlocked) {
             gameMenuBlocked = false;
             if (display.active || !notificationQueue.empty()) {
-                const auto delay = std::chrono::duration<float>(options.menuCloseDelaySeconds);
-                menuResumeAt = a_now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(delay);
+                menuResumeAt = TimeAfter(a_now, options.menuCloseDelaySeconds);
             }
         }
-        if (menuResumeAt.time_since_epoch().count() != 0 && a_now < menuResumeAt) {
+        if (IsTimeSet(menuResumeAt) && a_now < menuResumeAt) {
             return true;
         }
-        if (menuResumeAt.time_since_epoch().count() != 0) {
+        if (IsTimeSet(menuResumeAt)) {
             menuResumeAt = {};
-            if (display.pausedAt.time_since_epoch().count() != 0) {
+            if (IsTimeSet(display.pausedAt)) {
                 display.startedAt += a_now - display.pausedAt;
                 display.pausedAt = {};
             }
@@ -270,25 +266,20 @@ namespace MCMMemory
             return false;
         }
 
-        const float age = std::chrono::duration<float>(a_now - display.startedAt).count();
+        const float age = SecondsSince(display.startedAt, a_now);
         if (age >= options.durationSeconds + options.fadeSeconds) {
             display.active = false;
-            const auto gap = std::chrono::duration<float>(options.gapSeconds);
-            display.nextAt = a_now + std::chrono::duration_cast<std::chrono::steady_clock::duration>(gap);
+            display.nextAt = TimeAfter(a_now, options.gapSeconds);
             return true;
         }
 
-        float alpha = 1.0F;
-        if (options.fadeSeconds > 0.0F && age > options.durationSeconds) {
-            alpha = 1.0F - (age - options.durationSeconds) / options.fadeSeconds;
-        }
-        DrawMessage(display.message, alpha);
+        DrawMessage(display.message, FadeAlpha(age, options.durationSeconds, options.fadeSeconds));
         return true;
     }
 
     bool HUD::StartNextMessage(const std::chrono::steady_clock::time_point& a_now)
     {
-        if (display.nextAt.time_since_epoch().count() != 0 && a_now < display.nextAt) {
+        if (IsTimeSet(display.nextAt) && a_now < display.nextAt) {
             return false;
         }
         if (notificationQueue.empty() || a_now < notificationQueue.front().showAt) {
@@ -379,32 +370,28 @@ namespace MCMMemory
             return;
         }
         if (a_blocked) {
-            if (warning.startedAt.time_since_epoch().count() != 0 && warning.pausedAt.time_since_epoch().count() == 0) {
+            if (IsTimeSet(warning.startedAt) && !IsTimeSet(warning.pausedAt)) {
                 warning.pausedAt = a_now;
             }
             return;
         }
-        if (warning.pausedAt.time_since_epoch().count() != 0) {
+        if (IsTimeSet(warning.pausedAt)) {
             warning.startedAt += a_now - warning.pausedAt;
             warning.pausedAt = {};
         }
-        if (warning.startedAt.time_since_epoch().count() == 0) {
+        if (!IsTimeSet(warning.startedAt)) {
             warning.startedAt = a_now;
         }
 
-        const float age = std::chrono::duration<float>(a_now - warning.startedAt).count();
+        const float age = SecondsSince(warning.startedAt, a_now);
         if (age >= options.warningDurationSeconds) {
             warning.Reset();
             return;
         }
 
-        float alpha = 1.0F;
         const float fadeSeconds = std::min(options.fadeSeconds, options.warningDurationSeconds);
         const float fadeAt = options.warningDurationSeconds - fadeSeconds;
-        if (fadeSeconds > 0.0F && age > fadeAt) {
-            alpha = 1.0F - (age - fadeAt) / fadeSeconds;
-        }
-        DrawRestoreMenuWarning(alpha);
+        DrawRestoreMenuWarning(FadeAlpha(age, fadeAt, fadeSeconds));
     }
 
     void HUD::DrawRestoreMenuWarning(float a_alpha) const

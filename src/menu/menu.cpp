@@ -1,5 +1,6 @@
 #include "menu/hud.hpp"
 #include "menu/menu.hpp"
+#include "menu/icons.hpp"
 #include "menu/translate.hpp"
 #include "profile/backup.hpp"
 #include "profile/restore.hpp"
@@ -25,15 +26,16 @@ namespace MCMMemory::Menu
     void __stdcall RenderProfile()
     {
         const bool operationRunning = Backup::GetSingleton()->IsRunning() || Restore::GetSingleton()->IsRunning();
-        GUI::BeginDisabled(operationRunning);
-        if (GUI::Button(Trans::Tr("Back Up Now").c_str())) {
+
+        if (IconCTAButton(Trans::Tr("Back Up Now").c_str(), !operationRunning, Icons::kSave, Color::kBackupButtonColors)) {
             Backup::GetSingleton()->Start();
         }
+
         GUI::SameLine();
-        if (GUI::Button(Trans::Tr("Restore Now").c_str())) {
+
+        if (IconCTAButton(Trans::Tr("Restore Now").c_str(), !operationRunning, Icons::kRestore, Color::kRestoreButtonColors)) {
             Restore::GetSingleton()->Start();
         }
-        GUI::EndDisabled();
 
         GUI::Spacing();
 

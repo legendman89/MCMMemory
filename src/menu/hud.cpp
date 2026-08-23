@@ -16,7 +16,16 @@ namespace MCMMemory
     void HUD::Configure(const Settings& a_settings)
     {
         enabled.store(a_settings.notifications, std::memory_order_relaxed);
-        individualMCMs.store(a_settings.individualMCMNotifications, std::memory_order_relaxed);
+        
+        const std::array<bool, static_cast<size_t>(OperationMode::Count)> perModOptions
+        {
+            a_settings.perModNotificationsAuto,
+            a_settings.perModNotificationsManual
+        };
+
+        for (size_t index = 0; index < perModOptions.size(); ++index) {
+            perModNotifications[index].store(perModOptions[index], std::memory_order_relaxed);
+        }
 
         std::lock_guard lock(hudMutex);
 #define COPY_HUD_OPTION(type, settingName, defaultValue, optionName, minimum, maximum, label, format) options.optionName = a_settings.settingName;
@@ -35,19 +44,17 @@ namespace MCMMemory
             message.showAt = TimeAfter(message.createdAt, GetDelaySeconds(message.type));
         }
 
-        if (!a_settings.individualMCMNotifications) {
-            auto message = notificationQueue.begin();
-            while (message != notificationQueue.end()) {
-                if (message->type == HUDMessageType::MCMResult) {
-                    message = notificationQueue.erase(message);
-                }
-                else {
-                    ++message;
-                }
+        auto message = notificationQueue.begin();
+        while (message != notificationQueue.end()) {
+            if (message->type == HUDMessageType::MCMResult && !ShouldShowPerMod(message->operationMode)) {
+                message = notificationQueue.erase(message);
             }
-            if (display.active && display.message.type == HUDMessageType::MCMResult) {
-                display.Reset();
+            else {
+                ++message;
             }
+        }
+        if (display.active && display.message.type == HUDMessageType::MCMResult && !ShouldShowPerMod(display.message.operationMode)) {
+            display.Reset();
         }
     }
 
@@ -73,14 +80,15 @@ namespace MCMMemory
         BeginOperation(std::move(message));
     }
 
-    void HUD::ShowBackupMCM(std::string_view a_modName, const BackupStats& a_stats)
+    void HUD::ShowBackupMCM(std::string_view a_modName, const BackupStats& a_stats, OperationMode a_operationMode)
     {
-        if (!enabled.load(std::memory_order_relaxed) || !individualMCMs.load(std::memory_order_relaxed)) {
+        if (!enabled.load(std::memory_order_relaxed) || !ShouldShowPerMod(a_operationMode)) {
             return;
         }
 
         HUDMessage message;
         message.type = HUDMessageType::MCMResult;
+        message.operationMode = a_operationMode;
         const auto modName = GetDisplayModName(a_modName);
         if (a_stats.failedMCMCount > 0) {
             message.segments.push_back({ Trans::Format("{} backup failed", modName), HUDColor::Error });
@@ -96,14 +104,15 @@ namespace MCMMemory
         QueueMessage(std::move(message));
     }
 
-    void HUD::ShowRestoreMCM(std::string_view a_modName, const RestoreStats& a_stats)
+    void HUD::ShowRestoreMCM(std::string_view a_modName, const RestoreStats& a_stats, OperationMode a_operationMode)
     {
-        if (!enabled.load(std::memory_order_relaxed) || !individualMCMs.load(std::memory_order_relaxed)) {
+        if (!enabled.load(std::memory_order_relaxed) || !ShouldShowPerMod(a_operationMode)) {
             return;
         }
 
         HUDMessage message;
         message.type = HUDMessageType::MCMResult;
+        message.operationMode = a_operationMode;
         const auto modName = GetDisplayModName(a_modName);
         if (a_stats.appliedSettingCount == 0 && a_stats.unchangedSettingCount == 0 && a_stats.skippedSettingCount > 0) {
             message.segments.push_back({ Trans::Format("{} restore skipped", modName), HUDColor::Warning });

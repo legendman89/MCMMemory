@@ -156,7 +156,7 @@ namespace MCMMemory
         for (auto& result : results) {
             result.stats.MCMCount = 1;
             total += result.stats;
-            HUD::GetSingleton()->ShowBackupMCM(result.identity.modName, result.stats);
+            HUD::GetSingleton()->ShowBackupMCM(result.identity.modName, result.stats, OperationMode::Automatic);
         }
         HUD::GetSingleton()->ShowBackupSummary(total);
         logger::info("Automatic backup updated {} settings from {} MCMs", total.settingCount, total.MCMCount);

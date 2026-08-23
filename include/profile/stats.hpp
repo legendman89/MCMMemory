@@ -17,6 +17,13 @@
 
 namespace MCMMemory
 {
+    enum class OperationMode
+    {
+        Automatic,
+        Manual,
+        Count
+    };
+
     struct BackupStats
     {
 #define DECLARE_STAT(name) uint32_t name{};

@@ -23,12 +23,6 @@ namespace MCMMemory
         Finish
     };
 
-    enum class BackupRequestType
-    {
-        Manual,
-        Automatic
-    };
-
     struct BackupPage
     {
         std::string name;
@@ -57,7 +51,7 @@ namespace MCMMemory
 
         inline bool Start()
         {
-            return Begin(BackupRequestType::Manual);
+            return Begin(OperationMode::Manual);
         }
 
         inline bool IsRunning()
@@ -85,7 +79,7 @@ namespace MCMMemory
             }
         }
 
-        bool Begin(BackupRequestType a_requestType);
+        bool Begin(OperationMode a_operationMode);
 
         void RunNextStep(uint64_t a_loadedGameSession, uint64_t a_taskID);
 
@@ -151,7 +145,7 @@ namespace MCMMemory
 
         BackupStep step{ BackupStep::Registry };
 
-        BackupRequestType requestType{ BackupRequestType::Manual };
+        OperationMode operationMode{ OperationMode::Manual };
 
         bool installed{};
 

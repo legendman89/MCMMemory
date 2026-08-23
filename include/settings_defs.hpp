@@ -8,11 +8,13 @@
     FOREACH_HUD_SETTING(SETTING) \
     /* Keeps the profile updated and creates the first full backup when needed. */ \
     SETTING(bool, autoBackup, true) \
-    /* Restores the profile after MCM registration finishes. */ \
+    /* Restores the profile after a new game's MCM registration finishes. */ \
     SETTING(bool, autoRestore, true) \
     /* Shows backup and restore notifications through SKSE Menu Framework. */ \
     SETTING(bool, notifications, true) \
-    /* Shows each MCM completed during backup or restore. */ \
-    SETTING(bool, individualMCMNotifications, false) \
+    /* Shows each MCM completed during auto backup or restore. */ \
+    SETTING(bool, perModNotificationsAuto, false) \
+    /* Shows each MCM completed during manual backup or restore. */ \
+    SETTING(bool, perModNotificationsManual, false) \
     /* Controls whether Capture.json includes extra MCM menu data for debugging. */ \
     SETTING(bool, captureRawRecords, false)

@@ -337,6 +337,8 @@ namespace MCMMemory
 
         RestoreStats mcmStats;
 
+        OperationMode operationMode{ OperationMode::Automatic };
+
         // Prevents the registration listener from being installed twice.
         bool installed{};
 
@@ -357,8 +359,6 @@ namespace MCMMemory
 
         // Prevents repeated ready events from queuing the same registry check.
         bool registryCheckQueued{};
-
-        bool manualRequest{};
 
         bool requestFailed{};
 

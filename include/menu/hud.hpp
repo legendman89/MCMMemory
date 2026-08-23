@@ -78,6 +78,8 @@ namespace MCMMemory
         std::chrono::steady_clock::time_point showAt{};
 
         HUDMessageType type{ HUDMessageType::MCMResult };
+
+        OperationMode operationMode{ OperationMode::Automatic };
     };
 
     struct HUDDisplay
@@ -149,9 +151,9 @@ namespace MCMMemory
 
         void Reset();
 
-        void ShowBackupMCM(std::string_view a_modName, const BackupStats& a_stats);
+        void ShowBackupMCM(std::string_view a_modName, const BackupStats& a_stats, OperationMode a_operationMode);
 
-        void ShowRestoreMCM(std::string_view a_modName, const RestoreStats& a_stats);
+        void ShowRestoreMCM(std::string_view a_modName, const RestoreStats& a_stats, OperationMode a_operationMode);
 
         void ShowBackupSummary(const BackupStats& a_stats);
 
@@ -197,6 +199,12 @@ namespace MCMMemory
             return delays[static_cast<size_t>(a_type)];
         }
 
+        inline bool ShouldShowPerMod(OperationMode a_operationMode) const
+        {
+            const size_t index = static_cast<size_t>(a_operationMode);
+            return index < perModNotifications.size() && perModNotifications[index].load(std::memory_order_relaxed);
+        }
+
         void ShowOperationStarted(std::string_view a_text);
 
         void BeginOperation(HUDMessage a_message);
@@ -236,7 +244,7 @@ namespace MCMMemory
 
         std::atomic<bool> enabled{ true };
 
-        std::atomic<bool> individualMCMs{};
+        std::array<std::atomic<bool>, static_cast<size_t>(OperationMode::Count)> perModNotifications{};
 
         bool gameMenuBlocked{};
     };

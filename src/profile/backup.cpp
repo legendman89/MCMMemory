@@ -26,7 +26,7 @@ namespace MCMMemory
         return true;
     }
 
-    bool Backup::Begin(BackupRequestType a_requestType)
+    bool Backup::Begin(OperationMode a_operationMode)
     {
         std::lock_guard lock(backupMutex);
         if (running) {
@@ -44,12 +44,12 @@ namespace MCMMemory
         }
 
         Clear();
-        requestType = a_requestType;
+        operationMode = a_operationMode;
         profile = std::move(existingProfile);
         running = true;
         logger::info("Full MCM backup is waiting for a stable registry");
         QueueNext(0.0F);
-        if (running && requestType == BackupRequestType::Manual) {
+        if (running && operationMode == OperationMode::Manual) {
             HUD::GetSingleton()->ShowBackupStarted();
         }
         return running;
@@ -72,7 +72,7 @@ namespace MCMMemory
         scriptWaitCount = 0;
         scheduledTaskID = 0;
         step = BackupStep::Registry;
-        requestType = BackupRequestType::Manual;
+        operationMode = OperationMode::Manual;
         mcmFailed = false;
         running = false;
     }
@@ -112,7 +112,7 @@ namespace MCMMemory
             std::lock_guard lock(backupMutex);
             initialBackupChecked = false;
         }
-        else if (!profileExists && !Begin(BackupRequestType::Automatic)) {
+        else if (!profileExists && !Begin(OperationMode::Automatic)) {
             std::lock_guard lock(backupMutex);
             initialBackupChecked = false;
         }
@@ -181,7 +181,7 @@ namespace MCMMemory
             registeredMCMs = std::move(currentMCMs);
             step = BackupStep::OpenMCM;
             logger::info("Full MCM backup found {} stable registered MCMs", registeredMCMs.size());
-            if (requestType == BackupRequestType::Automatic) {
+            if (operationMode == OperationMode::Automatic) {
                 HUD::GetSingleton()->ShowBackupStarted();
             }
             QueueNext(0.0F);
@@ -436,7 +436,7 @@ namespace MCMMemory
             logger::warn("Full MCM backup kept the previous settings for '{}' after the MCM failed", modID);
         }
 
-        HUD::GetSingleton()->ShowBackupMCM(registeredMCMs[mcmIndex].identity.modName, mcmStats);
+        HUD::GetSingleton()->ShowBackupMCM(registeredMCMs[mcmIndex].identity.modName, mcmStats, operationMode);
         stats += mcmStats;
 
         ++mcmIndex;

@@ -32,7 +32,7 @@ namespace MCMMemory::Menu
             Backup::GetSingleton()->Start();
         }
 
-        GUI::SameLine();
+        GUI::SameLine(0.0F, 18.0F);
 
         if (IconCTAButton(Trans::Tr("Restore Now").c_str(), operationAvailable, Icons::kRestore, Color::kRestoreButtonColors)) {
             Restore::GetSingleton()->Start();
@@ -47,6 +47,9 @@ namespace MCMMemory::Menu
             if (GUI::Checkbox(Trans::Tr("Automatic backup").c_str(), std::addressof(settings.autoBackup))) {
                 settingsChanged = true;
             }
+
+            GUI::SameLine(0.0F, 20.0F);
+
             if (GUI::Checkbox(Trans::Tr("Automatic restore").c_str(), std::addressof(settings.autoRestore))) {
                 settingsChanged = true;
             }
@@ -62,11 +65,17 @@ namespace MCMMemory::Menu
 
             GUI::BeginDisabled(!settings.notifications);
 
-            if (GUI::Checkbox(Trans::Tr("Show individual MCM results").c_str(), std::addressof(settings.individualMCMNotifications))) {
+            if (GUI::Checkbox(Trans::Tr("Show per-mod notifications in auto mode").c_str(), std::addressof(settings.perModNotificationsAuto))) {
                 settingsChanged = true;
             }
 
             GUI::SameLine(0.0F, 18.0F);
+
+            if (GUI::Checkbox(Trans::Tr("Show per-mod notifications in manual mode").c_str(), std::addressof(settings.perModNotificationsManual))) {
+                settingsChanged = true;
+            }
+
+            GUI::Spacing();
 
             if (IconButton(Trans::Tr("Preview").c_str(), Icons::kPreview, Color::kPreviewButtonColors)) {
                 HUD::GetSingleton()->Preview();

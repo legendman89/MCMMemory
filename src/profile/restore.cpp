@@ -37,7 +37,7 @@ namespace MCMMemory
         stats.Reset();
         mcmStats.Reset();
         scheduledTaskID = 0;
-        manualRequest = false;
+        operationMode = OperationMode::Automatic;
         requestFailed = false;
         journalMenuOpen = false;
         characterCreationOpen = false;
@@ -58,7 +58,7 @@ namespace MCMMemory
             return false;
         }
 
-        manualRequest = true;
+        operationMode = OperationMode::Manual;
         QueueRegistryCheck();
         if (registryCheckQueued) {
             HUD::GetSingleton()->ShowRestoreStarted();
@@ -157,7 +157,7 @@ namespace MCMMemory
         }
 
         registryCheckQueued = false;
-        if (started || !configValid || (!manualRequest && (!autoRestoreAllowed || !GetSettings().autoRestore))) {
+        if (started || !configValid || (operationMode == OperationMode::Automatic && (!autoRestoreAllowed || !GetSettings().autoRestore))) {
             return;
         }
 
@@ -213,7 +213,7 @@ namespace MCMMemory
         currentActionIndex = 0;
         if (actions.empty()) {
             logger::warn("Persistent profile restoration has no actions after finding available MCMs");
-            if (manualRequest) {
+            if (operationMode == OperationMode::Manual) {
                 HUD::GetSingleton()->ShowFailure("Restore stopped", "No matching MCMs were available");
             }
             return;
@@ -221,7 +221,7 @@ namespace MCMMemory
 
         restoring = true;
 
-        if (!manualRequest) {
+        if (operationMode == OperationMode::Automatic) {
             HUD::GetSingleton()->ShowRestoreStarted();
         }
         if (auto* ui = RE::UI::GetSingleton()) {
@@ -249,7 +249,7 @@ namespace MCMMemory
 
         // Keep one short result for the MCM and add it to the final result.
         mcmStats.MCMCount = 1;
-        HUD::GetSingleton()->ShowRestoreMCM(restoreMCMs[a_mcmIndex].identity.modName, mcmStats);
+        HUD::GetSingleton()->ShowRestoreMCM(restoreMCMs[a_mcmIndex].identity.modName, mcmStats, operationMode);
         stats += mcmStats;
         logger::info("Restored '{}': {} applied, {} unchanged, {} skipped", restoreMCMs[a_mcmIndex].identity.modName, mcmStats.appliedSettingCount, mcmStats.unchangedSettingCount, mcmStats.skippedSettingCount);
         mcmStats.Reset();

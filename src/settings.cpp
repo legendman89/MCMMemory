@@ -59,7 +59,17 @@ namespace MCMMemory
 #undef VALIDATE_HUD_SETTING
 
         GetSettings() = settings;
-        logger::info("Loaded settings: autoBackup={}, autoRestore={}, notifications={}, individualMCMNotifications={}, startDelay={}, menuCloseDelay={}, summaryDelay={}, messageGap={}, actionTrialDelaySeconds={}, captureRawRecords={}", settings.autoBackup, settings.autoRestore, settings.notifications, settings.individualMCMNotifications, settings.notificationStartDelaySeconds, settings.notificationMenuCloseDelaySeconds, settings.notificationSummaryDelaySeconds, settings.notificationGapSeconds, settings.actionTrialDelaySeconds, settings.captureRawRecords);
+
+#define LOG_FORMATTER(type, name, defaultValue, ...) " {:<30s} : {}\n"
+#define LOG_SETTING(type, name, defaultValue, ...) , #name, settings.name
+        logger::info(
+            "Loaded Settings:\n"
+            FOREACH_SETTING(LOG_FORMATTER)
+            FOREACH_SETTING(LOG_SETTING)
+        );
+#undef LOG_SETTING
+#undef LOG_FORMATTER
+
         return true;
     }
 }

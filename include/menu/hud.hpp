@@ -165,9 +165,13 @@ namespace MCMMemory
 
         void Preview();
 
+        void KeepPreviewAlive();
+
         void Render();
 
     private:
+
+        void StartPreview(const std::chrono::steady_clock::time_point& a_now);
 
         void StartMessage(HUDMessage a_message, const std::chrono::steady_clock::time_point& a_now)
         {

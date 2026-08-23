@@ -191,23 +191,48 @@ namespace MCMMemory
         warning.active = true;
     }
 
+    void HUD::StartPreview(const std::chrono::steady_clock::time_point& a_now)
+    {
+        HUDMessage message;
+        message.type = HUDMessageType::Preview;
+        message.segments.push_back({ Trans::Tr("42 MCMs backed up"), HUDColor::Success });
+        message.segments.push_back({ Trans::Tr("    318 settings"), HUDColor::Accent });
+
+        gameMenuBlocked = false;
+        menuResumeAt = {};
+        StartMessage(std::move(message), a_now);
+    }
+
     void HUD::Preview()
     {
         if (!enabled.load(std::memory_order_relaxed)) {
             return;
         }
 
-        HUDMessage message;
-        message.type = HUDMessageType::Preview;
-        message.segments.push_back({ Trans::Tr("42 MCMs backed up"), HUDColor::Success });
-        message.segments.push_back({ Trans::Tr("    318 settings"), HUDColor::Accent });
+        const auto now = std::chrono::steady_clock::now();
+        std::lock_guard lock(hudMutex);
+        StartPreview(now);
+        logger::info("HUD notification preview started");
+    }
+
+    void HUD::KeepPreviewAlive()
+    {
+        if (!enabled.load(std::memory_order_relaxed)) {
+            return;
+        }
 
         const auto now = std::chrono::steady_clock::now();
         std::lock_guard lock(hudMutex);
         gameMenuBlocked = false;
         menuResumeAt = {};
-        StartMessage(std::move(message), now);
-        logger::info("HUD notification preview started");
+
+        if (display.active && display.message.type == HUDMessageType::Preview) {
+            display.startedAt = now;
+            display.pausedAt = {};
+            return;
+        }
+
+        StartPreview(now);
     }
 
     void HUD::BeginOperation(HUDMessage a_message)

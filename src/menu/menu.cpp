@@ -42,6 +42,7 @@ namespace MCMMemory::Menu
 
         auto& settings = GetSettings();
         bool settingsChanged{};
+        bool appearanceSettingActive{};
 
         if (GUI::CollapsingHeader(Trans::Tr("Automation").c_str(), GUI::ImGuiTreeNodeFlags_DefaultOpen)) {
             if (GUI::Checkbox(Trans::Tr("Automatic backup").c_str(), std::addressof(settings.autoBackup))) {
@@ -86,7 +87,8 @@ namespace MCMMemory::Menu
 #define DRAW_HUD_APPEARANCE_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
             if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
                 settingsChanged = true; \
-            }
+            } \
+            appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive();
             FOREACH_HUD_APPEARANCE_SETTING(DRAW_HUD_APPEARANCE_SETTING)
 #undef DRAW_HUD_APPEARANCE_SETTING
 
@@ -113,6 +115,10 @@ namespace MCMMemory::Menu
             if (!SettingsStorage::Save()) {
                 logger::error("MCM Memory menu could not save its settings");
             }
+        }
+
+        if (appearanceSettingActive) {
+            HUD::GetSingleton()->KeepPreviewAlive();
         }
     }
 }

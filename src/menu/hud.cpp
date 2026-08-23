@@ -16,7 +16,7 @@ namespace MCMMemory
     void HUD::Configure(const Settings& a_settings)
     {
         enabled.store(a_settings.notifications, std::memory_order_relaxed);
-        
+
         const std::array<bool, static_cast<size_t>(OperationMode::Count)> perModOptions
         {
             a_settings.perModNotificationsAuto,
@@ -344,28 +344,34 @@ namespace MCMMemory
         }
 
         const float requestedScale = static_cast<float>(options.fontScale) / 100.0F;
-        const float availableWidth = io->DisplaySize.x - 2.0F * HUDMargin - 2.0F * HUDHorizontalPadding;
+        const float availableWidth = io->DisplaySize.x - 2.0F * HUDHorizontalPadding;
         if (availableWidth <= 0.0F) {
             return;
         }
         const float fontScale = std::min(requestedScale, availableWidth / totalWidth);
         const float scaledWidth = totalWidth * fontScale;
         const float scaledHeight = font->FontSize * fontScale;
-        const float textX = io->DisplaySize.x - HUDMargin - HUDHorizontalPadding - scaledWidth;
-        const float textY = HUDMargin + HUDVerticalPadding;
+        const float backgroundWidth = scaledWidth + 2.0F * HUDHorizontalPadding;
+        const float backgroundHeight = scaledHeight + 2.0F * HUDVerticalPadding;
+        const float maximumX = std::max(0.0F, io->DisplaySize.x - backgroundWidth);
+        const float maximumY = std::max(0.0F, io->DisplaySize.y - backgroundHeight);
+        const float backgroundX = std::clamp(static_cast<float>(options.horizontalOffset), 0.0F, maximumX);
+        const float backgroundY = std::clamp(static_cast<float>(options.verticalOffset), 0.0F, maximumY);
+        const GUI::ImVec2 backgroundMin{ backgroundX, backgroundY };
+        const GUI::ImVec2 backgroundMax{ backgroundX + backgroundWidth, backgroundY + backgroundHeight };
+        const float textX = backgroundX + HUDHorizontalPadding;
+        const float textY = backgroundY + HUDVerticalPadding;
 
-        // Draw a dark background behind the notification.
-        const GUI::ImVec2 backgroundMin{ textX - HUDHorizontalPadding, textY - HUDVerticalPadding };
-        const GUI::ImVec2 backgroundMax{ textX + scaledWidth + HUDHorizontalPadding, textY + scaledHeight + HUDVerticalPadding };
-        const auto backgroundColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.04F, 0.04F, 0.05F, 0.78F * a_alpha });
-        GUI::ImDrawListManager::AddRectFilled(drawList, backgroundMin, backgroundMax, backgroundColor, 5.0F, 0);
+        // The light translucent surface keeps the text readable without hiding the scene.
+        const auto backgroundColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.96F, 0.96F, 0.96F, 0.75F * a_alpha });
+        GUI::ImDrawListManager::AddRectFilled(drawList, backgroundMin, backgroundMax, backgroundColor, 7.0F, 0);
 
         float positionX = textX;
         for (const auto& segment : a_message.segments) {
             const GUI::ImVec2 size = GUI::CalcTextSize(segment.text.c_str(), nullptr, false, 0.0F);
             const GUI::ImVec2 shadowPosition{ positionX + 1.0F, textY + 1.0F };
             const GUI::ImVec2 textPosition{ positionX, textY };
-            const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.85F * a_alpha });
+            const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.18F * a_alpha });
             const auto textColor = GUI::ColorConvertFloat4ToU32(GetColor(segment.color, a_alpha));
             GUI::ImDrawListManager::AddText(drawList, font, scaledHeight, shadowPosition, shadowColor, segment.text.c_str());
             GUI::ImDrawListManager::AddText(drawList, font, scaledHeight, textPosition, textColor, segment.text.c_str());
@@ -438,11 +444,11 @@ namespace MCMMemory
         const float textX = cardMin.x + HUDWarningAccentWidth + HUDWarningHorizontalPadding;
         const float titleY = cardMin.y + HUDWarningVerticalPadding;
         const float detailY = titleY + lineHeight + HUDWarningLineGap;
-        const auto backgroundColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.04F, 0.04F, 0.05F, 0.90F * a_alpha });
+        const auto backgroundColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.96F, 0.96F, 0.96F, 0.86F * a_alpha });
         const auto accentColor = GUI::ColorConvertFloat4ToU32(GetColor(HUDColor::Warning, a_alpha));
         const auto titleColor = GUI::ColorConvertFloat4ToU32(GetColor(HUDColor::Warning, a_alpha));
         const auto detailColor = GUI::ColorConvertFloat4ToU32(GetColor(HUDColor::Primary, a_alpha));
-        const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.85F * a_alpha });
+        const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.18F * a_alpha });
 
         GUI::ImDrawListManager::AddRectFilled(drawList, cardMin, cardMax, backgroundColor, 5.0F, 0);
         GUI::ImDrawListManager::AddRectFilled(drawList, cardMin, accentMax, accentColor, 5.0F, 0);

@@ -7,6 +7,8 @@ namespace MCMMemory::Menu::Color
 
     struct ButtonColors
     {
+        GUI::ImVec4 background;
+
         GUI::ImVec4 hover;
 
         GUI::ImVec4 active;
@@ -51,9 +53,10 @@ namespace MCMMemory::Menu::Color
 
     inline constexpr ButtonColors kPreviewButtonColors
     {
-        { 0.00F, 0.50F, 1.00F, 1.00F },
-        { 0.00F, 0.40F, 0.80F, 1.00F },
-        { 1.00F, 1.00F, 1.00F, 1.00F }
+        { 0.55F, 0.40F, 0.14F, 1.00F },
+        { 0.63F, 0.44F, 0.15F, 1.00F },
+        { 0.50F, 0.34F, 0.10F, 1.00F },
+        { 1.00F, 0.93F, 0.78F, 1.00F }
     };
 
     inline constexpr GUI::ImVec4 kIconHover{ 1.00F, 0.52F, 0.08F, 1.00F };

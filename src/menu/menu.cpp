@@ -75,11 +75,20 @@ namespace MCMMemory::Menu
                 settingsChanged = true;
             }
 
-            GUI::Spacing();
+            GUI::SeparatorText(Trans::Tr("Appearance").c_str());
 
             if (IconButton(Trans::Tr("Preview").c_str(), Icons::kPreview, Color::kPreviewButtonColors)) {
                 HUD::GetSingleton()->Preview();
             }
+
+            GUI::Spacing();
+
+#define DRAW_HUD_APPEARANCE_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+            if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
+                settingsChanged = true; \
+            }
+            FOREACH_HUD_APPEARANCE_SETTING(DRAW_HUD_APPEARANCE_SETTING)
+#undef DRAW_HUD_APPEARANCE_SETTING
 
             GUI::SeparatorText(Trans::Tr("Timing").c_str());
 #define DRAW_HUD_TIMING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
@@ -88,17 +97,9 @@ namespace MCMMemory::Menu
             }
             FOREACH_HUD_TIMING_SETTING(DRAW_HUD_TIMING_SETTING)
 #undef DRAW_HUD_TIMING_SETTING
-
-            GUI::SeparatorText(Trans::Tr("Appearance").c_str());
-#define DRAW_HUD_APPEARANCE_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
-            if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
-                settingsChanged = true; \
-            }
-            FOREACH_HUD_APPEARANCE_SETTING(DRAW_HUD_APPEARANCE_SETTING)
-#undef DRAW_HUD_APPEARANCE_SETTING
             GUI::EndDisabled();
 
-            GUI::SeparatorText(Trans::Tr("Restore Warning").c_str());
+            // Warning settings are always enabled, even if notifications are disabled, because they are critical to the user experience.
 #define DRAW_HUD_WARNING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
             if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
                 settingsChanged = true; \

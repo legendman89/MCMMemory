@@ -1,16 +1,18 @@
 #pragma once
 
 #define FOREACH_HUD_COLOR(HUD_COLOR) \
-    HUD_COLOR(Primary, 0.95F, 0.96F, 0.98F, 1.00F) \
-    HUD_COLOR(Success, 0.30F, 0.88F, 0.42F, 1.00F) \
-    HUD_COLOR(Accent, 0.92F, 0.70F, 0.30F, 1.00F) \
-    HUD_COLOR(Warning, 1.00F, 0.48F, 0.14F, 1.00F) \
-    HUD_COLOR(Error, 0.95F, 0.28F, 0.28F, 1.00F) \
-    HUD_COLOR(Muted, 0.68F, 0.70F, 0.76F, 1.00F)
+    HUD_COLOR(Primary, 0.08F, 0.09F, 0.11F, 1.00F) \
+    HUD_COLOR(Success, 0.12F, 0.36F, 0.18F, 1.00F) \
+    HUD_COLOR(Accent, 0.46F, 0.30F, 0.06F, 1.00F) \
+    HUD_COLOR(Warning, 0.68F, 0.28F, 0.04F, 1.00F) \
+    HUD_COLOR(Error, 0.66F, 0.10F, 0.12F, 1.00F) \
+    HUD_COLOR(Muted, 0.28F, 0.30F, 0.34F, 1.00F)
 
 #define FOREACH_HUD_APPEARANCE_SETTING(HUD_SETTING) \
     /* Setting type, stored name, default, HUD name, minimum, maximum, menu label and display format. */ \
-    HUD_SETTING(int, notificationFontScale, 125, fontScale, 50, 200, "Font scale", "%d%%")
+    HUD_SETTING(int, notificationFontScale, 125, fontScale, 50, 200, "Font scale", "%d%%") \
+    HUD_SETTING(int, notificationHorizontalOffset, 30, horizontalOffset, 0, 4000, "Horizontal offset", "%d px") \
+    HUD_SETTING(int, notificationVerticalOffset, 30, verticalOffset, 0, 4000, "Vertical offset", "%d px")
 
 #define FOREACH_HUD_TIMING_SETTING(HUD_SETTING) \
     HUD_SETTING(float, notificationStartDelaySeconds, 2.0F, startDelaySeconds, 0.0F, 15.0F, "Operation start delay", "%.1f s") \

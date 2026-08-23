@@ -231,12 +231,12 @@ namespace MCMMemory
 
         bool Start();
 
-        void Reset();
+        void Reset(bool a_autoRestoreAllowed);
 
         // Waits for a stable MCM registry before starting restoration.
         RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;
 
-        // Prevents the Journal Menu from opening while restore controls MCM scripts.
+        // Watches character creation and prevents the Journal Menu from opening during restore.
         RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) override;
 
     private:
@@ -346,6 +346,9 @@ namespace MCMMemory
         // Says whether the loaded profile can be restored.
         bool configValid{};
 
+        // Automatic restore is only fired for a new game.
+        bool autoRestoreAllowed{};
+
         // Prevents the restore queue from starting more than once.
         bool started{};
 
@@ -360,6 +363,8 @@ namespace MCMMemory
         bool requestFailed{};
 
         bool journalMenuOpen{};
+
+        bool characterCreationOpen{};
     };
 
     inline void RegistryCheckTask::operator()() const

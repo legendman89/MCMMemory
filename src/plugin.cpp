@@ -1,12 +1,12 @@
 
 #include "menu/hud.hpp"
 #include "menu/menu.hpp"
-#include "mcm/mcm_registry.hpp"
+#include "utils/logger.hpp"
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "profile/restore.hpp"
+#include "mcm/mcm_registry.hpp"
 #include "settings.hpp"
-#include "utils/logger.hpp"
 
 
 namespace MCMMemory
@@ -40,13 +40,15 @@ namespace MCMMemory
                 break;
 
             case SKSE::MessagingInterface::kNewGame:
-            case SKSE::MessagingInterface::kPostLoadGame:
+            case SKSE::MessagingInterface::kPostLoadGame: {
+                const bool autoRestoreAllowed = a_message->type == SKSE::MessagingInterface::kNewGame;
                 HUD::GetSingleton()->Reset();
                 Backup::GetSingleton()->Reset();
                 Capture::GetSingleton()->Reset();
-                Restore::GetSingleton()->Reset();
+                Restore::GetSingleton()->Reset(autoRestoreAllowed);
                 SetGameLoaded(true);
                 break;
+            }
 
             default:
                 break;
@@ -58,7 +60,7 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
     MCMMemory::Logger::SetupLog();
 
-    SKSE::Init(a_skse);
+    SKSE::Init(a_skse, false);
 
     auto messaging = SKSE::GetMessagingInterface();
     if (!messaging || !messaging->RegisterListener(MCMMemory::HandleSKSEMessage)) {

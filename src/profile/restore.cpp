@@ -40,6 +40,7 @@ namespace MCMMemory
         manualRequest = false;
         requestFailed = false;
         journalMenuOpen = false;
+        characterCreationOpen = false;
         restoreMCMs.clear();
         actions.clear();
     }
@@ -66,13 +67,14 @@ namespace MCMMemory
         return registryCheckQueued;
     }
 
-    void Restore::Reset()
+    void Restore::Reset(bool a_autoRestoreAllowed)
     {
         std::lock_guard lock(restoreMutex);
         // Cancel old tasks and wait for MCM registration again.
         ++loadedGameSession;
         Clear();
-        logger::info("Persistent profile restore event reset");
+        autoRestoreAllowed = a_autoRestoreAllowed;
+        logger::info("Persistent profile restore event reset; automatic restore allowed={}", autoRestoreAllowed);
     }
 
     RE::BSEventNotifyControl Restore::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
@@ -83,7 +85,7 @@ namespace MCMMemory
         }
 
         std::lock_guard lock(restoreMutex);
-        if (started || !GetSettings().autoRestore) {
+        if (started || !autoRestoreAllowed || !GetSettings().autoRestore) {
             return RE::BSEventNotifyControl::kContinue;
         }
         if (!configLoaded) {
@@ -102,11 +104,43 @@ namespace MCMMemory
 
     RE::BSEventNotifyControl Restore::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
     {
-        if (!a_event || std::string_view(a_event->menuName.c_str()) != RE::JournalMenu::MENU_NAME) {
+        if (!a_event) {
+            return RE::BSEventNotifyControl::kContinue;
+        }
+
+        const std::string_view menuName{ a_event->menuName.c_str() };
+        const bool journalMenu = menuName == RE::JournalMenu::MENU_NAME;
+        const bool characterMenu = menuName == RE::RaceSexMenu::MENU_NAME;
+        if (!journalMenu && !characterMenu) {
             return RE::BSEventNotifyControl::kContinue;
         }
 
         std::lock_guard lock(restoreMutex);
+        if (characterMenu) {
+            characterCreationOpen = a_event->opening;
+            if (restoring) {
+                if (characterCreationOpen) {
+                    logger::info("Character creation opened; MCM restore actions are paused");
+                }
+                else {
+                    logger::info("Character creation closed; MCM restore actions are resuming");
+                }
+            }
+            else if (!started) {
+                registryWait.Reset();
+                if (characterCreationOpen) {
+                    logger::info("Character creation opened; MCM registry checks are paused");
+                }
+                else {
+                    logger::info("Character creation closed; MCM registry stability will be checked again");
+                }
+                if (!characterCreationOpen && configValid && !registryCheckQueued) {
+                    QueueRegistryCheck();
+                }
+            }
+            return RE::BSEventNotifyControl::kContinue;
+        }
+
         journalMenuOpen = a_event->opening;
         if (journalMenuOpen && restoring) {
             CloseJournalMenu();
@@ -123,8 +157,25 @@ namespace MCMMemory
         }
 
         registryCheckQueued = false;
-        if (started || !configValid || (!manualRequest && !GetSettings().autoRestore)) {
+        if (started || !configValid || (!manualRequest && (!autoRestoreAllowed || !GetSettings().autoRestore))) {
             return;
+        }
+
+        auto* ui = RE::UI::GetSingleton();
+        const bool characterMenuOpen = ui && ui->IsMenuOpen(RE::RaceSexMenu::MENU_NAME);
+        if (characterMenuOpen) {
+            if (!characterCreationOpen) {
+                logger::info("Character creation is open; MCM registry checks are paused");
+            }
+            characterCreationOpen = true;
+            registryWait.Reset();
+            QueueRegistryCheck(registryCheckDelaySeconds);
+            return;
+        }
+        if (characterCreationOpen) {
+            characterCreationOpen = false;
+            registryWait.Reset();
+            logger::info("Character creation has closed; restarting the MCM registry stability check");
         }
 
         // The ready event can arrive before every MCM is registered, so wait for an unchanged list.
@@ -230,6 +281,11 @@ namespace MCMMemory
         }
         if (auto* ui = RE::UI::GetSingleton()) {
             journalMenuOpen = ui->IsMenuOpen(RE::JournalMenu::MENU_NAME);
+            characterCreationOpen = ui->IsMenuOpen(RE::RaceSexMenu::MENU_NAME);
+        }
+        if (characterCreationOpen) {
+            QueueNextAction(GetSettings().actionTrialDelaySeconds);
+            return;
         }
         if (journalMenuOpen) {
             CloseJournalMenu();

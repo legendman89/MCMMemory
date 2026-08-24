@@ -222,15 +222,17 @@ namespace MCMMemory
             return std::addressof(singleton);
         }
 
-        inline bool IsRunning()
+        inline OperationStatus GetStatus()
         {
             std::lock_guard lock(restoreMutex);
-            return registryCheckQueued || restoring;
+            return status;
         }
 
         bool Install();
 
         bool Start();
+
+        bool Cancel();
 
         void Reset(bool a_autoRestoreAllowed);
 
@@ -280,6 +282,8 @@ namespace MCMMemory
             const uint64_t taskID = ++scheduledTaskID;
             if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RestoreTask{ loadedGameSession, taskID }, a_delaySeconds)) {
                 logger::error("Persistent profile restore could not schedule action {}", currentActionIndex);
+                restoring = false;
+                status = OperationStatus::Idle;
             }
         }
 
@@ -289,6 +293,7 @@ namespace MCMMemory
             registryCheckQueued = true;
             if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RegistryCheckTask{ loadedGameSession }, a_delaySeconds)) {
                 registryCheckQueued = false;
+                status = OperationStatus::Idle;
                 logger::error("Persistent profile restore could not schedule its registry check");
             }
         }
@@ -308,8 +313,12 @@ namespace MCMMemory
         // Releases the menu only after the last script call returns.
         void FinishRestore();
 
+        void ContinueCancellation();
+
+        void FinishCancellation();
+
         // Adds the current MCM result to the full restore result.
-        void FinishMCMStats(size_t a_mcmIndex);
+        void FinishMCMStats(size_t a_mcmIndex, OperationResult a_result = OperationResult::Completed);
 
         void CloseJournalMenu();
 
@@ -331,6 +340,8 @@ namespace MCMMemory
         // Points to the next action in the final queue.
         size_t currentActionIndex{};
 
+        size_t activeMCMIndex{};
+
         // Changes whenever a new game starts or another save is loaded.
         uint64_t loadedGameSession{};
 
@@ -341,6 +352,8 @@ namespace MCMMemory
         RestoreStats mcmStats;
 
         OperationMode operationMode{ OperationMode::Automatic };
+
+        OperationStatus status{ OperationStatus::Idle };
 
         // Prevents the registration listener from being installed twice.
         bool installed{};
@@ -368,6 +381,12 @@ namespace MCMMemory
         bool journalMenuOpen{};
 
         bool characterCreationOpen{};
+
+        bool mcmStarted{};
+
+        bool mcmOpen{};
+
+        bool mcmStatsRecorded{};
     };
 
     inline void RegistryCheckTask::operator()() const

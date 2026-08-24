@@ -1,7 +1,6 @@
 #include "menu/hud.hpp"
 #include "menu/menu.hpp"
 #include "utils/logger.hpp"
-#include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "profile/restore.hpp"
 #include "profile/activity.hpp"
@@ -36,7 +35,6 @@ namespace MCMMemory
                 if (!Activity::GetSingleton()->Load()) {
                     logger::error("MCM Memory activity history could not be loaded");
                 }
-                Backup::GetSingleton()->Install();
                 Capture::GetSingleton()->Install();
                 Restore::GetSingleton()->Install();
                 if (GetSettings().allowCOCForTesting) {

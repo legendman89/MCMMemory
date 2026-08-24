@@ -57,6 +57,7 @@ namespace MCMMemory
         MCMResult,
         BackupSummary,
         RestoreSummary,
+        Cancellation,
         Failure,
         Preview,
         Count
@@ -161,9 +162,15 @@ namespace MCMMemory
 
         void ShowRestoreSummary(const RestoreStats& a_stats);
 
+        void ShowBackupCancelled(const BackupStats& a_stats);
+
+        void ShowRestoreCancelled(const RestoreStats& a_stats);
+
         void ShowFailure(std::string_view a_title, std::string_view a_detail);
 
         void ShowRestoreMenuWarning();
+
+        void HideRestoreMenuWarning();
 
         void Preview();
 
@@ -199,6 +206,7 @@ namespace MCMMemory
                 0.0F,
                 options.summaryDelaySeconds,
                 options.summaryDelaySeconds,
+                0.0F,
                 0.0F,
                 0.0F
             };

@@ -21,16 +21,28 @@ namespace MCMMemory
         Count
     };
 
+    inline constexpr std::array<std::string_view, static_cast<size_t>(OperationResult::Count)> operationResultNames
+    {
+        "Completed",
+        "Failed",
+        "Cancelled"
+    };
+
+    inline std::string_view OperationResultName(OperationResult a_result)
+    {
+        return operationResultNames[static_cast<size_t>(a_result)];
+    }
+
     struct ActivityModResult
     {
         ActivityModResult() = default;
 
-        ActivityModResult(std::string_view a_modName, const BackupStats& a_stats) :
-            modName(a_modName), backupStats(a_stats)
+        ActivityModResult(std::string_view a_modName, const BackupStats& a_stats, OperationResult a_result = OperationResult::Completed) :
+            modName(a_modName), backupStats(a_stats), result(a_result)
         {}
 
-        ActivityModResult(std::string_view a_modName, const RestoreStats& a_stats) :
-            modName(a_modName), restoreStats(a_stats)
+        ActivityModResult(std::string_view a_modName, const RestoreStats& a_stats, OperationResult a_result = OperationResult::Completed) :
+            modName(a_modName), restoreStats(a_stats), result(a_result)
         {}
 
         std::string modName;
@@ -38,6 +50,8 @@ namespace MCMMemory
         BackupStats backupStats;
 
         RestoreStats restoreStats;
+
+        OperationResult result{ OperationResult::Completed };
     };
 
     struct ActivityEntry
@@ -72,9 +86,9 @@ namespace MCMMemory
 
         bool Load();
 
-        void RecordBackup(OperationMode a_mode, const BackupStats& a_stats, const std::vector<ActivityModResult>& a_mods);
+        void RecordBackup(OperationMode a_mode, const BackupStats& a_stats, const std::vector<ActivityModResult>& a_mods, OperationResult a_result = OperationResult::Completed);
 
-        void RecordRestore(OperationMode a_mode, const RestoreStats& a_stats, const std::vector<ActivityModResult>& a_mods);
+        void RecordRestore(OperationMode a_mode, const RestoreStats& a_stats, const std::vector<ActivityModResult>& a_mods, OperationResult a_result = OperationResult::Completed);
 
         inline std::shared_ptr<const std::vector<ActivityEntry>> ReadEntries() const
         {

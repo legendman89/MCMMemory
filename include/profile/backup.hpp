@@ -40,7 +40,7 @@ namespace MCMMemory
         void operator()() const;
     };
 
-    class Backup : public RE::BSTEventSink<SKSE::ModCallbackEvent>
+    class Backup
     {
     public:
 
@@ -52,20 +52,18 @@ namespace MCMMemory
 
         inline bool Start()
         {
-            return Begin(OperationMode::Manual);
+            return Begin();
         }
 
-        inline bool IsRunning()
+        inline OperationStatus GetStatus()
         {
             std::lock_guard lock(backupMutex);
-            return running;
+            return status;
         }
 
-        bool Install();
+        bool Cancel();
 
         void Reset();
-
-        RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;
 
     private:
 
@@ -76,11 +74,11 @@ namespace MCMMemory
             const uint64_t taskID = ++scheduledTaskID;
             if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(BackupTask{ loadedGameSession, taskID }, a_delaySeconds)) {
                 logger::error("Full MCM backup could not schedule its next step");
-                running = false;
+                status = OperationStatus::Idle;
             }
         }
 
-        bool Begin(OperationMode a_operationMode);
+        bool Begin();
 
         void RunNextStep(uint64_t a_loadedGameSession, uint64_t a_taskID);
 
@@ -103,6 +101,10 @@ namespace MCMMemory
         void CommitMCM();
 
         void Finish();
+
+        void ContinueCancellation();
+
+        void FinishCancellation();
 
         void Clear();
 
@@ -148,15 +150,13 @@ namespace MCMMemory
 
         BackupStep step{ BackupStep::Registry };
 
-        OperationMode operationMode{ OperationMode::Manual };
-
-        bool installed{};
-
-        bool initialBackupChecked{};
+        OperationStatus status{ OperationStatus::Idle };
 
         bool mcmFailed{};
 
-        bool running{};
+        bool mcmStarted{};
+
+        bool mcmOpen{};
     };
 
     inline void BackupTask::operator()() const

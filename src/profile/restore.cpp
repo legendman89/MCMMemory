@@ -33,14 +33,19 @@ namespace MCMMemory
         restoring = false;
         registryCheckQueued = false;
         currentActionIndex = 0;
+        activeMCMIndex = 0;
         registryWait.Reset();
         stats.Reset();
         mcmStats.Reset();
         scheduledTaskID = 0;
         operationMode = OperationMode::Automatic;
+        status = OperationStatus::Idle;
         requestFailed = false;
         journalMenuOpen = false;
         characterCreationOpen = false;
+        mcmStarted = false;
+        mcmOpen = false;
+        mcmStatsRecorded = false;
         restoreMCMs.clear();
         actions.clear();
         activityMods.clear();
@@ -60,12 +65,29 @@ namespace MCMMemory
         }
 
         operationMode = OperationMode::Manual;
+        status = OperationStatus::Running;
         QueueRegistryCheck();
         if (registryCheckQueued) {
             HUD::GetSingleton()->ShowRestoreStarted();
         }
+        else {
+            status = OperationStatus::Idle;
+        }
         logger::info("Manual persistent profile restoration requested");
         return registryCheckQueued;
+    }
+
+    bool Restore::Cancel()
+    {
+        std::lock_guard lock(restoreMutex);
+        if (status != OperationStatus::Running) {
+            return false;
+        }
+
+        status = OperationStatus::Stopping;
+        started = true;
+        logger::info("Persistent profile restoration cancellation requested");
+        return true;
     }
 
     void Restore::Reset(bool a_autoRestoreAllowed)
@@ -97,7 +119,11 @@ namespace MCMMemory
             return RE::BSEventNotifyControl::kContinue;
         }
         if (!registryCheckQueued) {
+            status = OperationStatus::Running;
             QueueRegistryCheck();
+            if (!registryCheckQueued) {
+                status = OperationStatus::Idle;
+            }
         }
 
         return RE::BSEventNotifyControl::kContinue;
@@ -158,6 +184,10 @@ namespace MCMMemory
         }
 
         registryCheckQueued = false;
+        if (status == OperationStatus::Stopping) {
+            FinishCancellation();
+            return;
+        }
         if (started || !configValid || (operationMode == OperationMode::Automatic && (!autoRestoreAllowed || !GetSettings().autoRestore))) {
             return;
         }
@@ -191,6 +221,7 @@ namespace MCMMemory
             configValid = false;
             logger::error("Persistent profile restore stopped because the MCM registry did not become stable");
             HUD::GetSingleton()->ShowFailure("Restore failed", "MCM registration did not finish");
+            status = OperationStatus::Idle;
             return;
         }
         if (result == RegistryWaitResult::Empty) {
@@ -217,6 +248,7 @@ namespace MCMMemory
             if (operationMode == OperationMode::Manual) {
                 HUD::GetSingleton()->ShowFailure("Restore stopped", "No matching MCMs were available");
             }
+            status = OperationStatus::Idle;
             return;
         }
 
@@ -238,12 +270,14 @@ namespace MCMMemory
     void Restore::FinishRestore()
     {
         restoring = false;
+        status = OperationStatus::Idle;
+        HUD::GetSingleton()->HideRestoreMenuWarning();
         logger::info("Persistent profile restoration completed: {} applied, {} unchanged, {} skipped", stats.appliedSettingCount, stats.unchangedSettingCount, stats.skippedSettingCount);
         Activity::GetSingleton()->RecordRestore(operationMode, stats, activityMods);
         HUD::GetSingleton()->ShowRestoreSummary(stats);
     }
 
-    void Restore::FinishMCMStats(size_t a_mcmIndex)
+    void Restore::FinishMCMStats(size_t a_mcmIndex, OperationResult a_result)
     {
         if (a_mcmIndex >= restoreMCMs.size()) {
             return;
@@ -252,11 +286,14 @@ namespace MCMMemory
         // Keep one short result for the MCM and add it to the final result.
         mcmStats.MCMCount = 1;
         const auto& modName = restoreMCMs[a_mcmIndex].identity.modName;
-        activityMods.emplace_back(modName, mcmStats);
+        activityMods.emplace_back(modName, mcmStats, a_result);
 
-        HUD::GetSingleton()->ShowRestoreMCM(modName, mcmStats, operationMode);
+        if (a_result == OperationResult::Completed) {
+            HUD::GetSingleton()->ShowRestoreMCM(modName, mcmStats, operationMode);
+        }
         stats += mcmStats;
-        logger::info("Restored '{}': {} applied, {} unchanged, {} skipped", modName, mcmStats.appliedSettingCount, mcmStats.unchangedSettingCount, mcmStats.skippedSettingCount);
+        mcmStatsRecorded = true;
+        logger::info("Recorded '{}' restore result '{}': {} applied, {} unchanged, {} skipped", modName, OperationResultName(a_result), mcmStats.appliedSettingCount, mcmStats.unchangedSettingCount, mcmStats.skippedSettingCount);
         mcmStats.Reset();
     }
 
@@ -278,6 +315,10 @@ namespace MCMMemory
         std::lock_guard lock(restoreMutex);
         // Ignore callbacks from an older loaded game or an action that has already been replaced.
         if (a_loadedGameSession != loadedGameSession || a_taskID != scheduledTaskID || !restoring) {
+            return;
+        }
+        if (status == OperationStatus::Stopping) {
+            ContinueCancellation();
             return;
         }
         if (currentActionIndex >= actions.size()) {
@@ -302,6 +343,9 @@ namespace MCMMemory
         if (action.type == RestoreActionType::OpenConfig) {
             // Each MCM gets its own applied, unchanged and skipped counts.
             mcmStats.Reset();
+            activeMCMIndex = action.mcmIndex;
+            mcmStarted = true;
+            mcmStatsRecorded = false;
         }
 
         // Some settings need one call to prepare their data and another call to apply the value.
@@ -357,6 +401,9 @@ namespace MCMMemory
             else if (applyAction) {
                 ++mcmStats.appliedSettingCount;
             }
+            if (action.type == RestoreActionType::OpenConfig && dispatched) {
+                mcmOpen = true;
+            }
         }
 
         if (applyAction) {
@@ -364,6 +411,7 @@ namespace MCMMemory
             requestFailed = false;
         }
         if (action.type == RestoreActionType::CloseConfig) {
+            mcmOpen = false;
             FinishMCMStats(action.mcmIndex);
         }
 
@@ -379,5 +427,39 @@ namespace MCMMemory
             // Skipped and failed calls have no Papyrus callback to continue the queue.
             QueueNextAction(0.0F);
         }
+    }
+
+    void Restore::ContinueCancellation()
+    {
+        // Close an open MCM through the same callback queue before stopping.
+        if (mcmOpen && activeMCMIndex < restoreMCMs.size()) {
+            mcmOpen = false;
+            const uint64_t continuationTaskID = ++scheduledTaskID;
+            RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> result(new MCMCallResult(RestoreTask{ loadedGameSession, continuationTaskID }));
+            if (CallMCMFunction(activeMCMIndex, "CloseConfig", RE::MakeFunctionArguments(), std::move(result))) {
+                logger::info("Persistent profile restore is closing '{}' before cancellation", restoreMCMs[activeMCMIndex].identity.modID);
+                return;
+            }
+            logger::warn("Persistent profile restore could not close '{}' during cancellation", restoreMCMs[activeMCMIndex].identity.modID);
+        }
+
+        FinishCancellation();
+    }
+
+    void Restore::FinishCancellation()
+    {
+        // Values already applied remain changed, so record the interrupted result.
+        if (mcmStarted && !mcmStatsRecorded) {
+            FinishMCMStats(activeMCMIndex, OperationResult::Cancelled);
+        }
+
+        ++scheduledTaskID;
+        restoring = false;
+        registryCheckQueued = false;
+        status = OperationStatus::Idle;
+        HUD::GetSingleton()->HideRestoreMenuWarning();
+        Activity::GetSingleton()->RecordRestore(operationMode, stats, activityMods, OperationResult::Cancelled);
+        HUD::GetSingleton()->ShowRestoreCancelled(stats);
+        logger::info("Persistent profile restoration cancelled after changing {} settings in {} MCMs", stats.appliedSettingCount, stats.MCMCount);
     }
 }

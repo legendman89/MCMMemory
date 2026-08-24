@@ -96,7 +96,7 @@ namespace MCMMemory::Menu
         return clicked && a_enabled;
     }
 
-    inline bool CTAButton(const char* a_label, const bool a_enabled, const Color::CTAColors& a_colors)
+    inline bool CTAButton(const char* a_label, const bool a_enabled, const Color::CTAColors& a_colors, const GUI::ImVec2& a_size = {})
     {
         const auto& colors = a_enabled ? a_colors : Color::kDisabledButtonColors;
         GUI::PushStyleVar(GUI::ImGuiStyleVar_FrameRounding, 6.0F);
@@ -107,7 +107,7 @@ namespace MCMMemory::Menu
             GUI::BeginDisabled();
         }
 
-        const bool clicked = GUI::Button(a_label);
+        const bool clicked = GUI::Button(a_label, a_size);
 
         if (!a_enabled) {
             GUI::EndDisabled();

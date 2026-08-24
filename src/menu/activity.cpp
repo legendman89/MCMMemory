@@ -20,7 +20,7 @@ namespace MCMMemory::Menu
         FOREACH_BACKUP_ACTIVITY_COLUMN(MAKE_ACTIVITY_COLUMN)
     };
 
-    inline constexpr std::array<ActivityColumn, 3> restoreActivityColumns
+    inline constexpr std::array<ActivityColumn, 4> restoreActivityColumns
     {
         FOREACH_RESTORE_ACTIVITY_COLUMN(MAKE_ACTIVITY_COLUMN)
     };
@@ -30,14 +30,19 @@ namespace MCMMemory::Menu
     std::string ActivityMenu::FormatSummary(const ActivityEntry& a_entry) const
     {
         const auto mode = operationModeNames[static_cast<size_t>(a_entry.mode)];
+        const bool cancelled = a_entry.result == OperationResult::Cancelled;
+        const auto separator = cancelled ? " cancelled: " : ": ";
         if (a_entry.type == OperationType::Backup) {
+            if (cancelled) {
+                return std::format("{} backup{}{} MCMs, {} settings read", mode, separator, a_entry.backupStats.MCMCount, a_entry.backupStats.settingCount);
+            }
             if (a_entry.backupStats.failedMCMCount > 0) {
                 return std::format("{} backup: {} MCMs, {} settings, {} failed", mode, a_entry.backupStats.MCMCount,
                     a_entry.backupStats.settingCount, a_entry.backupStats.failedMCMCount);
             }
             return std::format("{} backup: {} MCMs, {} settings", mode, a_entry.backupStats.MCMCount, a_entry.backupStats.settingCount);
         }
-        return std::format("{} restore: {} MCMs, {} changed, {} already set", mode, a_entry.restoreStats.MCMCount,
+        return std::format("{} restore{}{} MCMs, {} changed, {} already set", mode, separator, a_entry.restoreStats.MCMCount,
             a_entry.restoreStats.appliedSettingCount, a_entry.restoreStats.unchangedSettingCount);
     }
 
@@ -155,7 +160,7 @@ namespace MCMMemory::Menu
         GUI::End();
     }
 
-    bool ActivityMenu::BeginModTable(const ActivityEntry& a_entry, const char* a_id, const std::array<ActivityColumn, 3>& a_columns) const
+    bool ActivityMenu::BeginModTable(const ActivityEntry& a_entry, const char* a_id, const ActivityColumn* a_columns, size_t a_columnCount) const
     {
         if (a_entry.mods.empty()) {
             GUI::TextUnformatted(Trans::Tr("No per-mod results were recorded.").c_str());
@@ -163,13 +168,13 @@ namespace MCMMemory::Menu
         }
 
         const auto flags = GUI::ImGuiTableFlags_RowBg | GUI::ImGuiTableFlags_BordersInnerH | GUI::ImGuiTableFlags_Resizable | GUI::ImGuiTableFlags_ScrollY;
-        if (!GUI::BeginTable(a_id, 4, flags)) {
+        if (!GUI::BeginTable(a_id, static_cast<int>(a_columnCount + 1), flags)) {
             return false;
         }
 
         GUI::TableSetupColumn(Trans::Tr("MCM").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
-        for (const auto& column : a_columns) {
-            GUI::TableSetupColumn(Trans::Tr(column.label).c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, column.width);
+        for (size_t index = 0; index < a_columnCount; ++index) {
+            GUI::TableSetupColumn(Trans::Tr(a_columns[index].label).c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, a_columns[index].width);
         }
         GUI::TableHeadersRow();
         return true;
@@ -189,15 +194,15 @@ namespace MCMMemory::Menu
         GUI::Text("%u", a_value);
     }
 
-    void ActivityMenu::RenderStatus(uint32_t a_failedCount) const
+    void ActivityMenu::RenderStatus(OperationResult a_result) const
     {
         GUI::TableNextColumn();
-        GUI::TextUnformatted(Trans::Tr(a_failedCount > 0 ? "Failed" : "Completed").c_str());
+        GUI::TextUnformatted(Trans::Tr(OperationResultName(a_result)).c_str());
     }
 
     void ActivityMenu::RenderBackupMods(const ActivityEntry& a_entry) const
     {
-        if (!BeginModTable(a_entry, "Backup Activity Details", backupActivityColumns)) {
+        if (!BeginModTable(a_entry, "Backup Activity Details", backupActivityColumns.data(), backupActivityColumns.size())) {
             return;
         }
 
@@ -212,7 +217,7 @@ namespace MCMMemory::Menu
 
     void ActivityMenu::RenderRestoreMods(const ActivityEntry& a_entry) const
     {
-        if (!BeginModTable(a_entry, "Restore Activity Details", restoreActivityColumns)) {
+        if (!BeginModTable(a_entry, "Restore Activity Details", restoreActivityColumns.data(), restoreActivityColumns.size())) {
             return;
         }
 

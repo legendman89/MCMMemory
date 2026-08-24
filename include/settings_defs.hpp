@@ -6,7 +6,7 @@
     /* Controls how often backup checks a script that has not finished updating its buffers. */ \
     SETTING(float, actionTrialDelaySeconds, 0.5F) \
     FOREACH_HUD_SETTING(SETTING) \
-    /* Keeps the profile updated and creates the first full backup when needed. */ \
+    /* Keeps the profile updated when an MCM setting changes. */ \
     SETTING(bool, autoBackup, true) \
     /* Restores the profile after a new game's MCM registration finishes. */ \
     SETTING(bool, autoRestore, true) \

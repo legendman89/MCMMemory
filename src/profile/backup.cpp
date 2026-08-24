@@ -7,29 +7,10 @@ namespace MCMMemory
 {
     inline constexpr uint32_t maximumScriptWaitChecks{ 20 };
 
-    bool Backup::Install()
+    bool Backup::Begin()
     {
         std::lock_guard lock(backupMutex);
-        if (installed) {
-            return true;
-        }
-
-        auto* source = SKSE::GetModCallbackEventSource();
-        if (!source) {
-            logger::error("Full MCM backup could not find the SKSE mod callback event source");
-            return false;
-        }
-
-        source->AddEventSink(this);
-        installed = true;
-        logger::info("Full MCM backup event installed");
-        return true;
-    }
-
-    bool Backup::Begin(OperationMode a_operationMode)
-    {
-        std::lock_guard lock(backupMutex);
-        if (running) {
+        if (status != OperationStatus::Idle) {
             logger::warn("Full MCM backup is already running");
             return false;
         }
@@ -44,15 +25,14 @@ namespace MCMMemory
         }
 
         Clear();
-        operationMode = a_operationMode;
         profile = std::move(existingProfile);
-        running = true;
+        status = OperationStatus::Running;
         logger::info("Full MCM backup is waiting for a stable registry");
         QueueNext(0.0F);
-        if (running && operationMode == OperationMode::Manual) {
+        if (status == OperationStatus::Running) {
             HUD::GetSingleton()->ShowBackupStarted();
         }
-        return running;
+        return status == OperationStatus::Running;
     }
 
     void Backup::Clear()
@@ -73,9 +53,10 @@ namespace MCMMemory
         scriptWaitCount = 0;
         scheduledTaskID = 0;
         step = BackupStep::Registry;
-        operationMode = OperationMode::Manual;
+        status = OperationStatus::Idle;
         mcmFailed = false;
-        running = false;
+        mcmStarted = false;
+        mcmOpen = false;
     }
 
     void Backup::Reset()
@@ -83,48 +64,29 @@ namespace MCMMemory
         std::lock_guard lock(backupMutex);
         ++loadedGameSession;
         Clear();
-        initialBackupChecked = false;
         logger::info("Full MCM backup reset");
     }
 
-    RE::BSEventNotifyControl Backup::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
+    bool Backup::Cancel()
     {
-        if (!a_event || a_event->eventName != "SKICP_configManagerReady" || !GetSettings().autoBackup) {
-            return RE::BSEventNotifyControl::kContinue;
+        std::lock_guard lock(backupMutex);
+        if (status != OperationStatus::Running) {
+            return false;
         }
 
-        bool shouldCheckProfile{};
-        { // Trap the lock inside.
-            std::lock_guard lock(backupMutex);
-            if (!initialBackupChecked) {
-                initialBackupChecked = true;
-                shouldCheckProfile = true;
-            }
-        }
-
-        if (!shouldCheckProfile) {
-            return RE::BSEventNotifyControl::kContinue;
-        }
-
-        std::error_code error;
-        const bool profileExists = std::filesystem::exists(ProfileStorage::Path(), error);
-        if (error) {
-            logger::error("Full MCM backup could not check profile {}: {}", ToUTF8(ProfileStorage::Path()), error.message());
-            std::lock_guard lock(backupMutex);
-            initialBackupChecked = false;
-        }
-        else if (!profileExists && !Begin(OperationMode::Automatic)) {
-            std::lock_guard lock(backupMutex);
-            initialBackupChecked = false;
-        }
-
-        return RE::BSEventNotifyControl::kContinue;
+        status = OperationStatus::Stopping;
+        logger::info("Full MCM backup cancellation requested");
+        return true;
     }
 
     void Backup::RunNextStep(uint64_t a_loadedGameSession, uint64_t a_taskID)
     {
         std::lock_guard lock(backupMutex);
-        if (!running || a_loadedGameSession != loadedGameSession || a_taskID != scheduledTaskID) {
+        if (status == OperationStatus::Idle || a_loadedGameSession != loadedGameSession || a_taskID != scheduledTaskID) {
+            return;
+        }
+        if (status == OperationStatus::Stopping) {
+            ContinueCancellation();
             return;
         }
 
@@ -182,16 +144,13 @@ namespace MCMMemory
             registeredMCMs = std::move(currentMCMs);
             step = BackupStep::OpenMCM;
             logger::info("Full MCM backup found {} stable registered MCMs", registeredMCMs.size());
-            if (operationMode == OperationMode::Automatic) {
-                HUD::GetSingleton()->ShowBackupStarted();
-            }
             QueueNext(0.0F);
             return;
         }
         if (result == RegistryWaitResult::Expired) {
             logger::error("Full MCM backup stopped because the registry did not become stable");
             HUD::GetSingleton()->ShowFailure("Backup failed", "MCM registration did not finish");
-            running = false;
+            status = OperationStatus::Idle;
             return;
         }
         if (result == RegistryWaitResult::Empty) {
@@ -224,6 +183,7 @@ namespace MCMMemory
         menuIndex = 0;
         scriptWaitCount = 0;
         mcmFailed = false;
+        mcmStarted = true;
 
         MCMScript script(registeredMCMs[mcmIndex].mcmScript);
         if (!CallAndContinue(script, "OpenConfig", RE::MakeFunctionArguments(), BackupStep::ReadPages)) {
@@ -233,6 +193,7 @@ namespace MCMMemory
             QueueNext(0.0F);
             return;
         }
+        mcmOpen = true;
     }
 
     void Backup::ReadPages()
@@ -410,6 +371,7 @@ namespace MCMMemory
             step = BackupStep::CommitMCM;
             QueueNext(0.0F);
         }
+        mcmOpen = false;
     }
 
     void Backup::CommitMCM()
@@ -438,11 +400,12 @@ namespace MCMMemory
         }
 
         const auto& modName = registeredMCMs[mcmIndex].identity.modName;
-        activityMods.emplace_back(modName, mcmStats);
+        activityMods.emplace_back(modName, mcmStats, mcmFailed ? OperationResult::Failed : OperationResult::Completed);
 
-        HUD::GetSingleton()->ShowBackupMCM(modName, mcmStats, operationMode);
+        HUD::GetSingleton()->ShowBackupMCM(modName, mcmStats, OperationMode::Manual);
         stats += mcmStats;
 
+        mcmStarted = false;
         ++mcmIndex;
         step = BackupStep::OpenMCM;
         QueueNext(0.0F);
@@ -454,13 +417,47 @@ namespace MCMMemory
         if (!ProfileStorage::Save(profile)) {
             logger::error("Full MCM backup failed to save its completed profile");
             HUD::GetSingleton()->ShowFailure("Backup failed", "Existing profile was not changed");
-            running = false;
+            status = OperationStatus::Idle;
             return;
         }
 
         logger::info("Full MCM backup completed: {} settings from {} MCMs, {} skipped, {} MCMs failed", stats.settingCount, stats.MCMCount, stats.skippedSettingCount, stats.failedMCMCount);
-        Activity::GetSingleton()->RecordBackup(operationMode, stats, activityMods);
+        Activity::GetSingleton()->RecordBackup(OperationMode::Manual, stats, activityMods);
         HUD::GetSingleton()->ShowBackupSummary(stats);
-        running = false;
+        status = OperationStatus::Idle;
+    }
+
+    void Backup::ContinueCancellation()
+    {
+        // Do not leave the current MCM open when the backup stops.
+        if (mcmOpen && mcmIndex < registeredMCMs.size()) {
+            mcmOpen = false;
+            MCMScript script(registeredMCMs[mcmIndex].mcmScript);
+            if (CallAndContinue(script, "CloseConfig", RE::MakeFunctionArguments(), BackupStep::Finish)) {
+                logger::info("Full MCM backup is closing '{}' before cancellation", registeredMCMs[mcmIndex].identity.modID);
+                return;
+            }
+            logger::warn("Full MCM backup could not close '{}' during cancellation", registeredMCMs[mcmIndex].identity.modID);
+        }
+
+        FinishCancellation();
+    }
+
+    void Backup::FinishCancellation()
+    {
+        // Keep the unfinished MCM in Activity, but never save the interrupted profile.
+        if (mcmStarted && mcmIndex < registeredMCMs.size()) {
+            mcmStats.MCMCount = 1;
+            mcmStats.settingCount = static_cast<uint32_t>(mcmSettings.size());
+            activityMods.emplace_back(registeredMCMs[mcmIndex].identity.modName, mcmStats, OperationResult::Cancelled);
+            stats += mcmStats;
+            mcmStarted = false;
+        }
+
+        ++scheduledTaskID;
+        status = OperationStatus::Idle;
+        Activity::GetSingleton()->RecordBackup(OperationMode::Manual, stats, activityMods, OperationResult::Cancelled);
+        HUD::GetSingleton()->ShowBackupCancelled(stats);
+        logger::info("Full MCM backup cancelled after reading {} settings from {} MCMs; the existing profile was not changed", stats.settingCount, stats.MCMCount);
     }
 }

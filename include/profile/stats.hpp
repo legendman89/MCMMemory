@@ -14,6 +14,13 @@ namespace MCMMemory
         Count
     };
 
+    enum class OperationStatus
+    {
+        Idle,
+        Running,
+        Stopping
+    };
+
     struct BackupStats
     {
 #define DECLARE_STAT(name) uint32_t name{};

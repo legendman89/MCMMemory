@@ -169,6 +169,32 @@ namespace MCMMemory
         QueueMessage(std::move(message));
     }
 
+    void HUD::ShowBackupCancelled(const BackupStats& a_stats)
+    {
+        if (!enabled.load(std::memory_order_relaxed)) {
+            return;
+        }
+
+        HUDMessage message;
+        message.type = HUDMessageType::Cancellation;
+        message.segments.push_back({ Trans::Tr("Backup cancelled"), HUDColor::Warning });
+        message.segments.push_back({ Trans::Format("    Existing profile unchanged; {} MCMs read", a_stats.MCMCount), HUDColor::Muted });
+        BeginOperation(std::move(message));
+    }
+
+    void HUD::ShowRestoreCancelled(const RestoreStats& a_stats)
+    {
+        if (!enabled.load(std::memory_order_relaxed)) {
+            return;
+        }
+
+        HUDMessage message;
+        message.type = HUDMessageType::Cancellation;
+        message.segments.push_back({ Trans::Tr("Restore cancelled"), HUDColor::Warning });
+        message.segments.push_back({ Trans::Format("    {} settings changed before stopping", a_stats.appliedSettingCount), HUDColor::Muted });
+        BeginOperation(std::move(message));
+    }
+
     void HUD::ShowFailure(std::string_view a_title, std::string_view a_detail)
     {
         if (!enabled.load(std::memory_order_relaxed)) {
@@ -190,6 +216,12 @@ namespace MCMMemory
         warning.startedAt = {};
         warning.pausedAt = {};
         warning.active = true;
+    }
+
+    void HUD::HideRestoreMenuWarning()
+    {
+        std::lock_guard lock(hudMutex);
+        warning.Reset();
     }
 
     void HUD::StartPreview(const std::chrono::steady_clock::time_point& a_now)

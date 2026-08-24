@@ -35,13 +35,13 @@ namespace MCMMemory::Menu
 
         void RenderDetails(const std::vector<ActivityEntry>& a_entries);
 
-        bool BeginModTable(const ActivityEntry& a_entry, const char* a_id, const std::array<ActivityColumn, 3>& a_columns) const;
+        bool BeginModTable(const ActivityEntry& a_entry, const char* a_id, const ActivityColumn* a_columns, size_t a_columnCount) const;
 
         void RenderModName(const ActivityModResult& a_mod) const;
 
         void RenderValue(uint32_t a_value) const;
 
-        void RenderStatus(uint32_t a_failedCount) const;
+        void RenderStatus(OperationResult a_result) const;
 
         void RenderBackupMods(const ActivityEntry& a_entry) const;
 

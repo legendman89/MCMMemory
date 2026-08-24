@@ -27,22 +27,62 @@ namespace MCMMemory::Menu
 
     void __stdcall RenderProfile()
     {
-        const bool operationRunning = Backup::GetSingleton()->IsRunning() || Restore::GetSingleton()->IsRunning();
+        auto* backup = Backup::GetSingleton();
+        auto* restore = Restore::GetSingleton();
+        const auto backupStatus = backup->GetStatus();
+        const auto restoreStatus = restore->GetStatus();
+        const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
         const bool operationAvailable = IsGameLoaded() && !operationRunning;
+        const float rowStart = GUI::GetCursorPosX();
+        const float rowWidth = GUI::GetContentRegionAvail().x;
 
         if (IconCTAButton(Trans::Tr("Back Up Now").c_str(), operationAvailable, Icons::kSave, Color::kBackupButtonColors)) {
-            Backup::GetSingleton()->Start();
+            backup->Start();
         }
 
-        GUI::SameLine(0.0F, 18.0F);
+        GUI::SameLine(0.0F, 14.0F);
 
         if (IconCTAButton(Trans::Tr("Restore Now").c_str(), operationAvailable, Icons::kRestore, Color::kRestoreButtonColors)) {
-            Restore::GetSingleton()->Start();
+            restore->Start();
+        }
+
+        const bool stopping = backupStatus == OperationStatus::Stopping || restoreStatus == OperationStatus::Stopping;
+        const bool cancellationAvailable = backupStatus == OperationStatus::Running || restoreStatus == OperationStatus::Running;
+        auto cancelText = Trans::Tr("Cancel");
+        if (stopping) {
+            cancelText = Trans::Tr("Stopping...");
+        }
+        else if (backupStatus == OperationStatus::Running) {
+            cancelText = Trans::Tr("Cancel Backup");
+        }
+        else if (restoreStatus == OperationStatus::Running) {
+            cancelText = Trans::Tr("Cancel Restore");
+        }
+        const std::array<std::string, 3> cancellationLabels{ Trans::Tr("Cancel Backup"), Trans::Tr("Cancel Restore"), Trans::Tr("Stopping...") };
+        float cancelWidth{};
+        for (const auto& label : cancellationLabels) {
+            cancelWidth = std::max(cancelWidth, GUI::CalcTextSize(label.c_str()).x);
+        }
+        cancelWidth += 28.0F;
+
+        GUI::SameLine();
+        GUI::SetCursorPosX(std::max(GUI::GetCursorPosX(), rowStart + rowWidth - cancelWidth));
+        if (CTAButton(cancelText.c_str(), cancellationAvailable, Color::kCancelButtonColors, GUI::ImVec2{ cancelWidth, 0.0F })) {
+            if (backupStatus == OperationStatus::Running) {
+                backup->Cancel();
+            }
+            else if (restoreStatus == OperationStatus::Running) {
+                restore->Cancel();
+            }
+        }
+        if (restoreStatus != OperationStatus::Idle) {
+            WrappedTooltip(Trans::Tr("Settings already restored will not be reverted.").c_str());
         }
 
         GUI::Spacing();
 
         auto& settings = GetSettings();
+        constexpr float hudSliderWidth = 360.0F;
         bool settingsChanged{};
         bool appearanceSettingActive{};
 
@@ -86,25 +126,46 @@ namespace MCMMemory::Menu
 
             GUI::Spacing();
 
-#define DRAW_HUD_APPEARANCE_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+#define DRAW_HUD_FONT_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+            GUI::SetNextItemWidth(hudSliderWidth); \
             if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
                 settingsChanged = true; \
             } \
             appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive();
-            FOREACH_HUD_APPEARANCE_SETTING(DRAW_HUD_APPEARANCE_SETTING)
-#undef DRAW_HUD_APPEARANCE_SETTING
+            FOREACH_HUD_FONT_SETTING(DRAW_HUD_FONT_SETTING)
+#undef DRAW_HUD_FONT_SETTING
+
+            const auto compactTableFlags = GUI::ImGuiTableFlags_SizingStretchSame;
+            if (GUI::BeginTable("HUD notification offsets", 2, compactTableFlags)) {
+#define DRAW_HUD_OFFSET_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+                GUI::TableNextColumn(); \
+                GUI::SetNextItemWidth(hudSliderWidth); \
+                if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
+                    settingsChanged = true; \
+                } \
+                appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive();
+                FOREACH_HUD_OFFSET_SETTING(DRAW_HUD_OFFSET_SETTING)
+#undef DRAW_HUD_OFFSET_SETTING
+                GUI::EndTable();
+            }
 
             GUI::SeparatorText(Trans::Tr("Timing").c_str());
+            if (GUI::BeginTable("HUD notification timing", 2, compactTableFlags)) {
 #define DRAW_HUD_TIMING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
-            if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
-                settingsChanged = true; \
-            }
-            FOREACH_HUD_TIMING_SETTING(DRAW_HUD_TIMING_SETTING)
+                GUI::TableNextColumn(); \
+                GUI::SetNextItemWidth(hudSliderWidth); \
+                if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
+                    settingsChanged = true; \
+                }
+                FOREACH_HUD_TIMING_SETTING(DRAW_HUD_TIMING_SETTING)
 #undef DRAW_HUD_TIMING_SETTING
+                GUI::EndTable();
+            }
             GUI::EndDisabled();
 
             // Warning settings are always enabled, even if notifications are disabled, because they are critical to the user experience.
 #define DRAW_HUD_WARNING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+            GUI::SetNextItemWidth(hudSliderWidth); \
             if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
                 settingsChanged = true; \
             }

@@ -59,7 +59,7 @@ namespace MCMMemory
         return true;
     }
 
-    void Activity::RecordBackup(OperationMode a_mode, const BackupStats& a_stats, const std::vector<ActivityModResult>& a_mods)
+    void Activity::RecordBackup(OperationMode a_mode, const BackupStats& a_stats, const std::vector<ActivityModResult>& a_mods, OperationResult a_result)
     {
         ActivityEntry entry;
         entry.mods = a_mods;
@@ -67,10 +67,11 @@ namespace MCMMemory
         entry.backupStats = a_stats;
         entry.type = OperationType::Backup;
         entry.mode = a_mode;
+        entry.result = a_result;
         Record(std::move(entry));
     }
 
-    void Activity::RecordRestore(OperationMode a_mode, const RestoreStats& a_stats, const std::vector<ActivityModResult>& a_mods)
+    void Activity::RecordRestore(OperationMode a_mode, const RestoreStats& a_stats, const std::vector<ActivityModResult>& a_mods, OperationResult a_result)
     {
         ActivityEntry entry;
         entry.mods = a_mods;
@@ -78,6 +79,7 @@ namespace MCMMemory
         entry.restoreStats = a_stats;
         entry.type = OperationType::Restore;
         entry.mode = a_mode;
+        entry.result = a_result;
         Record(std::move(entry));
     }
 
@@ -139,6 +141,7 @@ namespace MCMMemory
             for (const auto& mod : entry.mods) {
                 entryDocument["mods"].push_back({
                     { "modName", mod.modName },
+                    { "result", static_cast<int>(mod.result) },
                     { "backupStats", ToJson(mod.backupStats) },
                     { "restoreStats", ToJson(mod.restoreStats) }
                 });
@@ -220,11 +223,22 @@ namespace MCMMemory
             if (!JSON::ReadValue(modDocument, "modName", mod.modName)) {
                 continue;
             }
+            int modResult{};
+            const bool resultAvailable = JSON::ReadValue(modDocument, "result", modResult);
+            if (resultAvailable) {
+                if (modResult < 0 || modResult >= static_cast<int>(OperationResult::Count)) {
+                    continue;
+                }
+                mod.result = static_cast<OperationResult>(modResult);
+            }
             if (modDocument.contains("backupStats") && modDocument["backupStats"].is_object()) {
                 ReadStats(modDocument["backupStats"], mod.backupStats);
             }
             if (modDocument.contains("restoreStats") && modDocument["restoreStats"].is_object()) {
                 ReadStats(modDocument["restoreStats"], mod.restoreStats);
+            }
+            if (!resultAvailable && mod.backupStats.failedMCMCount > 0) {
+                mod.result = OperationResult::Failed;
             }
             a_entry.mods.push_back(std::move(mod));
         }

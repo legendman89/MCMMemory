@@ -1,6 +1,7 @@
 #include "menu/hud.hpp"
 #include "menu/translate.hpp"
 #include "settings.hpp"
+#include "utils/helper.hpp"
 
 namespace MCMMemory
 {
@@ -223,10 +224,16 @@ namespace MCMMemory
 
         const auto now = std::chrono::steady_clock::now();
         std::lock_guard lock(hudMutex);
-        gameMenuBlocked = false;
-        menuResumeAt = {};
 
-        if (display.active && display.message.type == HUDMessageType::Preview) {
+        if (display.active && display.message.type != HUDMessageType::Preview) {
+            return;
+        }
+        if (!notificationQueue.empty()) {
+            return;
+        }
+        if (display.active) {
+            gameMenuBlocked = false;
+            menuResumeAt = {};
             display.startedAt = now;
             display.pausedAt = {};
             return;
@@ -481,23 +488,6 @@ namespace MCMMemory
         GUI::ImDrawListManager::AddText(drawList, font, lineHeight, GUI::ImVec2{ textX, titleY }, titleColor, title.c_str());
         GUI::ImDrawListManager::AddText(drawList, font, lineHeight, GUI::ImVec2{ textX + 1.0F, detailY + 1.0F }, shadowColor, detail.c_str());
         GUI::ImDrawListManager::AddText(drawList, font, lineHeight, GUI::ImVec2{ textX, detailY }, detailColor, detail.c_str());
-    }
-
-    std::string HUD::GetDisplayModName(std::string_view a_modName) const
-    {
-        std::string modName{ a_modName };
-        if (!modName.starts_with('$')) {
-            return modName;
-        }
-
-        std::string translatedName;
-        if (SKSE::Translation::Translate(modName, translatedName) && !translatedName.empty()) {
-            modName = std::move(translatedName);
-        }
-        if (modName.starts_with('$')) {
-            modName.erase(0, 1);
-        }
-        return modName;
     }
 
     void HUD::Render()

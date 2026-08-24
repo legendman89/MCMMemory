@@ -2,6 +2,7 @@
 
 #include "mcm/mcm_registry.hpp"
 #include "mcm/mcm_script.hpp"
+#include "profile/activity.hpp"
 #include "profile/profile.hpp"
 #include "profile/restore_defs.hpp"
 #include "profile/stats.hpp"
@@ -322,6 +323,8 @@ namespace MCMMemory
 
         // Holds the final action queue currently being run.
         std::vector<RestoreAction> actions;
+
+        std::vector<ActivityModResult> activityMods;
 
         RegistryWait registryWait;
 

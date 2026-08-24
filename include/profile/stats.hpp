@@ -1,19 +1,9 @@
 #pragma once
 
+#include "profile/stats_defs.hpp"
+
 #include <cstdint>
 #include <cstring>
-
-#define FOREACH_BACKUP_STAT(STAT) \
-    STAT(MCMCount) \
-    STAT(settingCount) \
-    STAT(skippedSettingCount) \
-    STAT(failedMCMCount)
-
-#define FOREACH_RESTORE_STAT(STAT) \
-    STAT(MCMCount) \
-    STAT(appliedSettingCount) \
-    STAT(unchangedSettingCount) \
-    STAT(skippedSettingCount)
 
 namespace MCMMemory
 {
@@ -64,6 +54,3 @@ namespace MCMMemory
         }
     };
 }
-
-#undef FOREACH_BACKUP_STAT
-#undef FOREACH_RESTORE_STAT

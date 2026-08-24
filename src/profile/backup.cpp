@@ -63,6 +63,7 @@ namespace MCMMemory
         pageSettings.clear();
         mcmSettings.clear();
         menuSettings.clear();
+        activityMods.clear();
         profile.clear();
         mcmIndex = 0;
         pageIndex = 0;
@@ -436,7 +437,10 @@ namespace MCMMemory
             logger::warn("Full MCM backup kept the previous settings for '{}' after the MCM failed", modID);
         }
 
-        HUD::GetSingleton()->ShowBackupMCM(registeredMCMs[mcmIndex].identity.modName, mcmStats, operationMode);
+        const auto& modName = registeredMCMs[mcmIndex].identity.modName;
+        activityMods.emplace_back(modName, mcmStats);
+
+        HUD::GetSingleton()->ShowBackupMCM(modName, mcmStats, operationMode);
         stats += mcmStats;
 
         ++mcmIndex;
@@ -455,6 +459,7 @@ namespace MCMMemory
         }
 
         logger::info("Full MCM backup completed: {} settings from {} MCMs, {} skipped, {} MCMs failed", stats.settingCount, stats.MCMCount, stats.skippedSettingCount, stats.failedMCMCount);
+        Activity::GetSingleton()->RecordBackup(operationMode, stats, activityMods);
         HUD::GetSingleton()->ShowBackupSummary(stats);
         running = false;
     }

@@ -1,4 +1,5 @@
 #include "menu/hud.hpp"
+#include "profile/activity.hpp"
 #include "profile/capture.hpp"
 
 namespace MCMMemory
@@ -152,12 +153,18 @@ namespace MCMMemory
             ++result->stats.settingCount;
         }
 
+        std::vector<ActivityModResult> activityMods;
+        activityMods.reserve(results.size());
         BackupStats total;
         for (auto& result : results) {
             result.stats.MCMCount = 1;
             total += result.stats;
+
+            activityMods.emplace_back(result.identity.modName, result.stats);
+
             HUD::GetSingleton()->ShowBackupMCM(result.identity.modName, result.stats, OperationMode::Automatic);
         }
+        Activity::GetSingleton()->RecordBackup(OperationMode::Automatic, total, activityMods);
         HUD::GetSingleton()->ShowBackupSummary(total);
         logger::info("Automatic backup updated {} settings from {} MCMs", total.settingCount, total.MCMCount);
         pendingAutoBackupSettings.clear();

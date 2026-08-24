@@ -127,6 +127,8 @@ namespace MCMMemory
 #undef DECLARE_HUD_OPTION
     };
 
+    // Singleton class that manages the heads-up display for MCM backup and restore operations.
+    // I hand-crafted this to hvae a customizable appearance over Debug Notifications.
     class HUD
     {
     public:
@@ -230,8 +232,6 @@ namespace MCMMemory
         void UpdateRestoreMenuWarning(bool a_blocked, const std::chrono::steady_clock::time_point& a_now);
 
         void DrawRestoreMenuWarning(float a_alpha) const;
-
-        std::string GetDisplayModName(std::string_view a_modName) const;
 
         std::mutex hudMutex;
 

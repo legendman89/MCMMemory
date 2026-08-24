@@ -16,5 +16,7 @@
     SETTING(bool, perModNotificationsAuto, false) \
     /* Shows each MCM completed during manual backup or restore. */ \
     SETTING(bool, perModNotificationsManual, false) \
+    /* Lets COC start a temporary game session when testing from the main menu. */ \
+    SETTING(bool, allowCOCForTesting, false) \
     /* Controls whether Capture.json includes extra MCM menu data for debugging. */ \
     SETTING(bool, captureRawRecords, false)

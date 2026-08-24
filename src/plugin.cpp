@@ -1,12 +1,16 @@
-
 #include "menu/hud.hpp"
 #include "menu/menu.hpp"
 #include "utils/logger.hpp"
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "profile/restore.hpp"
+#include "profile/activity.hpp"
 #include "mcm/mcm_registry.hpp"
+
+#include "debug/coc_test.hpp"
+
 #include "settings.hpp"
+#include "session.hpp"
 
 
 namespace MCMMemory
@@ -29,24 +33,25 @@ namespace MCMMemory
                     break;
                 }
                 HUD::GetSingleton()->Configure(GetSettings());
+                if (!Activity::GetSingleton()->Load()) {
+                    logger::error("MCM Memory activity history could not be loaded");
+                }
                 Backup::GetSingleton()->Install();
                 Capture::GetSingleton()->Install();
                 Restore::GetSingleton()->Install();
+                if (GetSettings().allowCOCForTesting) {
+                    COCTest::GetSingleton()->Install();
+                }
                 break;
 
             case SKSE::MessagingInterface::kPreLoadGame:
-                SetGameLoaded(false);
-                HUD::GetSingleton()->Reset();
+                GameSession::GetSingleton()->PrepareLoad();
                 break;
 
             case SKSE::MessagingInterface::kNewGame:
             case SKSE::MessagingInterface::kPostLoadGame: {
                 const bool autoRestoreAllowed = a_message->type == SKSE::MessagingInterface::kNewGame;
-                HUD::GetSingleton()->Reset();
-                Backup::GetSingleton()->Reset();
-                Capture::GetSingleton()->Reset();
-                Restore::GetSingleton()->Reset(autoRestoreAllowed);
-                SetGameLoaded(true);
+                GameSession::GetSingleton()->Start(autoRestoreAllowed, autoRestoreAllowed ? "new game" : "loaded save");
                 break;
             }
 

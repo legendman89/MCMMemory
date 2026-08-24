@@ -2,6 +2,7 @@
 
 #include "mcm/mcm_registry.hpp"
 #include "mcm/mcm_script.hpp"
+#include "profile/activity.hpp"
 #include "profile/profile.hpp"
 #include "profile/stats.hpp"
 #include "settings.hpp"
@@ -122,6 +123,8 @@ namespace MCMMemory
         std::vector<CapturedSetting> mcmSettings;
 
         std::vector<size_t> menuSettings;
+
+        std::vector<ActivityModResult> activityMods;
 
         Profile profile;
 

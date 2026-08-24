@@ -43,6 +43,7 @@ namespace MCMMemory
         characterCreationOpen = false;
         restoreMCMs.clear();
         actions.clear();
+        activityMods.clear();
     }
 
     bool Restore::Start()
@@ -238,6 +239,7 @@ namespace MCMMemory
     {
         restoring = false;
         logger::info("Persistent profile restoration completed: {} applied, {} unchanged, {} skipped", stats.appliedSettingCount, stats.unchangedSettingCount, stats.skippedSettingCount);
+        Activity::GetSingleton()->RecordRestore(operationMode, stats, activityMods);
         HUD::GetSingleton()->ShowRestoreSummary(stats);
     }
 
@@ -249,9 +251,12 @@ namespace MCMMemory
 
         // Keep one short result for the MCM and add it to the final result.
         mcmStats.MCMCount = 1;
-        HUD::GetSingleton()->ShowRestoreMCM(restoreMCMs[a_mcmIndex].identity.modName, mcmStats, operationMode);
+        const auto& modName = restoreMCMs[a_mcmIndex].identity.modName;
+        activityMods.emplace_back(modName, mcmStats);
+
+        HUD::GetSingleton()->ShowRestoreMCM(modName, mcmStats, operationMode);
         stats += mcmStats;
-        logger::info("Restored '{}': {} applied, {} unchanged, {} skipped", restoreMCMs[a_mcmIndex].identity.modName, mcmStats.appliedSettingCount, mcmStats.unchangedSettingCount, mcmStats.skippedSettingCount);
+        logger::info("Restored '{}': {} applied, {} unchanged, {} skipped", modName, mcmStats.appliedSettingCount, mcmStats.unchangedSettingCount, mcmStats.skippedSettingCount);
         mcmStats.Reset();
     }
 

@@ -1,3 +1,4 @@
+#include "menu/activity.hpp"
 #include "menu/hud.hpp"
 #include "menu/menu.hpp"
 #include "menu/icons.hpp"
@@ -18,7 +19,8 @@ namespace MCMMemory::Menu
 
         Trans::GetTranslator().Load();
         SKSEMenuFramework::SetSection(BEAUTIFUL_NAME);
-        SKSEMenuFramework::AddSectionItem("Profile", RenderProfile);
+        SKSEMenuFramework::AddSectionItem(Trans::Tr("Profile").c_str(), RenderProfile);
+        SKSEMenuFramework::AddSectionItem(Trans::Tr("Activity").c_str(), RenderActivity);
         SKSEMenuFramework::AddHudElement(RenderHUD);
         logger::info("MCM Memory menu registered with SKSE Menu Framework {}", version);
     }

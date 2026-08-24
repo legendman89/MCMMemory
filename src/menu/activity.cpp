@@ -7,7 +7,7 @@
 
 namespace MCMMemory::Menu
 {
-    inline constexpr std::array<std::string_view, static_cast<size_t>(OperationMode::Count)> operationModeNames
+    inline constexpr std::array<std::string_view, ToIndex(OperationMode::Count)> operationModeNames
     {
         "Automatic",
         "Manual"
@@ -29,7 +29,7 @@ namespace MCMMemory::Menu
 
     std::string ActivityMenu::FormatSummary(const ActivityEntry& a_entry) const
     {
-        const auto mode = operationModeNames[static_cast<size_t>(a_entry.mode)];
+        const auto mode = operationModeNames[ToIndex(a_entry.mode)];
         const bool cancelled = a_entry.result == OperationResult::Cancelled;
         const auto separator = cancelled ? " cancelled: " : ": ";
         if (a_entry.type == OperationType::Backup) {

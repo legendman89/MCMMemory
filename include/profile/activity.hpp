@@ -1,6 +1,8 @@
 #pragma once
 
 #include "profile/stats.hpp"
+#include "profile/types.hpp"
+#include "utils/helper.hpp"
 
 #include <deque>
 
@@ -21,7 +23,7 @@ namespace MCMMemory
         Count
     };
 
-    inline constexpr std::array<std::string_view, static_cast<size_t>(OperationResult::Count)> operationResultNames
+    inline constexpr std::array<std::string_view, ToIndex(OperationResult::Count)> operationResultNames
     {
         "Completed",
         "Failed",
@@ -30,22 +32,24 @@ namespace MCMMemory
 
     inline std::string_view OperationResultName(OperationResult a_result)
     {
-        return operationResultNames[static_cast<size_t>(a_result)];
+        return operationResultNames[ToIndex(a_result)];
     }
 
     struct ActivityModResult
     {
         ActivityModResult() = default;
 
-        ActivityModResult(std::string_view a_modName, const BackupStats& a_stats, OperationResult a_result = OperationResult::Completed) :
-            modName(a_modName), backupStats(a_stats), result(a_result)
+        ActivityModResult(const MCMIdentity& a_identity, const BackupStats& a_stats, OperationResult a_result = OperationResult::Completed) :
+            modName(a_identity.modName), modID(a_identity.modID), backupStats(a_stats), result(a_result)
         {}
 
-        ActivityModResult(std::string_view a_modName, const RestoreStats& a_stats, OperationResult a_result = OperationResult::Completed) :
-            modName(a_modName), restoreStats(a_stats), result(a_result)
+        ActivityModResult(const MCMIdentity& a_identity, const RestoreStats& a_stats, OperationResult a_result = OperationResult::Completed) :
+            modName(a_identity.modName), modID(a_identity.modID), restoreStats(a_stats), result(a_result)
         {}
 
         std::string modName;
+
+        std::string modID;
 
         BackupStats backupStats;
 

@@ -5,6 +5,7 @@
 #include "menu/hud_defs.hpp"
 #include "menu/ui.hpp"
 #include "profile/stats.hpp"
+#include "utils/helper.hpp"
 
 #include <deque>
 
@@ -46,7 +47,7 @@ namespace MCMMemory
         Count
     };
 
-    inline constexpr std::array<GUI::ImVec4, static_cast<size_t>(HUDColor::Count)> HUDColors
+    inline constexpr std::array<GUI::ImVec4, ToIndex(HUDColor::Count)> HUDColors
     {
         FOREACH_HUD_COLOR(DECLARE_HUD_COLOR_VALUE)
     };
@@ -193,14 +194,14 @@ namespace MCMMemory
 
         inline GUI::ImVec4 GetColor(HUDColor a_color, float a_alpha) const
         {
-            auto color = HUDColors[static_cast<size_t>(a_color)];
+            auto color = HUDColors[ToIndex(a_color)];
             color.w *= a_alpha;
             return color;
         }
 
         inline float GetDelaySeconds(HUDMessageType a_type) const
         {
-            const std::array<float, static_cast<size_t>(HUDMessageType::Count)> delays
+            const std::array<float, ToIndex(HUDMessageType::Count)> delays
             {
                 options.startDelaySeconds,
                 0.0F,
@@ -210,12 +211,12 @@ namespace MCMMemory
                 0.0F,
                 0.0F
             };
-            return delays[static_cast<size_t>(a_type)];
+            return delays[ToIndex(a_type)];
         }
 
         inline bool ShouldShowPerMod(OperationMode a_operationMode) const
         {
-            const size_t index = static_cast<size_t>(a_operationMode);
+            const size_t index = ToIndex(a_operationMode);
             return index < perModNotifications.size() && perModNotifications[index].load(std::memory_order_relaxed);
         }
 
@@ -256,7 +257,7 @@ namespace MCMMemory
 
         std::atomic<bool> enabled{ true };
 
-        std::array<std::atomic<bool>, static_cast<size_t>(OperationMode::Count)> perModNotifications{};
+        std::array<std::atomic<bool>, ToIndex(OperationMode::Count)> perModNotifications{};
 
         bool gameMenuBlocked{};
     };

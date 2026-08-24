@@ -2,6 +2,7 @@
 
 #include "mcm/control_defs.hpp"
 #include "mcm/event_defs.hpp"
+#include "utils/helper.hpp"
 
 #define DECLARE_CONTROL_TYPE(name, text) name,
 #define DECLARE_CONTROL_TYPE_NAME(name, text) text,
@@ -14,12 +15,12 @@ namespace MCMMemory
         Count
     };
 
-    inline constexpr std::array<std::string_view, static_cast<size_t>(ControlType::Count)> controlTypeNames
+    inline constexpr std::array<std::string_view, ToIndex(ControlType::Count)> controlTypeNames
     {
         FOREACH_CONTROL_TYPE(DECLARE_CONTROL_TYPE_NAME)
     };
 
-    inline constexpr std::array<ControlType, static_cast<size_t>(EventType::Count)> eventControlTypes
+    inline constexpr std::array<ControlType, ToIndex(EventType::Count)> eventControlTypes
     {
         ControlType::Unknown,
 #define DECLARE_EVENT_CONTROL_TYPE(name, eventName, role, controlType) ControlType::controlType,
@@ -30,7 +31,7 @@ namespace MCMMemory
     // Says whether this is a toggle, slider, menu, color, input or keymap.
     inline std::string_view ControlTypeName(ControlType a_type)
     {
-        return controlTypeNames[static_cast<size_t>(a_type)];
+        return controlTypeNames[ToIndex(a_type)];
     }
 
     inline ControlType ParseControlType(std::string_view a_name)
@@ -45,7 +46,24 @@ namespace MCMMemory
 
     inline ControlType ControlTypeForEvent(EventType a_type)
     {
-        return eventControlTypes[static_cast<size_t>(a_type)];
+        return eventControlTypes[ToIndex(a_type)];
+    }
+
+    using MCMFilter = std::vector<std::string>;
+
+    inline bool ContainsMCMID(const MCMFilter& a_filter, std::string_view a_modID)
+    {
+        for (const auto& modID : a_filter) {
+            if (modID == a_modID) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    inline bool AllowsMCM(const MCMFilter& a_filter, std::string_view a_modID)
+    {
+        return a_filter.empty() || ContainsMCMID(a_filter, a_modID);
     }
 
     // Identifies one MCM by its visible name and stable ID.

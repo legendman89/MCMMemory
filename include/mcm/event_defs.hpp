@@ -1,5 +1,7 @@
 #pragma once
 
+#include "utils/helper.hpp"
+
 #include "plugin.hpp"
 
 // Navigation events identify the open MCM or page.
@@ -44,13 +46,13 @@ namespace MCMMemory
         Count
     };
 
-    inline constexpr std::array<std::string_view, static_cast<size_t>(EventType::Count)> eventNames
+    inline constexpr std::array<std::string_view, ToIndex(EventType::Count)> eventNames
     {
         "Unknown",
         FOREACH_MCM_EVENT(DECLARE_EVENT_NAME)
     };
 
-    inline constexpr std::array<EventRole, static_cast<size_t>(EventType::Count)> eventRoles
+    inline constexpr std::array<EventRole, ToIndex(EventType::Count)> eventRoles
     {
         EventRole::Cancel,
         FOREACH_MCM_EVENT(DECLARE_EVENT_ROLE)
@@ -68,12 +70,12 @@ namespace MCMMemory
 
     inline std::string_view EventName(EventType a_type)
     {
-        return eventNames[static_cast<size_t>(a_type)];
+        return eventNames[ToIndex(a_type)];
     }
 
     inline EventRole Role(EventType a_type)
     {
-        return eventRoles[static_cast<size_t>(a_type)];
+        return eventRoles[ToIndex(a_type)];
     }
 
     inline bool IsValueChange(EventType a_type) { return Role(a_type) == EventRole::ValueChange; }

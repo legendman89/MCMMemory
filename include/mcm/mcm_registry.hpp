@@ -89,17 +89,23 @@ namespace MCMMemory
             return dataHandler && dataHandler->LookupForm<RE::TESObjectACTI>(markerBaseLocalFormID, mcmUnlockedPluginName) && dataHandler->LookupForm<RE::TESObjectCELL>(markerCellLocalFormID, mcmUnlockedPluginName);
         }
 
-        static std::string CreateModID(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript, std::string_view a_modName)
+        static const char* ReadScriptName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript)
         {
             auto* typeInfo = a_mcmScript ? a_mcmScript->GetTypeInfo() : nullptr;
             auto* scriptName = typeInfo ? typeInfo->GetName() : nullptr;
-            if (!scriptName || !scriptName[0] || a_modName.empty()) {
+            return scriptName && scriptName[0] ? scriptName : nullptr;
+        }
+
+        static std::string CreateModID(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript, std::string_view a_modName)
+        {
+            const auto* scriptName = ReadScriptName(a_mcmScript);
+            if (!scriptName || a_modName.empty()) {
                 return {};
             }
             return std::format("{}::{}", scriptName, a_modName);
         }
 
-        static std::optional<std::string> ReadModName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript);
+        static std::optional<std::string> ReadModName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript, std::string* a_failureReason = nullptr);
 
         static RE::BSTSmartPointer<RE::BSScript::Object> ReadManagerScript();
 
@@ -115,6 +121,6 @@ namespace MCMMemory
         static std::vector<RE::NiPointer<RE::TESObjectREFR>> CollectMCMMarkers(RE::TESObjectCELL* a_markerCell, const RE::TESBoundObject* a_markerBase);
 
         // Create an MCMRegistryEntry instance for each MCM.
-        static std::optional<MCMRegistryEntry> CreateRegistryEntry(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript);
+        static std::optional<MCMRegistryEntry> CreateRegistryEntry(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript, std::string* a_failureReason = nullptr);
     };
 }

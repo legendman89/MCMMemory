@@ -7,7 +7,7 @@ namespace MCMMemory
 {
     inline constexpr uint32_t maximumScriptWaitChecks{ 20 };
 
-    bool Backup::Begin()
+    bool Backup::Begin(MCMFilter a_filter)
     {
         std::lock_guard lock(backupMutex);
         if (status != OperationStatus::Idle) {
@@ -25,6 +25,7 @@ namespace MCMMemory
         }
 
         Clear();
+        mcmFilter = std::move(a_filter);
         profile = std::move(existingProfile);
         status = OperationStatus::Running;
         logger::info("Full MCM backup is waiting for a stable registry");
@@ -44,6 +45,7 @@ namespace MCMMemory
         mcmSettings.clear();
         menuSettings.clear();
         activityMods.clear();
+        mcmFilter.clear();
         profile.clear();
         mcmIndex = 0;
         pageIndex = 0;
@@ -141,6 +143,21 @@ namespace MCMMemory
         auto currentMCMs = MCMRegistry().ReadRegisteredMCMs();
         const auto result = registryWait.Update(currentMCMs);
         if (result == RegistryWaitResult::Ready) {
+            auto mcm = currentMCMs.begin();
+            while (mcm != currentMCMs.end()) {
+                if (!AllowsMCM(mcmFilter, mcm->identity.modID)) {
+                    mcm = currentMCMs.erase(mcm);
+                }
+                else {
+                    ++mcm;
+                }
+            }
+            if (currentMCMs.empty()) {
+                logger::warn("Full MCM backup found none of the selected MCMs in the active registry");
+                HUD::GetSingleton()->ShowFailure("Backup stopped", "No selected MCMs were available");
+                status = OperationStatus::Idle;
+                return;
+            }
             registeredMCMs = std::move(currentMCMs);
             step = BackupStep::OpenMCM;
             logger::info("Full MCM backup found {} stable registered MCMs", registeredMCMs.size());
@@ -399,10 +416,10 @@ namespace MCMMemory
             logger::warn("Full MCM backup kept the previous settings for '{}' after the MCM failed", modID);
         }
 
-        const auto& modName = registeredMCMs[mcmIndex].identity.modName;
-        activityMods.emplace_back(modName, mcmStats, mcmFailed ? OperationResult::Failed : OperationResult::Completed);
+        const auto& identity = registeredMCMs[mcmIndex].identity;
+        activityMods.emplace_back(identity, mcmStats, mcmFailed ? OperationResult::Failed : OperationResult::Completed);
 
-        HUD::GetSingleton()->ShowBackupMCM(modName, mcmStats, OperationMode::Manual);
+        HUD::GetSingleton()->ShowBackupMCM(identity.modName, mcmStats, OperationMode::Manual);
         stats += mcmStats;
 
         mcmStarted = false;
@@ -449,7 +466,7 @@ namespace MCMMemory
         if (mcmStarted && mcmIndex < registeredMCMs.size()) {
             mcmStats.MCMCount = 1;
             mcmStats.settingCount = static_cast<uint32_t>(mcmSettings.size());
-            activityMods.emplace_back(registeredMCMs[mcmIndex].identity.modName, mcmStats, OperationResult::Cancelled);
+            activityMods.emplace_back(registeredMCMs[mcmIndex].identity, mcmStats, OperationResult::Cancelled);
             stats += mcmStats;
             mcmStarted = false;
         }

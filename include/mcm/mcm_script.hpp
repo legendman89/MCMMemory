@@ -65,13 +65,21 @@ namespace MCMMemory
         // Supports normal variables, properties, and their generated Papyrus backing names.
         const RE::BSScript::Variable* FindVariable(std::string_view a_name) const;
 
-        RE::BSTSmartPointer<RE::BSScript::Array> ReadArray(std::string_view a_name) const;
+        inline RE::BSTSmartPointer<RE::BSScript::Array> ReadArray(std::string_view a_name) const
+        {
+            const auto* value = FindVariable(a_name);
+            return value && value->IsArray() ? value->GetArray() : RE::BSTSmartPointer<RE::BSScript::Array>();
+        }
 
         std::optional<float> ReadNumber(std::string_view a_name, size_t a_index) const;
 
         std::optional<std::string> ReadString(std::string_view a_name, size_t a_index) const;
 
-        std::optional<int> ReadInteger(std::string_view a_name) const;
+        inline std::optional<int> ReadInteger(std::string_view a_name) const
+        {
+            const auto* value = FindVariable(a_name);
+            return value && value->IsInt() ? std::optional<int>(value->GetSInt()) : std::nullopt;
+        }
 
         // Keeps the live config script alive while backup or restore is using it.
         RE::BSTSmartPointer<RE::BSScript::Object> script;

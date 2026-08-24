@@ -44,12 +44,6 @@ namespace MCMMemory
         return value;
     }
 
-    RE::BSTSmartPointer<RE::BSScript::Array> MCMScript::ReadArray(std::string_view a_name) const
-    {
-        const auto* value = FindVariable(a_name);
-        return value && value->IsArray() ? value->GetArray() : RE::BSTSmartPointer<RE::BSScript::Array>();
-    }
-
     std::optional<float> MCMScript::ReadNumber(std::string_view a_name, size_t a_index) const
     {
         auto values = ReadArray(a_name);
@@ -79,12 +73,6 @@ namespace MCMMemory
 
         const auto& value = (*values)[static_cast<uint32_t>(a_index)];
         return value.IsString() ? std::optional<std::string>(std::string(value.GetString())) : std::nullopt;
-    }
-
-    std::optional<int> MCMScript::ReadInteger(std::string_view a_name) const
-    {
-        const auto* value = FindVariable(a_name);
-        return value && value->IsInt() ? std::optional<int>(value->GetSInt()) : std::nullopt;
     }
 
     std::vector<std::string> MCMScript::ReadPages() const

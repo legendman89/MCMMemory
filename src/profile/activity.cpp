@@ -141,6 +141,7 @@ namespace MCMMemory
             for (const auto& mod : entry.mods) {
                 entryDocument["mods"].push_back({
                     { "modName", mod.modName },
+                    { "modID", mod.modID },
                     { "result", static_cast<int>(mod.result) },
                     { "backupStats", ToJson(mod.backupStats) },
                     { "restoreStats", ToJson(mod.restoreStats) }
@@ -223,6 +224,7 @@ namespace MCMMemory
             if (!JSON::ReadValue(modDocument, "modName", mod.modName)) {
                 continue;
             }
+            JSON::ReadValue(modDocument, "modID", mod.modID);
             int modResult{};
             const bool resultAvailable = JSON::ReadValue(modDocument, "result", modResult);
             if (resultAvailable) {

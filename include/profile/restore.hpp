@@ -37,18 +37,18 @@ namespace MCMMemory
     };
 
     // These names match the functions on the MCM config script.
-    inline constexpr std::array<std::string_view, static_cast<size_t>(RestoreActionType::Count)> restoreActionFunctionNames
+    inline constexpr std::array<std::string_view, ToIndex(RestoreActionType::Count)> restoreActionFunctionNames
     {
         FOREACH_RESTORE_ACTION(DECLARE_RESTORE_FUNCTION_NAME)
     };
 
     // Matches every restore action with the argument it needs.
-    inline constexpr std::array<RestoreArgumentType, static_cast<size_t>(RestoreActionType::Count)> restoreArgumentTypes
+    inline constexpr std::array<RestoreArgumentType, ToIndex(RestoreActionType::Count)> restoreArgumentTypes
     {
         FOREACH_RESTORE_ACTION(DECLARE_RESTORE_ARGUMENT_TYPE)
     };
 
-    inline constexpr std::array<bool, static_cast<size_t>(RestoreActionType::Count)> restoreApplyActions
+    inline constexpr std::array<bool, ToIndex(RestoreActionType::Count)> restoreApplyActions
     {
         FOREACH_RESTORE_ACTION(DECLARE_RESTORE_APPLY_ACTION)
     };
@@ -56,18 +56,18 @@ namespace MCMMemory
     // Returns the Papyrus function name for one restore action.
     inline std::string_view RestoreActionFunctionName(RestoreActionType a_type)
     {
-        return restoreActionFunctionNames[static_cast<size_t>(a_type)];
+        return restoreActionFunctionNames[ToIndex(a_type)];
     }
 
     // Returns the argument type needed by one restore action.
     inline RestoreArgumentType GetRestoreArgumentType(RestoreActionType a_type)
     {
-        return restoreArgumentTypes[static_cast<size_t>(a_type)];
+        return restoreArgumentTypes[ToIndex(a_type)];
     }
 
     inline bool IsRestoreApplyAction(RestoreActionType a_type)
     {
-        return restoreApplyActions[static_cast<size_t>(a_type)];
+        return restoreApplyActions[ToIndex(a_type)];
     }
 
     // One small description of a script call waiting to be dispatched.
@@ -230,7 +230,15 @@ namespace MCMMemory
 
         bool Install();
 
-        bool Start();
+        inline bool Start()
+        {
+            return Begin({});
+        }
+
+        inline bool StartSelected(const MCMFilter& a_filter)
+        {
+            return !a_filter.empty() && Begin(a_filter);
+        }
 
         bool Cancel();
 
@@ -251,6 +259,8 @@ namespace MCMMemory
 
         // Finds the RestoreMCM for a setting or creates it.
         size_t GetOrAddMCM(const CapturedSetting& a_setting);
+
+        bool Begin(MCMFilter a_filter);
 
         bool LoadProfile();
 
@@ -334,6 +344,8 @@ namespace MCMMemory
         std::vector<RestoreAction> actions;
 
         std::vector<ActivityModResult> activityMods;
+
+        MCMFilter mcmFilter;
 
         RegistryWait registryWait;
 

@@ -2,8 +2,49 @@
 
 #include "plugin.hpp"
 
+#include <cstddef>
+#include <type_traits>
+
 namespace MCMMemory
 {
+    template <class Enum> requires std::is_enum_v<Enum>
+    inline constexpr size_t ToIndex(Enum a_value) noexcept
+    {
+        return static_cast<size_t>(a_value);
+    }
+
+    inline unsigned char ToLowerASCII(unsigned char a_character)
+    {
+        if (a_character >= 'A' && a_character <= 'Z') {
+            return static_cast<unsigned char>(a_character + ('a' - 'A'));
+        }
+        return a_character;
+    }
+
+    inline bool ContainsCaseInsensitive(std::string_view a_text, std::string_view a_search)
+    {
+        if (a_search.empty()) {
+            return true;
+        }
+        if (a_search.size() > a_text.size()) {
+            return false;
+        }
+        for (size_t start = 0; start + a_search.size() <= a_text.size(); ++start) {
+            size_t index{};
+            for (; index < a_search.size(); ++index) {
+                const auto textCharacter = static_cast<unsigned char>(a_text[start + index]);
+                const auto searchCharacter = static_cast<unsigned char>(a_search[index]);
+                if (ToLowerASCII(textCharacter) != ToLowerASCII(searchCharacter)) {
+                    break;
+                }
+            }
+            if (index == a_search.size()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     inline std::string ToUTF8(const std::filesystem::path& a_path)
     {
         auto utf8 = a_path.u8string();

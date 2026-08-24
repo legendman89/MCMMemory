@@ -49,14 +49,22 @@ namespace MCMMemory
         restoreMCMs.clear();
         actions.clear();
         activityMods.clear();
+        mcmFilter.clear();
     }
 
-    bool Restore::Start()
+    bool Restore::Begin(MCMFilter a_filter)
     {
         std::lock_guard lock(restoreMutex);
+        if (status != OperationStatus::Idle) {
+            logger::warn("Persistent profile restoration is already running");
+            return false;
+        }
+
         // A new session number makes callbacks from an older restore harmless.
         ++loadedGameSession;
         Clear();
+        operationMode = OperationMode::Manual;
+        mcmFilter = std::move(a_filter);
         configLoaded = true;
         configValid = LoadProfile();
         if (!configValid) {
@@ -64,7 +72,6 @@ namespace MCMMemory
             return false;
         }
 
-        operationMode = OperationMode::Manual;
         status = OperationStatus::Running;
         QueueRegistryCheck();
         if (registryCheckQueued) {
@@ -285,15 +292,15 @@ namespace MCMMemory
 
         // Keep one short result for the MCM and add it to the final result.
         mcmStats.MCMCount = 1;
-        const auto& modName = restoreMCMs[a_mcmIndex].identity.modName;
-        activityMods.emplace_back(modName, mcmStats, a_result);
+        const auto& identity = restoreMCMs[a_mcmIndex].identity;
+        activityMods.emplace_back(identity, mcmStats, a_result);
 
         if (a_result == OperationResult::Completed) {
-            HUD::GetSingleton()->ShowRestoreMCM(modName, mcmStats, operationMode);
+            HUD::GetSingleton()->ShowRestoreMCM(identity.modName, mcmStats, operationMode);
         }
         stats += mcmStats;
         mcmStatsRecorded = true;
-        logger::info("Recorded '{}' restore result '{}': {} applied, {} unchanged, {} skipped", modName, OperationResultName(a_result), mcmStats.appliedSettingCount, mcmStats.unchangedSettingCount, mcmStats.skippedSettingCount);
+        logger::info("Recorded '{}' restore result '{}': {} applied, {} unchanged, {} skipped", identity.modName, OperationResultName(a_result), mcmStats.appliedSettingCount, mcmStats.unchangedSettingCount, mcmStats.skippedSettingCount);
         mcmStats.Reset();
     }
 

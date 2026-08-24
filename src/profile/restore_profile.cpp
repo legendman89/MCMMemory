@@ -153,13 +153,21 @@ namespace MCMMemory
         }
 
         size_t supportedSettingCount{};
+        size_t excludedSettingCount{};
         for (const auto& setting : profile) {
+            const auto& modID = setting.selection.identity.modID;
+            const bool selected = AllowsMCM(mcmFilter, modID);
+            const bool automaticEnabled = operationMode != OperationMode::Automatic || GetSettings().IsAutoRestoreEnabled(modID);
+            if (!selected || !automaticEnabled) {
+                ++excludedSettingCount;
+                continue;
+            }
             if (AddSettingActions(setting)) {
                 ++supportedSettingCount;
             }
         }
 
-        logger::info("Loaded persistent profile with {} supported settings across {} MCM configurations", supportedSettingCount, restoreMCMs.size());
+        logger::info("Loaded persistent profile with {} supported settings across {} MCM configurations ({} excluded)", supportedSettingCount, restoreMCMs.size(), excludedSettingCount);
         if (supportedSettingCount == 0) {
             logger::warn("Persistent profile contains no supported settings to restore");
             return false;

@@ -18,7 +18,7 @@ namespace MCMMemory
     {
         enabled.store(a_settings.notifications, std::memory_order_relaxed);
 
-        const std::array<bool, static_cast<size_t>(OperationMode::Count)> perModOptions
+        const std::array<bool, ToIndex(OperationMode::Count)> perModOptions
         {
             a_settings.perModNotificationsAuto,
             a_settings.perModNotificationsManual

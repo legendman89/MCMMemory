@@ -52,7 +52,12 @@ namespace MCMMemory
 
         inline bool Start()
         {
-            return Begin();
+            return Begin({});
+        }
+
+        inline bool StartSelected(const MCMFilter& a_filter)
+        {
+            return !a_filter.empty() && Begin(a_filter);
         }
 
         inline OperationStatus GetStatus()
@@ -78,7 +83,7 @@ namespace MCMMemory
             }
         }
 
-        bool Begin();
+        bool Begin(MCMFilter a_filter);
 
         void RunNextStep(uint64_t a_loadedGameSession, uint64_t a_taskID);
 
@@ -127,6 +132,8 @@ namespace MCMMemory
         std::vector<size_t> menuSettings;
 
         std::vector<ActivityModResult> activityMods;
+
+        MCMFilter mcmFilter;
 
         Profile profile;
 

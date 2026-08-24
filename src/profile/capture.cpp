@@ -160,7 +160,7 @@ namespace MCMMemory
             result.stats.MCMCount = 1;
             total += result.stats;
 
-            activityMods.emplace_back(result.identity.modName, result.stats);
+            activityMods.emplace_back(result.identity, result.stats);
 
             HUD::GetSingleton()->ShowBackupMCM(result.identity.modName, result.stats, OperationMode::Automatic);
         }

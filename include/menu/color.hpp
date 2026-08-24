@@ -68,6 +68,8 @@ namespace MCMMemory::Menu::Color
     };
 
     inline constexpr GUI::ImVec4 kIconHover{ 1.00F, 0.52F, 0.08F, 1.00F };
+    inline constexpr GUI::ImVec4 kCountNumber{ 0.90F, 0.70F, 0.30F, 1.00F };
+    inline constexpr GUI::ImVec4 kCountText{ 0.72F, 0.74F, 0.78F, 1.00F };
     inline constexpr GUI::ImVec4 kTransparent{ 0.0F, 0.0F, 0.0F, 0.0F };
 
 }

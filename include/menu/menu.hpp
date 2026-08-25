@@ -42,7 +42,7 @@ namespace MCMMemory::Menu
 
     inline void WrappedTooltip(const char* a_text, const float& a_width = 420.0F)
     {
-        if (GUI::IsItemHovered()) {
+        if (GUI::IsItemHovered(GUI::ImGuiHoveredFlags_AllowWhenDisabled)) {
             GUI::PushStyleColor(GUI::ImGuiCol_PopupBg, Color::kOpaqueBackground);
             GUI::BeginTooltip();
             GUI::PushTextWrapPos(a_width);
@@ -51,6 +51,13 @@ namespace MCMMemory::Menu
             GUI::EndTooltip();
             GUI::PopStyleColor();
         }
+    }
+
+    inline void HelpMarker(const char* a_text)
+    {
+        GUI::SameLine(0.0F, 6.0F);
+        GUI::TextDisabled("(?)");
+        WrappedTooltip(a_text);
     }
 
     inline void BoldTextColored(const GUI::ImVec4& a_color, const char* a_text)

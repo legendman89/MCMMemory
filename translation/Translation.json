@@ -25,11 +25,17 @@
      ============================================================ */
 
   "Profile.Active": "Active Profile",
+  "Profile.Active.Tooltip": "The profile used by backup and restore operations.",
 
   "Profile.Action.BackUpNow": "Back Up Now",
   "Profile.Action.RestoreNow": "Restore Now",
   "Profile.Action.CancelNow": "Cancel Now",
   "Profile.Action.Stopping": "Stopping...",
+  "Profile.Action.Create.Tooltip": "Create an empty profile or copy an existing one.",
+  "Profile.Action.Delete.Tooltip": "Delete the active profile. At least one profile is always kept.",
+  "Profile.Action.BackUpNow.Tooltip": "Back up every registered MCM to the active profile.",
+  "Profile.Action.RestoreNow.Tooltip": "Restore every available MCM saved in the active profile.",
+  "Profile.Action.CancelBackup.Tooltip": "Stop after the current safe point. The existing profile will not be replaced.",
   "Profile.Action.CancelRestore.Tooltip": "Settings already restored will not be reverted.",
 
   "Profile.Create.Title": "Create Profile",
@@ -37,12 +43,16 @@
   "Profile.Create.Empty": "Empty profile",
   "Profile.Create.Duplicate": "Duplicate profile",
   "Profile.Create.CopyFrom": "Copy from",
+  "Profile.Create.Empty.Tooltip": "Create a profile with no saved MCM settings.",
+  "Profile.Create.Duplicate.Tooltip": "Copy every saved setting from another profile.",
 
   "Profile.Delete.Title": "Delete Profile",
   "Profile.Delete.Prompt": "Delete {0} profile?",
 
   "Profile.Automation.Backup": "Automatic backup",
   "Profile.Automation.Restore": "Automatic restore",
+  "Profile.Automation.Backup.Tooltip": "Keep the active profile updated when you change an MCM setting.",
+  "Profile.Automation.Restore.Tooltip": "Restore the active profile after MCM registration finishes in a new game. This does not run when loading a save.",
 
   "Profile.MCM.Header": "MCM Management",
   "Profile.MCM.Waiting": "Waiting for MCM registration...",
@@ -52,10 +62,17 @@
   "Profile.MCM.HideUnavailable": "Hide unavailable MCMs",
   "Profile.MCM.BackUpSelected": "Back Up Selected",
   "Profile.MCM.RestoreSelected": "Restore Selected",
+  "Profile.MCM.SelectAll.Tooltip": "Select every visible and registered MCM.",
+  "Profile.MCM.Clear.Tooltip": "Clear the current MCM selection.",
+  "Profile.MCM.HideUnavailable.Tooltip": "Hide profile entries whose MCM is not registered in the current game.",
+  "Profile.MCM.BackUpSelected.Tooltip": "Back up only the selected MCMs to the active profile.",
+  "Profile.MCM.RestoreSelected.Tooltip": "Restore only selected MCMs that already have saved settings.",
 
   "Profile.MCM.Column.Selected": "Selected",
   "Profile.MCM.Column.SavedSettings": "Saved Settings",
   "Profile.MCM.Column.AutoRestore": "Auto Restore",
+  "Profile.MCM.Column.Selected.Tooltip": "Include this MCM when using Back Up Selected or Restore Selected.",
+  "Profile.MCM.Column.AutoRestore.Tooltip": "Include this MCM in automatic restore. Manual restore is unaffected.",
 
   "Profile.MCM.Tooltip.BackupRestore": "Select this MCM to back up or restore its settings.",
   "Profile.MCM.Tooltip.BackupOnly": "Select this MCM to back it up.",
@@ -80,6 +97,7 @@
      ============================================================ */
 
   "Activity.Empty": "No activity yet.",
+  "Activity.Entry.Tooltip": "Open the per-MCM results for this operation.",
   "Activity.Details.Title": "Activity Details",
   "Activity.Details.Empty": "No per-mod results were recorded.",
 
@@ -118,12 +136,19 @@
   "Notifications.Enable": "Show backup and restore notifications",
   "Notifications.PerMod.Automatic": "Show per-mod notifications in auto mode",
   "Notifications.PerMod.Manual": "Show per-mod notifications in manual mode",
+  "Notifications.Enable.Tooltip": "Show MCM Memory progress and summaries on screen. The restore warning remains available when this is disabled.",
+  "Notifications.PerMod.Automatic.Tooltip": "Show a separate result for each MCM during automatic operations.",
+  "Notifications.PerMod.Manual.Tooltip": "Show a separate result for each MCM during operations started from the menu.",
 
   "Notifications.Appearance.Header": "Appearance",
   "Notifications.Appearance.Preview": "Preview",
   "Notifications.Appearance.FontScale": "Font scale",
   "Notifications.Appearance.HorizontalOffset": "Horizontal offset",
   "Notifications.Appearance.VerticalOffset": "Vertical offset",
+  "Notifications.Appearance.Preview.Tooltip": "Keep a sample notification visible while adjusting its appearance.",
+  "Notifications.Appearance.FontScale.Tooltip": "Change the size of notification text.",
+  "Notifications.Appearance.HorizontalOffset.Tooltip": "Set the distance from the left edge of the screen.",
+  "Notifications.Appearance.VerticalOffset.Tooltip": "Set the distance from the top edge of the screen.",
 
   "Notifications.Timing.Header": "Timing",
   "Notifications.Timing.StartDelay": "Start delay",
@@ -133,9 +158,17 @@
   "Notifications.Timing.MessageGap": "Message gap",
   "Notifications.Timing.DisplayDuration": "Display duration",
   "Notifications.Timing.FadeDuration": "Fade duration",
+  "Notifications.Timing.StartDelay.Tooltip": "Wait before showing the backup or restore starting message.",
+  "Notifications.Timing.OperationDelay.Tooltip": "Keep the starting message visible for at least this long before showing results.",
+  "Notifications.Timing.MenuCloseDelay.Tooltip": "Wait after a blocking game menu closes before resuming notifications.",
+  "Notifications.Timing.SummaryDelay.Tooltip": "Wait before the final operation summary can appear.",
+  "Notifications.Timing.MessageGap.Tooltip": "Set the pause between consecutive notification cards.",
+  "Notifications.Timing.DisplayDuration.Tooltip": "Set how long a notification remains fully visible.",
+  "Notifications.Timing.FadeDuration.Tooltip": "Set how long a notification takes to fade out.",
 
   "Notifications.Warning.Header": "Restore Warning",
   "Notifications.Warning.Duration": "Warning duration",
+  "Notifications.Warning.Duration.Tooltip": "Set how long the centered warning remains visible after the game menu is closed during restore.",
 
   /* ============================================================
      HUD MESSAGES

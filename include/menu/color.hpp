@@ -51,6 +51,14 @@ namespace MCMMemory::Menu::Color
         { 1.00F, 0.90F, 0.90F, 1.00F }
     };
 
+    inline constexpr CTAColors kNeutralButtonColors
+    {
+        { 0.82F, 0.83F, 0.85F, 1.00F },
+        { 0.94F, 0.95F, 0.97F, 1.00F },
+        { 0.70F, 0.71F, 0.74F, 1.00F },
+        { 0.08F, 0.08F, 0.09F, 1.00F }
+    };
+
     inline constexpr CTAColors kDisabledButtonColors
     {
         { 0.35F, 0.37F, 0.40F, 0.55F },

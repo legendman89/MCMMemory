@@ -38,6 +38,17 @@ namespace MCMMemory::Menu
         }
     }
 
+    inline void BoldTextColored(const GUI::ImVec4& a_color, const char* a_text)
+    {
+        GUI::TextColored(a_color, "%s", a_text);
+        auto* drawList = GUI::GetWindowDrawList();
+        auto* font = GUI::GetFont();
+        if (drawList && font) {
+            const auto position = GUI::GetItemRectMin();
+            GUI::ImDrawListManager::AddText(drawList, font, GUI::GetFontSize(), GUI::ImVec2{ position.x + 1.0F, position.y }, GUI::GetColorU32(a_color), a_text);
+        }
+    }
+
     template <class Colors>
     inline void PushButtonColors(const Colors& a_colors)
     {

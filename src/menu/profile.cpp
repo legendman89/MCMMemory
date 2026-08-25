@@ -28,7 +28,8 @@ namespace MCMMemory::Menu
 
         auto& settings = GetSettings();
         GUI::BeginDisabled(a_operationRunning);
-        GUI::TextUnformatted(Trans::Tr("Profile:").c_str());
+        GUI::AlignTextToFramePadding();
+        BoldTextColored(Color::kCountNumber, Trans::Tr("Active Profile").c_str());
         GUI::SameLine();
         GUI::SetNextItemWidth(ProfileFieldWidth);
         if (GUI::BeginCombo("##Active Profile", settings.activeProfile.c_str())) {
@@ -90,7 +91,7 @@ namespace MCMMemory::Menu
         const auto* style = GUI::GetStyle();
         const float itemSpacing = style ? style->ItemSpacing.x : 8.0F;
         const float framePadding = style ? style->FramePadding.x : 4.0F;
-        const auto profileLabel = Trans::Tr("Profile:");
+        const auto profileLabel = Trans::Tr("Active Profile");
         const auto createLabel = Trans::Tr("Create");
         const auto deleteLabel = Trans::Tr("Delete");
         const float profileWidth = GUI::CalcTextSize(profileLabel.c_str()).x + itemSpacing + ProfileFieldWidth + 10.0F + GUI::CalcTextSize(createLabel.c_str()).x + framePadding * 2.0F + itemSpacing + GUI::CalcTextSize(deleteLabel.c_str()).x + framePadding * 2.0F;
@@ -353,7 +354,7 @@ namespace MCMMemory::Menu
 
             const std::string profileName{ window.name.data() };
             std::error_code error;
-            const bool duplicateName = std::filesystem::exists(ProfileStorage::Path(profileName), error);
+            const bool duplicateName = !profileName.empty() && std::filesystem::exists(ProfileStorage::Path(profileName), error);
             const bool operationRunning = Backup::GetSingleton()->GetStatus() != OperationStatus::Idle || Restore::GetSingleton()->GetStatus() != OperationStatus::Idle;
             const bool canCreate = !operationRunning && Profiles::IsValidName(profileName) && !duplicateName && !error && (!window.duplicate || sourceAvailable);
             std::string validationError;
@@ -372,7 +373,7 @@ namespace MCMMemory::Menu
                 }
             }
             GUI::SameLine(0.0F, 14.0F);
-            if (GUI::Button(Trans::Tr("Cancel").c_str())) {
+            if (CTAButton(Trans::Tr("Cancel").c_str(), true, Color::kNeutralButtonColors)) {
                 window.open = false;
             }
 
@@ -408,7 +409,7 @@ namespace MCMMemory::Menu
                 }
             }
             GUI::SameLine(0.0F, 14.0F);
-            if (GUI::Button(Trans::Tr("Cancel").c_str())) {
+            if (CTAButton(Trans::Tr("Cancel").c_str(), true, Color::kNeutralButtonColors)) {
                 window.open = false;
             }
 
@@ -481,7 +482,10 @@ namespace MCMMemory::Menu
 
             GUI::TableSetColumnIndex(1);
             const auto modName = GetDisplayModName(mcm.identity.modName);
-            if (mcm.available) {
+            if (mcm.selected) {
+                GUI::TextColored(Color::kCountNumber, "%s", modName.c_str());
+            }
+            else if (mcm.available) {
                 GUI::TextUnformatted(modName.c_str());
             }
             else {
@@ -499,10 +503,20 @@ namespace MCMMemory::Menu
 
             GUI::TableSetColumnIndex(2);
             if (mcm.settingCount > 0) {
-                GUI::Text("%u", mcm.settingCount);
+                if (mcm.selected) {
+                    GUI::TextColored(Color::kCountNumber, "%u", mcm.settingCount);
+                }
+                else {
+                    GUI::Text("%u", mcm.settingCount);
+                }
             }
             else {
-                GUI::TextDisabled("%s", Trans::Tr("None").c_str());
+                if (mcm.selected) {
+                    GUI::TextColored(Color::kCountNumber, "%s", Trans::Tr("None").c_str());
+                }
+                else {
+                    GUI::TextDisabled("%s", Trans::Tr("None").c_str());
+                }
             }
 
             GUI::TableSetColumnIndex(3);

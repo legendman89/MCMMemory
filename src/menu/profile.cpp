@@ -73,15 +73,42 @@ namespace MCMMemory::Menu
         const auto restoreStatus = Restore::GetSingleton()->GetStatus();
         const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
         const bool profileEditing = createProfileWindow.open || deleteProfileWindow.open;
-        const float rowStart = GUI::GetCursorPosX();
-        const float rowWidth = GUI::GetContentRegionAvail().x;
+        const auto backupLabel = Trans::Tr("Back Up Now");
+        const auto restoreLabel = Trans::Tr("Restore Now");
+        const auto cancelLabel = Trans::Tr("Cancel Now");
+        const auto stoppingLabel = Trans::Tr("Stopping...");
+        const auto backupMetrics = MeasureIconButton(backupLabel.c_str(), Icons::kSave);
+        const auto restoreMetrics = MeasureIconButton(restoreLabel.c_str(), Icons::kRestore);
+        const auto cancelMetrics = MeasureIconButton(cancelLabel.c_str(), Icons::kCancel);
+        const auto stoppingMetrics = MeasureIconButton(stoppingLabel.c_str(), Icons::kCancel);
+        const float backupWidth = std::max({ backupMetrics.buttonSize.x, cancelMetrics.buttonSize.x, stoppingMetrics.buttonSize.x });
+        const float restoreWidth = std::max({ restoreMetrics.buttonSize.x, cancelMetrics.buttonSize.x, stoppingMetrics.buttonSize.x });
+        constexpr float operationSpacing{ 14.0F };
+        const float operationWidth = backupWidth + operationSpacing + restoreWidth;
+        const float operationHeight = std::max({ backupMetrics.buttonSize.y, restoreMetrics.buttonSize.y, cancelMetrics.buttonSize.y, stoppingMetrics.buttonSize.y });
+
+        const auto* style = GUI::GetStyle();
+        const float itemSpacing = style ? style->ItemSpacing.x : 8.0F;
+        const float framePadding = style ? style->FramePadding.x : 4.0F;
+        const auto profileLabel = Trans::Tr("Profile:");
+        const auto createLabel = Trans::Tr("Create");
+        const auto deleteLabel = Trans::Tr("Delete");
+        const float profileWidth = GUI::CalcTextSize(profileLabel.c_str()).x + itemSpacing + ProfileFieldWidth + 10.0F + GUI::CalcTextSize(createLabel.c_str()).x + framePadding * 2.0F + itemSpacing + GUI::CalcTextSize(deleteLabel.c_str()).x + framePadding * 2.0F;
+        const float profileHeight = GUI::GetFrameHeight();
+
+        const GUI::ImVec2 start = GUI::GetCursorPos();
+        const GUI::ImVec2 available = GUI::GetContentRegionAvail();
+        const bool singleRow = profileWidth + itemSpacing + operationWidth <= available.x;
 
         RenderProfileSelector(operationRunning || profileEditing);
 
-        constexpr float operationControlsWidth{ 445.0F };
-        GUI::SameLine();
-        GUI::SetCursorPosX(std::max(GUI::GetCursorPosX() + 20.0F, rowStart + rowWidth - operationControlsWidth));
-        RenderOperationButtons();
+        const float operationX = singleRow ? start.x + std::max(0.0F, available.x - operationWidth) : start.x;
+        const float operationY = singleRow ? start.y : start.y + profileHeight + itemSpacing;
+        GUI::SetCursorPos(GUI::ImVec2{ operationX, operationY });
+        RenderOperationButtons(backupWidth, restoreWidth);
+
+        const float controlsHeight = singleRow ? std::max(profileHeight, operationHeight) : profileHeight + itemSpacing + operationHeight;
+        GUI::SetCursorPos(GUI::ImVec2{ start.x, start.y + controlsHeight });
     }
 
     bool ProfileMenu::NeedsRefresh() const
@@ -199,7 +226,7 @@ namespace MCMMemory::Menu
         }
     }
 
-    void ProfileMenu::RenderOperationButtons()
+    void ProfileMenu::RenderOperationButtons(float a_backupWidth, float a_restoreWidth)
     {
         auto* backup = Backup::GetSingleton();
         auto* restore = Restore::GetSingleton();
@@ -207,47 +234,52 @@ namespace MCMMemory::Menu
         const auto restoreStatus = restore->GetStatus();
         const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
         const bool operationAvailable = IsGameLoaded() && !operationRunning && !createProfileWindow.open && !deleteProfileWindow.open;
-        const float rowStart = GUI::GetCursorPosX();
-        const float rowWidth = GUI::GetContentRegionAvail().x;
+        std::string backupLabel = Trans::Tr("Back Up Now");
+        std::string restoreLabel = Trans::Tr("Restore Now");
+        unsigned backupIcon = Icons::kSave;
+        unsigned restoreIcon = Icons::kRestore;
+        const Color::CTAColors* backupColors = std::addressof(Color::kBackupButtonColors);
+        const Color::CTAColors* restoreColors = std::addressof(Color::kRestoreButtonColors);
+        bool backupEnabled = operationAvailable;
+        bool restoreEnabled = operationAvailable;
 
-        if (IconCTAButton(Trans::Tr("Back Up Now").c_str(), operationAvailable, Icons::kSave, Color::kBackupButtonColors)) {
-            backup->Start();
+        if (backupStatus == OperationStatus::Running) {
+            backupLabel = Trans::Tr("Cancel Now");
+            backupIcon = Icons::kCancel;
+            backupColors = std::addressof(Color::kCancelButtonColors);
+            backupEnabled = true;
+        }
+        else if (backupStatus == OperationStatus::Stopping) {
+            backupLabel = Trans::Tr("Stopping...");
+            backupIcon = Icons::kCancel;
+        }
+        if (restoreStatus == OperationStatus::Running) {
+            restoreLabel = Trans::Tr("Cancel Now");
+            restoreIcon = Icons::kCancel;
+            restoreColors = std::addressof(Color::kCancelButtonColors);
+            restoreEnabled = true;
+        }
+        else if (restoreStatus == OperationStatus::Stopping) {
+            restoreLabel = Trans::Tr("Stopping...");
+            restoreIcon = Icons::kCancel;
         }
 
-        GUI::SameLine(0.0F, 14.0F);
-
-        if (IconCTAButton(Trans::Tr("Restore Now").c_str(), operationAvailable, Icons::kRestore, Color::kRestoreButtonColors)) {
-            restore->Start();
-        }
-
-        const bool stopping = backupStatus == OperationStatus::Stopping || restoreStatus == OperationStatus::Stopping;
-        const bool cancellationAvailable = backupStatus == OperationStatus::Running || restoreStatus == OperationStatus::Running;
-        auto cancelText = Trans::Tr("Cancel");
-        if (stopping) {
-            cancelText = Trans::Tr("Stopping...");
-        }
-        else if (backupStatus == OperationStatus::Running) {
-            cancelText = Trans::Tr("Cancel Backup");
-        }
-        else if (restoreStatus == OperationStatus::Running) {
-            cancelText = Trans::Tr("Cancel Restore");
-        }
-
-        const std::array<std::string, 3> cancellationLabels{ Trans::Tr("Cancel Backup"), Trans::Tr("Cancel Restore"), Trans::Tr("Stopping...") };
-        float cancelWidth{};
-        for (const auto& label : cancellationLabels) {
-            cancelWidth = std::max(cancelWidth, GUI::CalcTextSize(label.c_str()).x);
-        }
-        cancelWidth += 28.0F;
-
-        GUI::SameLine();
-        GUI::SetCursorPosX(std::max(GUI::GetCursorPosX(), rowStart + rowWidth - cancelWidth));
-        if (CTAButton(cancelText.c_str(), cancellationAvailable, Color::kCancelButtonColors, GUI::ImVec2{ cancelWidth, 0.0F })) {
+        if (IconCTAButton(backupLabel.c_str(), backupEnabled, backupIcon, *backupColors, GUI::ImVec2{ a_backupWidth, 0.0F })) {
             if (backupStatus == OperationStatus::Running) {
                 backup->Cancel();
             }
-            else if (restoreStatus == OperationStatus::Running) {
+            else {
+                backup->Start();
+            }
+        }
+
+        GUI::SameLine(0.0F, 14.0F);
+        if (IconCTAButton(restoreLabel.c_str(), restoreEnabled, restoreIcon, *restoreColors, GUI::ImVec2{ a_restoreWidth, 0.0F })) {
+            if (restoreStatus == OperationStatus::Running) {
                 restore->Cancel();
+            }
+            else {
+                restore->Start();
             }
         }
         if (restoreStatus != OperationStatus::Idle) {

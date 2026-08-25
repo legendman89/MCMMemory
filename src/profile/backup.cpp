@@ -28,7 +28,7 @@ namespace MCMMemory
         mcmFilter = std::move(a_filter);
         profile = std::move(existingProfile);
         status = OperationStatus::Running;
-        logger::info("Full MCM backup is waiting for a stable registry");
+        logger::info("Full MCM backup is reading the registered MCMs");
         QueueNext(0.0F);
         if (status == OperationStatus::Running) {
             HUD::GetSingleton()->ShowBackupStarted();
@@ -39,7 +39,6 @@ namespace MCMMemory
     void Backup::Clear()
     {
         registeredMCMs.clear();
-        registryWait.Reset();
         pages.clear();
         pageSettings.clear();
         mcmSettings.clear();
@@ -54,7 +53,7 @@ namespace MCMMemory
         mcmStats.Reset();
         scriptWaitCount = 0;
         scheduledTaskID = 0;
-        step = BackupStep::Registry;
+        step = BackupStep::ReadRegistry;
         status = OperationStatus::Idle;
         mcmFailed = false;
         mcmStarted = false;
@@ -93,8 +92,8 @@ namespace MCMMemory
         }
 
         switch (step) {
-        case BackupStep::Registry:
-            CheckRegistry();
+        case BackupStep::ReadRegistry:
+            ReadRegistry();
             break;
         case BackupStep::OpenMCM:
             OpenMCM();
@@ -138,49 +137,29 @@ namespace MCMMemory
         return true;
     }
 
-    void Backup::CheckRegistry()
+    void Backup::ReadRegistry()
     {
         auto currentMCMs = MCMRegistry().ReadRegisteredMCMs();
-        const auto result = registryWait.Update(currentMCMs);
-        if (result == RegistryWaitResult::Ready) {
-            auto mcm = currentMCMs.begin();
-            while (mcm != currentMCMs.end()) {
-                if (!AllowsMCM(mcmFilter, mcm->identity.modID)) {
-                    mcm = currentMCMs.erase(mcm);
-                }
-                else {
-                    ++mcm;
-                }
+        auto mcm = currentMCMs.begin();
+        while (mcm != currentMCMs.end()) {
+            if (!AllowsMCM(mcmFilter, mcm->identity.modID)) {
+                mcm = currentMCMs.erase(mcm);
             }
-            if (currentMCMs.empty()) {
-                logger::warn("Full MCM backup found none of the selected MCMs in the active registry");
-                HUD::GetSingleton()->ShowFailure("Backup stopped", "No selected MCMs were available");
-                status = OperationStatus::Idle;
-                return;
+            else {
+                ++mcm;
             }
-            registeredMCMs = std::move(currentMCMs);
-            step = BackupStep::OpenMCM;
-            logger::info("Full MCM backup found {} stable registered MCMs", registeredMCMs.size());
-            QueueNext(0.0F);
-            return;
         }
-        if (result == RegistryWaitResult::Expired) {
-            logger::error("Full MCM backup stopped because the registry did not become stable");
-            HUD::GetSingleton()->ShowFailure("Backup failed", "MCM registration did not finish");
+        if (currentMCMs.empty()) {
+            logger::warn("Full MCM backup found none of the selected MCMs in the active registry");
+            HUD::GetSingleton()->ShowFailure("Backup stopped", "No selected MCMs were available");
             status = OperationStatus::Idle;
             return;
         }
-        if (result == RegistryWaitResult::Empty) {
-            logger::info("Full MCM backup is waiting for MCM registry entries (check {})", registryWait.checkCount);
-        }
-        else if (result == RegistryWaitResult::Changed) {
-            logger::info("Full MCM backup caught {} registered MCMs and is waiting for registration to settle", currentMCMs.size());
-        }
-        else {
-            logger::info("Full MCM backup registry is unchanged (quiet check {} of {})", registryWait.quietCheckCount, requiredStableRegistryChecks);
-        }
 
-        QueueNext(registryCheckDelaySeconds);
+        registeredMCMs = std::move(currentMCMs);
+        step = BackupStep::OpenMCM;
+        logger::info("Full MCM backup found {} registered MCMs", registeredMCMs.size());
+        QueueNext(0.0F);
     }
 
     void Backup::OpenMCM()

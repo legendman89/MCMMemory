@@ -12,7 +12,7 @@ namespace MCMMemory
 {
     enum class BackupStep
     {
-        Registry,
+        ReadRegistry,
         OpenMCM,
         ReadPages,
         SetPage,
@@ -87,7 +87,7 @@ namespace MCMMemory
 
         void RunNextStep(uint64_t a_loadedGameSession, uint64_t a_taskID);
 
-        void CheckRegistry();
+        void ReadRegistry();
 
         void OpenMCM();
 
@@ -137,8 +137,6 @@ namespace MCMMemory
 
         Profile profile;
 
-        RegistryWait registryWait;
-
         size_t mcmIndex{};
 
         size_t pageIndex{};
@@ -155,7 +153,7 @@ namespace MCMMemory
 
         uint32_t scriptWaitCount{};
 
-        BackupStep step{ BackupStep::Registry };
+        BackupStep step{ BackupStep::ReadRegistry };
 
         OperationStatus status{ OperationStatus::Idle };
 

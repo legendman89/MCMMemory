@@ -129,6 +129,17 @@ namespace MCMMemory
 #undef DECLARE_HUD_OPTION
     };
 
+    struct HUDMessageTiming
+    {
+        float delaySeconds{};
+
+        float lifetimeSeconds{};
+
+        float fadeAtSeconds{};
+
+        float fadeSeconds{};
+    };
+
     // Singleton class that manages the heads-up display for MCM backup and restore operations.
     // I hand-crafted this to hvae a customizable appearance over Debug Notifications.
     class HUD
@@ -199,19 +210,21 @@ namespace MCMMemory
             return color;
         }
 
-        inline float GetDelaySeconds(HUDMessageType a_type) const
+        inline HUDMessageTiming GetTiming(HUDMessageType a_type) const
         {
-            const std::array<float, ToIndex(HUDMessageType::Count)> delays
+            const float lifetime = options.durationSeconds + options.fadeSeconds;
+            const float operationFade = std::min(options.fadeSeconds, options.operationDelaySeconds);
+            const std::array<HUDMessageTiming, ToIndex(HUDMessageType::Count)> timings
             {
-                options.startDelaySeconds,
-                0.0F,
-                options.summaryDelaySeconds,
-                options.summaryDelaySeconds,
-                0.0F,
-                0.0F,
-                0.0F
+                HUDMessageTiming{ options.startDelaySeconds, options.operationDelaySeconds, options.operationDelaySeconds - operationFade, operationFade },
+                HUDMessageTiming{ 0.0F, lifetime, options.durationSeconds, options.fadeSeconds },
+                HUDMessageTiming{ options.summaryDelaySeconds, lifetime, options.durationSeconds, options.fadeSeconds },
+                HUDMessageTiming{ options.summaryDelaySeconds, lifetime, options.durationSeconds, options.fadeSeconds },
+                HUDMessageTiming{ 0.0F, lifetime, options.durationSeconds, options.fadeSeconds },
+                HUDMessageTiming{ 0.0F, lifetime, options.durationSeconds, options.fadeSeconds },
+                HUDMessageTiming{ 0.0F, lifetime, options.durationSeconds, options.fadeSeconds }
             };
-            return delays[ToIndex(a_type)];
+            return timings[ToIndex(a_type)];
         }
 
         inline bool ShouldShowPerMod(OperationMode a_operationMode) const

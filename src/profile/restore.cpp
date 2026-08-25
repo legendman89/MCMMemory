@@ -72,16 +72,19 @@ namespace MCMMemory
             return false;
         }
 
+        const auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
+        if (registeredMCMs.empty()) {
+            HUD::GetSingleton()->ShowFailure("Restore failed", "No MCMs were registered");
+            logger::warn("Manual persistent profile restoration found no registered MCMs");
+            return false;
+        }
+
         status = OperationStatus::Running;
-        QueueRegistryCheck();
-        if (registryCheckQueued) {
-            HUD::GetSingleton()->ShowRestoreStarted();
-        }
-        else {
-            status = OperationStatus::Idle;
-        }
-        logger::info("Manual persistent profile restoration requested");
-        return registryCheckQueued;
+        HUD::GetSingleton()->ShowRestoreStarted();
+        MatchRegisteredMCMs(registeredMCMs);
+        StartRestore();
+        logger::info("Manual persistent profile restoration started from {} registered MCMs", registeredMCMs.size());
+        return status == OperationStatus::Running;
     }
 
     bool Restore::Cancel()

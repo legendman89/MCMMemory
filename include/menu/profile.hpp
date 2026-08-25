@@ -70,7 +70,7 @@ namespace MCMMemory::Menu
 
         void RenderProfileSelector(bool a_operationRunning);
 
-        void RenderOperationButtons();
+        void RenderOperationButtons(float a_backupWidth, float a_restoreWidth);
 
         void RenderCreateProfileWindow();
 

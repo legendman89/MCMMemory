@@ -21,7 +21,8 @@
     FOREACH_HUD_OFFSET_SETTING(HUD_SETTING)
 
 #define FOREACH_HUD_TIMING_SETTING(HUD_SETTING) \
-    HUD_SETTING(float, notificationStartDelaySeconds, 2.0F, startDelaySeconds, 0.0F, 10.0F, "Operation start delay", "%.1f s") \
+    HUD_SETTING(float, notificationStartDelaySeconds, 2.0F, startDelaySeconds, 0.0F, 10.0F, "Start delay", "%.1f s") \
+    HUD_SETTING(float, notificationOperationDelaySeconds, 2.0F, operationDelaySeconds, 0.0F, 10.0F, "Operation delay", "%.1f s") \
     HUD_SETTING(float, notificationMenuCloseDelaySeconds, 2.0F, menuCloseDelaySeconds, 0.0F, 10.0F, "Menu close delay", "%.1f s") \
     HUD_SETTING(float, notificationSummaryDelaySeconds, 2.0F, summaryDelaySeconds, 0.0F, 10.0F, "Summary delay", "%.1f s") \
     HUD_SETTING(float, notificationGapSeconds, 0.5F, gapSeconds, 0.0F, 5.0F, "Message gap", "%.1f s") \

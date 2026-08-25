@@ -42,7 +42,7 @@ namespace MCMMemory
         }
 
         for (auto& message : notificationQueue) {
-            message.showAt = TimeAfter(message.createdAt, GetDelaySeconds(message.type));
+            message.showAt = TimeAfter(message.createdAt, GetTiming(message.type).delaySeconds);
         }
 
         auto message = notificationQueue.begin();
@@ -277,7 +277,7 @@ namespace MCMMemory
     void HUD::BeginOperation(HUDMessage a_message)
     {
         std::lock_guard lock(hudMutex);
-        a_message.showAt = TimeAfter(a_message.createdAt, GetDelaySeconds(a_message.type));
+        a_message.showAt = TimeAfter(a_message.createdAt, GetTiming(a_message.type).delaySeconds);
         notificationQueue.clear();
         display.Reset();
         notificationQueue.push_back(std::move(a_message));
@@ -286,7 +286,7 @@ namespace MCMMemory
     void HUD::QueueMessage(HUDMessage a_message)
     {
         std::lock_guard lock(hudMutex);
-        a_message.showAt = TimeAfter(a_message.createdAt, GetDelaySeconds(a_message.type));
+        a_message.showAt = TimeAfter(a_message.createdAt, GetTiming(a_message.type).delaySeconds);
         notificationQueue.push_back(std::move(a_message));
     }
 
@@ -340,13 +340,14 @@ namespace MCMMemory
         }
 
         const float age = SecondsSince(display.startedAt, a_now);
-        if (age >= options.durationSeconds + options.fadeSeconds) {
+        const auto timing = GetTiming(display.message.type);
+        if (age >= timing.lifetimeSeconds) {
             display.active = false;
             display.nextAt = TimeAfter(a_now, options.gapSeconds);
             return true;
         }
 
-        DrawMessage(display.message, FadeAlpha(age, options.durationSeconds, options.fadeSeconds));
+        DrawMessage(display.message, FadeAlpha(age, timing.fadeAtSeconds, timing.fadeSeconds));
         return true;
     }
 

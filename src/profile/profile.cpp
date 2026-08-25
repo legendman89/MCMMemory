@@ -1,4 +1,6 @@
 #include "profile/profile.hpp"
+#include "profile/profiles.hpp"
+#include "settings.hpp"
 #include "utils/helper.hpp"
 #include "utils/json.hpp"
 
@@ -6,8 +8,14 @@ namespace MCMMemory
 {
     bool ProfileStorage::Load(Profile& a_profile)
     {
+        return Load(GetSettings().activeProfile, a_profile);
+    }
+
+    bool ProfileStorage::Load(std::string_view a_name, Profile& a_profile)
+    {
         a_profile.clear();
-        std::ifstream stream(Path());
+        const auto path = Path(a_name);
+        std::ifstream stream(path);
         if (!stream) {
             return false;
         }
@@ -15,12 +23,12 @@ namespace MCMMemory
         try {
             auto document = nlohmann::json::parse(stream);
             if (!document.is_object()) {
-                logger::error("Profile root is not an object in {}", ToUTF8(Path()));
+                logger::error("Profile root is not an object in {}", ToUTF8(path));
                 return false;
             }
             auto settings = document.find("settings");
             if (settings == document.end() || !settings->is_array()) {
-                logger::error("Profile settings are missing or invalid in {}", ToUTF8(Path()));
+                logger::error("Profile settings are missing or invalid in {}", ToUTF8(path));
                 return false;
             }
             for (const auto& settingDocument : *settings) {
@@ -30,7 +38,7 @@ namespace MCMMemory
                 }
             }
         } catch (const std::exception& error) {
-            logger::error("Failed to read profile {}: {}", ToUTF8(Path()), error.what());
+            logger::error("Failed to read profile {}: {}", ToUTF8(path), error.what());
             return false;
         }
         return true;
@@ -57,11 +65,28 @@ namespace MCMMemory
 
     bool ProfileStorage::Save(const Profile& a_profile)
     {
-        if (!JSON::WriteFile(Path(), ToJson(a_profile))) {
+        return Save(GetSettings().activeProfile, a_profile);
+    }
+
+    bool ProfileStorage::Save(std::string_view a_name, const Profile& a_profile)
+    {
+        const auto path = Path(a_name);
+        if (!JSON::WriteFile(path, ToJson(a_profile))) {
             return false;
         }
-        logger::info("Saved {} persistent profile settings to {}", a_profile.size(), ToUTF8(Path()));
+        logger::info("Saved {} persistent profile settings to {}", a_profile.size(), ToUTF8(path));
         return true;
+    }
+
+    std::filesystem::path ProfileStorage::Path()
+    {
+        return Path(GetSettings().activeProfile);
+    }
+
+    std::filesystem::path ProfileStorage::Path(std::string_view a_name)
+    {
+        const auto name = Profiles::IsValidName(a_name) ? a_name : std::string_view{ "Default" };
+        return Profiles::Directory() / FromUTF8(std::format("{}.json", name));
     }
 
     bool ProfileStorage::FromJson(const nlohmann::json& a_document, CapturedSetting& a_setting)

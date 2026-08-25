@@ -2,6 +2,7 @@
 #include "menu/menu.hpp"
 #include "utils/logger.hpp"
 #include "profile/capture.hpp"
+#include "profile/profiles.hpp"
 #include "profile/restore.hpp"
 #include "profile/activity.hpp"
 #include "mcm/mcm_registry.hpp"
@@ -30,6 +31,9 @@ namespace MCMMemory
                 if (!SettingsStorage::Load()) {
                     logger::critical("MCM Memory settings could not be loaded");
                     break;
+                }
+                if (!Profiles::CheckSelection()) {
+                    logger::error("MCM Memory could not save its selected profile");
                 }
                 HUD::GetSingleton()->Configure(GetSettings());
                 if (!Activity::GetSingleton()->Load()) {

@@ -7,6 +7,7 @@ namespace MCMMemory
     bool SettingsStorage::Save()
     {
         nlohmann::json document;
+        document["activeProfile"] = GetSettings().activeProfile;
         document["autoRestoreExcludedMCMs"] = GetSettings().autoRestoreExcludedMCMs;
 #define WRITE_SETTING(type, name, defaultValue, ...) document[#name] = GetSettings().name;
         FOREACH_SETTING(WRITE_SETTING)
@@ -38,6 +39,7 @@ namespace MCMMemory
 
         try {
             auto document = nlohmann::json::parse(stream);
+            JSON::ReadValue(document, "activeProfile", settings.activeProfile);
             JSON::ReadValue(document, "autoRestoreExcludedMCMs", settings.autoRestoreExcludedMCMs);
 #define READ_SETTING(type, name, defaultValue, ...) JSON::ReadValue(document, #name, settings.name);
             FOREACH_SETTING(READ_SETTING)
@@ -83,7 +85,8 @@ namespace MCMMemory
         );
 #undef LOG_SETTING
 #undef LOG_FORMATTER
-        logger::info(" Auto restore exclusions       : {}", settings.autoRestoreExcludedMCMs.size());
+        logger::info(" {:<30s} : {}", "Auto restore exclusions", settings.autoRestoreExcludedMCMs.size());
+        logger::info(" {:<30s} : {}", "Active profile", settings.activeProfile);
 
         return true;
     }

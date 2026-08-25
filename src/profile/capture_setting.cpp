@@ -96,7 +96,7 @@ namespace MCMMemory
 
         }
 
-        // Incomplete settings stay in Capture.json but not saved in Profile.json.
+        // Incomplete settings stay in Capture.json but not in the selected profile.
         setting.identityComplete = !setting.selection.identity.modName.empty() && !setting.selection.identity.modID.empty() && setting.selection.optionIndex >= 0 && !setting.optionLabel.empty() && setting.type != ControlType::Unknown && !setting.valueSource.empty();
         if (setting.identityComplete && GetSettings().autoBackup) {
             if (ProfileStorage::UpdateSetting(setting)) {

@@ -24,6 +24,28 @@ namespace MCMMemory::Menu
         MCMFilter restore;
     };
 
+    struct CreateProfileWindow
+    {
+        std::string sourceProfile;
+
+        std::string error;
+
+        std::array<char, 81> name{};
+
+        bool open{};
+
+        bool duplicate{};
+    };
+
+    struct DeleteProfileWindow
+    {
+        std::string profile;
+
+        std::string error;
+
+        bool open{};
+    };
+
     class ProfileMenu
     {
     public:
@@ -42,7 +64,17 @@ namespace MCMMemory::Menu
 
         bool NeedsRefresh() const;
 
+        void RefreshProfileNames();
+
+        void RenderProfileControls();
+
+        void RenderProfileSelector(bool a_operationRunning);
+
         void RenderOperationButtons();
+
+        void RenderCreateProfileWindow();
+
+        void RenderDeleteProfileWindow();
 
         void RenderAutomation();
 
@@ -54,7 +86,7 @@ namespace MCMMemory::Menu
 
         bool MatchesSearch(const ProfileMCMRow& a_mcm) const;
 
-        bool IsVisible(const ProfileMCMRow& a_mcm) const
+        inline bool IsVisible(const ProfileMCMRow& a_mcm) const
         {
             return MatchesSearch(a_mcm) && (!hideUnavailable || a_mcm.available);
         }
@@ -66,6 +98,12 @@ namespace MCMMemory::Menu
         void SelectVisibleMCMs(bool a_selected);
 
         std::vector<ProfileMCMRow> mcms;
+
+        std::vector<std::string> profileNames;
+
+        CreateProfileWindow createProfileWindow;
+
+        DeleteProfileWindow deleteProfileWindow;
 
         RegistryWait registryWait;
 

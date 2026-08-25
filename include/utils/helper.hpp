@@ -51,6 +51,12 @@ namespace MCMMemory
         return std::string(reinterpret_cast<const char*>(utf8.c_str()));
     }
 
+    inline std::filesystem::path FromUTF8(std::string_view a_text)
+    {
+        const auto* first = reinterpret_cast<const char8_t*>(a_text.data());
+        return std::filesystem::path(std::u8string(first, first + a_text.size()));
+    }
+
     inline std::string GetDisplayModName(std::string_view a_modName)
     {
         std::string modName{ a_modName };

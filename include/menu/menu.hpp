@@ -6,6 +6,15 @@
 namespace MCMMemory::Menu
 {
 
+    inline void CenterNextWindow()
+    {
+        const auto* viewport = GUI::GetMainViewport();
+        if (viewport) {
+            const GUI::ImVec2 center{ viewport->Pos.x + viewport->Size.x * 0.5F, viewport->Pos.y + viewport->Size.y * 0.5F };
+            GUI::SetNextWindowPos(center, GUI::ImGuiCond_Appearing, GUI::ImVec2{ 0.5F, 0.5F });
+        }
+    }
+
     inline void WrappedTooltip(const char* a_text, const float& a_width = 420.0F)
     {
         if (GUI::IsItemHovered()) {

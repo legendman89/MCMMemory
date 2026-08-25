@@ -8,6 +8,9 @@ namespace MCMMemory
 {
     struct Settings
     {
+        // Chooses the profile file used by capture, backup and restore.
+        std::string activeProfile{ "Default" };
+
         MCMFilter autoRestoreExcludedMCMs;
 
 #define DECLARE_SETTING(type, name, defaultValue, ...) type name{ defaultValue };

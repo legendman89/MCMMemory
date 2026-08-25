@@ -92,7 +92,7 @@ namespace MCMMemory
         int optionIndex{-1};
     };
 
-    // One setting stored in Profile.json.
+    // One setting stored in a profile.
     struct CapturedSetting
     {
         MCMSelection selection;

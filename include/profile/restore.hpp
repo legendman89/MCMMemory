@@ -370,7 +370,7 @@ namespace MCMMemory
         // Prevents the registration listener from being installed twice.
         bool installed{};
 
-        // Says whether Profile.json has already been read for this game.
+        // Says whether the selected profile has already been read for this game.
         bool configLoaded{};
 
         // Says whether the loaded profile can be restored.

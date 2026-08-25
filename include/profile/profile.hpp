@@ -10,17 +10,22 @@ namespace MCMMemory
     {
     public:
 
-        // Reads Profile.json into memory.
+        // Reads the selected profile into memory.
         static bool Load(Profile& a_profile);
 
-        // Adds or replaces one captured setting in Profile.json.
+        static bool Load(std::string_view a_name, Profile& a_profile);
+
+        // Adds or replaces one captured setting in the selected profile.
         static bool UpdateSetting(const CapturedSetting& a_setting);
 
         // Writes the complete profile to disk.
         static bool Save(const Profile& a_profile);
 
-        // Returns the full path to Profile.json.
-        static inline std::filesystem::path Path() { return GetPluginDataPath() / "Profile.json"; }
+        static bool Save(std::string_view a_name, const Profile& a_profile);
+
+        static std::filesystem::path Path();
+
+        static std::filesystem::path Path(std::string_view a_name);
 
     private:
 

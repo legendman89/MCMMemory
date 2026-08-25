@@ -5,6 +5,7 @@
 #include "menu/translate.hpp"
 #include "profile/backup.hpp"
 #include "profile/profile.hpp"
+#include "profile/profiles.hpp"
 #include "profile/restore.hpp"
 #include "settings.hpp"
 #include "utils/helper.hpp"
@@ -12,6 +13,76 @@
 namespace MCMMemory::Menu
 {
     inline constexpr auto registryRefreshInterval{ std::chrono::seconds(5) };
+    inline constexpr auto ProfileFieldWidth{ 240.0F };
+
+    void ProfileMenu::RefreshProfileNames()
+    {
+        profileNames = Profiles::ReadNames();
+    }
+
+    void ProfileMenu::RenderProfileSelector(bool a_operationRunning)
+    {
+        if (profileNames.empty()) {
+            RefreshProfileNames();
+        }
+
+        auto& settings = GetSettings();
+        GUI::BeginDisabled(a_operationRunning);
+        GUI::TextUnformatted(Trans::Tr("Profile:").c_str());
+        GUI::SameLine();
+        GUI::SetNextItemWidth(ProfileFieldWidth);
+        if (GUI::BeginCombo("##Active Profile", settings.activeProfile.c_str())) {
+            for (const auto& profileName : profileNames) {
+                const bool selected = profileName == settings.activeProfile;
+                if (GUI::Selectable(profileName.c_str(), selected)) {
+                    std::string error;
+                    if (Profiles::Select(profileName, error)) {
+                        loaded = false;
+                    }
+                    else {
+                        logger::error("Profile selection failed: {}", error);
+                    }
+                }
+            }
+            GUI::EndCombo();
+        }
+
+        GUI::SameLine(0.0F, 10.0F);
+        if (GUI::Button(Trans::Tr("Create").c_str())) {
+            createProfileWindow = {};
+            createProfileWindow.open = true;
+            createProfileWindow.sourceProfile = settings.activeProfile;
+        }
+
+        std::error_code error;
+        const bool selectedProfileExists = std::filesystem::exists(ProfileStorage::Path(), error) && !error;
+        GUI::SameLine();
+        GUI::BeginDisabled(!selectedProfileExists || profileNames.size() <= 1);
+        if (GUI::Button(Trans::Tr("Delete").c_str())) {
+            deleteProfileWindow = {};
+            deleteProfileWindow.open = true;
+            deleteProfileWindow.profile = settings.activeProfile;
+        }
+        GUI::EndDisabled();
+        GUI::EndDisabled();
+    }
+
+    void ProfileMenu::RenderProfileControls()
+    {
+        const auto backupStatus = Backup::GetSingleton()->GetStatus();
+        const auto restoreStatus = Restore::GetSingleton()->GetStatus();
+        const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
+        const bool profileEditing = createProfileWindow.open || deleteProfileWindow.open;
+        const float rowStart = GUI::GetCursorPosX();
+        const float rowWidth = GUI::GetContentRegionAvail().x;
+
+        RenderProfileSelector(operationRunning || profileEditing);
+
+        constexpr float operationControlsWidth{ 445.0F };
+        GUI::SameLine();
+        GUI::SetCursorPosX(std::max(GUI::GetCursorPosX() + 20.0F, rowStart + rowWidth - operationControlsWidth));
+        RenderOperationButtons();
+    }
 
     bool ProfileMenu::NeedsRefresh() const
     {
@@ -135,7 +206,7 @@ namespace MCMMemory::Menu
         const auto backupStatus = backup->GetStatus();
         const auto restoreStatus = restore->GetStatus();
         const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
-        const bool operationAvailable = IsGameLoaded() && !operationRunning;
+        const bool operationAvailable = IsGameLoaded() && !operationRunning && !createProfileWindow.open && !deleteProfileWindow.open;
         const float rowStart = GUI::GetCursorPosX();
         const float rowWidth = GUI::GetContentRegionAvail().x;
 
@@ -182,6 +253,138 @@ namespace MCMMemory::Menu
         if (restoreStatus != OperationStatus::Idle) {
             WrappedTooltip(Trans::Tr("Settings already restored will not be reverted.").c_str());
         }
+    }
+
+    void ProfileMenu::RenderCreateProfileWindow()
+    {
+        auto& window = createProfileWindow;
+        if (!window.open) {
+            return;
+        }
+
+        bool sourceAvailable{};
+        for (const auto& profileName : profileNames) {
+            std::error_code error;
+            if (std::filesystem::exists(ProfileStorage::Path(profileName), error) && !error) {
+                sourceAvailable = true;
+                if (window.sourceProfile.empty() || !std::filesystem::exists(ProfileStorage::Path(window.sourceProfile), error)) {
+                    window.sourceProfile = profileName;
+                }
+            }
+        }
+        if (!sourceAvailable) {
+            window.duplicate = false;
+        }
+
+        GUI::SetNextWindowSize(GUI::ImVec2{ 440.0F, 210.0F }, GUI::ImGuiCond_FirstUseEver);
+        CenterNextWindow();
+        const auto title = std::format("{}###Create MCM Memory Profile", Trans::Tr("Create Profile"));
+        if (GUI::Begin(title.c_str(), std::addressof(window.open), GUI::ImGuiWindowFlags_NoCollapse)) {
+
+            GUI::SetNextItemWidth(ProfileFieldWidth);
+            if (GUI::InputText(Trans::Tr("Name").c_str(), window.name.data(), window.name.size())) {
+                window.error.clear();
+            }
+
+            if (GUI::RadioButton(Trans::Tr("Empty profile").c_str(), !window.duplicate)) {
+                window.duplicate = false;
+            }
+
+            GUI::SameLine(0.0F, 20.0F);
+
+            GUI::BeginDisabled(!sourceAvailable);
+
+            if (GUI::RadioButton(Trans::Tr("Duplicate profile").c_str(), window.duplicate)) {
+                window.duplicate = true;
+            }
+            GUI::EndDisabled();
+
+            if (window.duplicate) {
+
+                GUI::SetNextItemWidth(ProfileFieldWidth);
+                if (GUI::BeginCombo(Trans::Tr("Copy from").c_str(), window.sourceProfile.c_str())) {
+                    for (const auto& profileName : profileNames) {
+                        std::error_code error;
+                        if (!std::filesystem::exists(ProfileStorage::Path(profileName), error) || error) {
+                            continue;
+                        }
+                        const bool selected = profileName == window.sourceProfile;
+                        if (GUI::Selectable(profileName.c_str(), selected)) {
+                            window.sourceProfile = profileName;
+                        }
+                    }
+                    GUI::EndCombo();
+                }
+            }
+
+            GUI::Spacing();
+
+            const std::string profileName{ window.name.data() };
+            std::error_code error;
+            const bool duplicateName = std::filesystem::exists(ProfileStorage::Path(profileName), error);
+            const bool operationRunning = Backup::GetSingleton()->GetStatus() != OperationStatus::Idle || Restore::GetSingleton()->GetStatus() != OperationStatus::Idle;
+            const bool canCreate = !operationRunning && Profiles::IsValidName(profileName) && !duplicateName && !error && (!window.duplicate || sourceAvailable);
+            std::string validationError;
+            if (!profileName.empty() && !Profiles::IsValidName(profileName)) {
+                validationError = Trans::Tr("Enter a valid profile name.");
+            }
+            else if (duplicateName) {
+                validationError = Trans::Tr("A profile with this name already exists.");
+            }
+            if (CTAButton(Trans::Tr("Create").c_str(), canCreate, Color::kBackupButtonColors)) {
+                const auto source = window.duplicate ? window.sourceProfile : std::string{};
+                if (Profiles::Create(profileName, source, window.error)) {
+                    RefreshProfileNames();
+                    loaded = false;
+                    window.open = false;
+                }
+            }
+            GUI::SameLine(0.0F, 14.0F);
+            if (GUI::Button(Trans::Tr("Cancel").c_str())) {
+                window.open = false;
+            }
+
+            const auto& displayError = validationError.empty() ? window.error : validationError;
+            if (!displayError.empty()) {
+                GUI::TextWrapped("%s", displayError.c_str());
+            }
+        }
+        GUI::End();
+    }
+
+    void ProfileMenu::RenderDeleteProfileWindow()
+    {
+        auto& window = deleteProfileWindow;
+        if (!window.open) {
+            return;
+        }
+
+        GUI::SetNextWindowSize(GUI::ImVec2{ 420.0F, 145.0F }, GUI::ImGuiCond_FirstUseEver);
+        CenterNextWindow();
+        const auto title = std::format("{}###Delete MCM Memory Profile", Trans::Tr("Delete Profile"));
+        if (GUI::Begin(title.c_str(), std::addressof(window.open), GUI::ImGuiWindowFlags_NoCollapse)) {
+            const auto message = std::format("{}: {}", Trans::Tr("Delete profile"), window.profile);
+            GUI::TextWrapped("%s", message.c_str());
+            GUI::Spacing();
+
+            const bool operationRunning = Backup::GetSingleton()->GetStatus() != OperationStatus::Idle || Restore::GetSingleton()->GetStatus() != OperationStatus::Idle;
+            if (CTAButton(Trans::Tr("Delete").c_str(), !operationRunning, Color::kCancelButtonColors)) {
+                if (Profiles::Delete(window.profile, window.error)) {
+                    RefreshProfileNames();
+                    loaded = false;
+                    window.open = false;
+                }
+            }
+            GUI::SameLine(0.0F, 14.0F);
+            if (GUI::Button(Trans::Tr("Cancel").c_str())) {
+                window.open = false;
+            }
+
+            if (!window.error.empty()) {
+                GUI::TextWrapped("%s", window.error.c_str());
+            }
+        }
+        GUI::End();
     }
 
     void ProfileMenu::RenderAutomation()
@@ -351,7 +554,9 @@ namespace MCMMemory::Menu
 
     void ProfileMenu::Render()
     {
-        RenderOperationButtons();
+        RenderProfileControls();
+        RenderCreateProfileWindow();
+        RenderDeleteProfileWindow();
         GUI::Spacing();
         RenderAutomation();
         GUI::Spacing();

@@ -55,7 +55,7 @@ namespace MCMMemory::Menu
 
         GUI::SameLine(0.0F, 10.0F);
 
-        if (GUI::Button(Trans::Tr("Common.Action.Create").c_str())) {
+        if (IconCTAButton(Trans::Tr("Common.Action.Create").c_str(), true, Icons::kCreate, Color::kCreateButtonColors)) {
             createProfileWindow = {};
             createProfileWindow.open = true;
             createProfileWindow.sourceProfile = settings.activeProfile;
@@ -66,15 +66,11 @@ namespace MCMMemory::Menu
 
         GUI::SameLine();
 
-        GUI::BeginDisabled(!selectedProfileExists || profileNames.size() <= 1);
-
-        if (GUI::Button(Trans::Tr("Common.Action.Delete").c_str())) {
+        if (IconCTAButton(Trans::Tr("Common.Action.Delete").c_str(), selectedProfileExists && profileNames.size() > 1, Icons::kDelete, Color::kCancelButtonColors)) {
             deleteProfileWindow = {};
             deleteProfileWindow.open = true;
             deleteProfileWindow.profile = settings.activeProfile;
         }
-
-        GUI::EndDisabled();
 
         GUI::EndDisabled();
     }
@@ -101,12 +97,13 @@ namespace MCMMemory::Menu
 
         const auto* style = GUI::GetStyle();
         const float itemSpacing = style ? style->ItemSpacing.x : 8.0F;
-        const float framePadding = style ? style->FramePadding.x : 4.0F;
         const auto profileLabel = Trans::Tr("Profile.Active");
         const auto createLabel = Trans::Tr("Common.Action.Create");
         const auto deleteLabel = Trans::Tr("Common.Action.Delete");
-        const float profileWidth = GUI::CalcTextSize(profileLabel.c_str()).x + itemSpacing + ProfileFieldWidth + 10.0F + GUI::CalcTextSize(createLabel.c_str()).x + framePadding * 2.0F + itemSpacing + GUI::CalcTextSize(deleteLabel.c_str()).x + framePadding * 2.0F;
-        const float profileHeight = GUI::GetFrameHeight();
+        const auto createMetrics = MeasureIconButton(createLabel.c_str(), Icons::kCreate);
+        const auto deleteMetrics = MeasureIconButton(deleteLabel.c_str(), Icons::kDelete);
+        const float profileWidth = GUI::CalcTextSize(profileLabel.c_str()).x + itemSpacing + ProfileFieldWidth + 10.0F + createMetrics.buttonSize.x + itemSpacing + deleteMetrics.buttonSize.x;
+        const float profileHeight = std::max({ GUI::GetFrameHeight(), createMetrics.buttonSize.y, deleteMetrics.buttonSize.y });
 
         const GUI::ImVec2 start = GUI::GetCursorPos();
         const GUI::ImVec2 available = GUI::GetContentRegionAvail();
@@ -380,7 +377,7 @@ namespace MCMMemory::Menu
             else if (duplicateName) {
                 validationError = "Profile.Error.DuplicateName";
             }
-            if (CTAButton(Trans::Tr("Common.Action.Create").c_str(), canCreate, Color::kBackupButtonColors)) {
+            if (CTAButton(Trans::Tr("Common.Action.Create").c_str(), canCreate, Color::kCreateButtonColors)) {
                 const auto source = window.duplicate ? window.sourceProfile : std::string{};
                 if (Profiles::Create(profileName, source, window.error)) {
                     RefreshProfileNames();

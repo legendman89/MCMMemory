@@ -5,8 +5,8 @@
 
 namespace MCMMemory::Menu
 {
-    inline constexpr float IconButtonHorizontalPadding{ 14.0F };
-    inline constexpr float IconButtonVerticalPadding{ 6.0F };
+    inline constexpr float CTAButtonHorizontalPadding{ 14.0F };
+    inline constexpr float CTAButtonVerticalPadding{ 6.0F };
     inline constexpr float IconButtonSpacing{ 8.0F };
 
     struct IconButtonMetrics
@@ -27,14 +27,29 @@ namespace MCMMemory::Menu
         }
     }
 
+    inline void CenterNextItem(float a_width)
+    {
+        GUI::SetCursorPosX(GUI::GetCursorPosX() + std::max(0.0F, (GUI::GetContentRegionAvail().x - a_width) * 0.5F));
+    }
+
+    inline bool BeginOpaqueCombo(const char* a_label, const char* a_preview)
+    {
+        GUI::PushStyleColor(GUI::ImGuiCol_PopupBg, Color::kOpaqueBackground);
+        const bool open = GUI::BeginCombo(a_label, a_preview);
+        GUI::PopStyleColor();
+        return open;
+    }
+
     inline void WrappedTooltip(const char* a_text, const float& a_width = 420.0F)
     {
         if (GUI::IsItemHovered()) {
+            GUI::PushStyleColor(GUI::ImGuiCol_PopupBg, Color::kOpaqueBackground);
             GUI::BeginTooltip();
             GUI::PushTextWrapPos(a_width);
             GUI::TextUnformatted(a_text);
             GUI::PopTextWrapPos();
             GUI::EndTooltip();
+            GUI::PopStyleColor();
         }
     }
 
@@ -70,8 +85,14 @@ namespace MCMMemory::Menu
 
         const float contentWidth = metrics.iconSize.x + IconButtonSpacing + metrics.labelSize.x;
         const float contentHeight = std::max(metrics.iconSize.y, metrics.labelSize.y);
-        metrics.buttonSize = GUI::ImVec2{ contentWidth + IconButtonHorizontalPadding * 2.0F, contentHeight + IconButtonVerticalPadding * 2.0F };
+        metrics.buttonSize = GUI::ImVec2{ contentWidth + CTAButtonHorizontalPadding * 2.0F, contentHeight + CTAButtonVerticalPadding * 2.0F };
         return metrics;
+    }
+
+    inline GUI::ImVec2 MeasureCTAButton(const char* a_label)
+    {
+        const auto labelSize = GUI::CalcTextSize(a_label);
+        return GUI::ImVec2{ labelSize.x + CTAButtonHorizontalPadding * 2.0F, labelSize.y + CTAButtonVerticalPadding * 2.0F };
     }
 
     template <class Colors>
@@ -142,7 +163,7 @@ namespace MCMMemory::Menu
     {
         const auto& colors = a_enabled ? a_colors : Color::kDisabledButtonColors;
         GUI::PushStyleVar(GUI::ImGuiStyleVar_FrameRounding, 6.0F);
-        GUI::PushStyleVar(GUI::ImGuiStyleVar_FramePadding, GUI::ImVec2{ 14.0F, 6.0F });
+        GUI::PushStyleVar(GUI::ImGuiStyleVar_FramePadding, GUI::ImVec2{ CTAButtonHorizontalPadding, CTAButtonVerticalPadding });
         PushButtonColors(colors);
 
         if (!a_enabled) {

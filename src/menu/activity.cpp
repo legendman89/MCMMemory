@@ -1,5 +1,6 @@
 #include "menu/activity_defs.hpp"
 #include "menu/activity.hpp"
+#include "menu/menu.hpp"
 #include "menu/translate.hpp"
 #include "utils/helper.hpp"
 
@@ -93,7 +94,7 @@ namespace MCMMemory::Menu
         if (GUI::BeginTable("MCM Memory Activity", 2, flags, GUI::ImVec2(0.0F, 320.0F))) {
 
             GUI::TableSetupColumn(Trans::Tr("Result").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
-            GUI::TableSetupColumn(Trans::Tr("When").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 140.0F);
+            GUI::TableSetupColumn(Trans::Tr("When").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 150.0F);
 
             GUI::TableHeadersRow();
 
@@ -140,9 +141,13 @@ namespace MCMMemory::Menu
             return;
         }
 
-        GUI::SetNextWindowSize(GUI::ImVec2(760.0F, 430.0F), GUI::ImGuiCond_FirstUseEver);
+        GUI::SetNextWindowSize(GUI::ImVec2(780.0F, 430.0F), GUI::ImGuiCond_FirstUseEver);
+        CenterNextWindow();
         const auto windowTitle = std::format("{}###MCM Memory Activity Details", Trans::Tr("Activity Details"));
-        if (GUI::Begin(windowTitle.c_str(), std::addressof(detailsOpen), GUI::ImGuiWindowFlags_NoCollapse)) {
+        GUI::PushStyleColor(GUI::ImGuiCol_WindowBg, Color::kOpaqueBackground);
+        const bool windowOpen = GUI::Begin(windowTitle.c_str(), std::addressof(detailsOpen), GUI::ImGuiWindowFlags_NoCollapse);
+        GUI::PopStyleColor();
+        if (windowOpen) {
             const auto summary = FormatSummary(*selected);
             const auto exactTime = FormatExactTime(*selected);
             GUI::TextWrapped("%s", summary.c_str());

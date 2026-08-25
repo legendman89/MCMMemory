@@ -19,7 +19,7 @@ namespace MCMMemory::Trans
             return false;
         }
         if (!exists) {
-            logger::info("Translation file does not exist at {}; using built-in text", ToUTF8(path));
+            logger::warn("Translation file does not exist at {}; using translation keys", ToUTF8(path));
             return true;
         }
 

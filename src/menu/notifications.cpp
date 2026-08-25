@@ -14,25 +14,25 @@ namespace MCMMemory::Menu
         bool settingsChanged{};
         bool appearanceSettingActive{};
 
-        if (GUI::Checkbox(Trans::Tr("Show backup and restore notifications").c_str(), std::addressof(settings.notifications))) {
+        if (GUI::Checkbox(Trans::Tr("Notifications.Enable").c_str(), std::addressof(settings.notifications))) {
             settingsChanged = true;
         }
 
         GUI::BeginDisabled(!settings.notifications);
 
-        if (GUI::Checkbox(Trans::Tr("Show per-mod notifications in auto mode").c_str(), std::addressof(settings.perModNotificationsAuto))) {
+        if (GUI::Checkbox(Trans::Tr("Notifications.PerMod.Automatic").c_str(), std::addressof(settings.perModNotificationsAuto))) {
             settingsChanged = true;
         }
 
         GUI::SameLine(0.0F, 18.0F);
 
-        if (GUI::Checkbox(Trans::Tr("Show per-mod notifications in manual mode").c_str(), std::addressof(settings.perModNotificationsManual))) {
+        if (GUI::Checkbox(Trans::Tr("Notifications.PerMod.Manual").c_str(), std::addressof(settings.perModNotificationsManual))) {
             settingsChanged = true;
         }
 
-        GUI::SeparatorText(Trans::Tr("Appearance").c_str());
+        GUI::SeparatorText(Trans::Tr("Notifications.Appearance.Header").c_str());
 
-        if (IconButton(Trans::Tr("Preview").c_str(), Icons::kPreview, Color::kPreviewButtonColors)) {
+        if (IconButton(Trans::Tr("Notifications.Appearance.Preview").c_str(), Icons::kPreview, Color::kPreviewButtonColors)) {
             HUD::GetSingleton()->Preview();
         }
 
@@ -61,7 +61,7 @@ namespace MCMMemory::Menu
             GUI::EndTable();
         }
 
-        GUI::SeparatorText(Trans::Tr("Timing").c_str());
+        GUI::SeparatorText(Trans::Tr("Notifications.Timing.Header").c_str());
         if (GUI::BeginTable("HUD notification timing", 2, compactTableFlags)) {
 #define DRAW_HUD_TIMING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
             GUI::TableNextColumn(); \
@@ -75,7 +75,7 @@ namespace MCMMemory::Menu
         }
         GUI::EndDisabled();
 
-        GUI::SeparatorText(Trans::Tr("Restore Warning").c_str());
+        GUI::SeparatorText(Trans::Tr("Notifications.Warning.Header").c_str());
 
         // The restore warning remains available when normal notifications are disabled.
 #define DRAW_HUD_WARNING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \

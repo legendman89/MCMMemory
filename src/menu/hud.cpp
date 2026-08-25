@@ -69,7 +69,7 @@ namespace MCMMemory
         gameMenuBlocked = false;
     }
 
-    void HUD::ShowOperationStarted(std::string_view a_text)
+    void HUD::ShowOperationStarted(std::string_view a_key)
     {
         if (!enabled.load(std::memory_order_relaxed)) {
             return;
@@ -77,7 +77,7 @@ namespace MCMMemory
 
         HUDMessage message;
         message.type = HUDMessageType::OperationStarted;
-        message.segments.push_back({ Trans::Tr(a_text), HUDColor::Accent });
+        message.segments.push_back({ Trans::Tr(a_key), HUDColor::Accent });
         BeginOperation(std::move(message));
     }
 
@@ -92,14 +92,14 @@ namespace MCMMemory
         message.operationMode = a_operationMode;
         const auto modName = GetDisplayModName(a_modName);
         if (a_stats.failedMCMCount > 0) {
-            message.segments.push_back({ Trans::Format("{} backup failed", modName), HUDColor::Error });
-            message.segments.push_back({ Trans::Tr("    Previous settings kept"), HUDColor::Muted });
+            message.segments.push_back({ Trans::Format("HUD.Backup.MCM.Failed", modName), HUDColor::Error });
+            message.segments.push_back({ Trans::Tr("HUD.Backup.MCM.PreviousKept"), HUDColor::Muted });
         }
         else {
-            message.segments.push_back({ Trans::Format("{} backed up", modName), HUDColor::Success });
-            message.segments.push_back({ Trans::Format("    {} settings", a_stats.settingCount), HUDColor::Accent });
+            message.segments.push_back({ Trans::Format("HUD.Backup.MCM.Success", modName), HUDColor::Success });
+            message.segments.push_back({ Trans::Format("HUD.Common.Settings", a_stats.settingCount), HUDColor::Accent });
             if (a_stats.skippedSettingCount > 0) {
-                message.segments.push_back({ Trans::Format("    {} skipped", a_stats.skippedSettingCount), HUDColor::Warning });
+                message.segments.push_back({ Trans::Format("HUD.Common.Skipped", a_stats.skippedSettingCount), HUDColor::Warning });
             }
         }
         QueueMessage(std::move(message));
@@ -116,19 +116,19 @@ namespace MCMMemory
         message.operationMode = a_operationMode;
         const auto modName = GetDisplayModName(a_modName);
         if (a_stats.appliedSettingCount == 0 && a_stats.unchangedSettingCount == 0 && a_stats.skippedSettingCount > 0) {
-            message.segments.push_back({ Trans::Format("{} restore skipped", modName), HUDColor::Warning });
+            message.segments.push_back({ Trans::Format("HUD.Restore.MCM.Skipped", modName), HUDColor::Warning });
         }
         else {
-            message.segments.push_back({ Trans::Format("{} restored", modName), HUDColor::Success });
+            message.segments.push_back({ Trans::Format("HUD.Restore.MCM.Success", modName), HUDColor::Success });
         }
         if (a_stats.appliedSettingCount > 0) {
-            message.segments.push_back({ Trans::Format("    {} changed", a_stats.appliedSettingCount), HUDColor::Accent });
+            message.segments.push_back({ Trans::Format("HUD.Common.Changed", a_stats.appliedSettingCount), HUDColor::Accent });
         }
         if (a_stats.unchangedSettingCount > 0) {
-            message.segments.push_back({ Trans::Format("    {} already set", a_stats.unchangedSettingCount), HUDColor::Muted });
+            message.segments.push_back({ Trans::Format("HUD.Common.AlreadySet", a_stats.unchangedSettingCount), HUDColor::Muted });
         }
         if (a_stats.skippedSettingCount > 0) {
-            message.segments.push_back({ Trans::Format("    {} skipped", a_stats.skippedSettingCount), HUDColor::Warning });
+            message.segments.push_back({ Trans::Format("HUD.Common.Skipped", a_stats.skippedSettingCount), HUDColor::Warning });
         }
         QueueMessage(std::move(message));
     }
@@ -141,13 +141,13 @@ namespace MCMMemory
 
         HUDMessage message;
         message.type = HUDMessageType::BackupSummary;
-        message.segments.push_back({ Trans::Format("{} MCMs backed up", a_stats.MCMCount), HUDColor::Success });
-        message.segments.push_back({ Trans::Format("    {} settings", a_stats.settingCount), HUDColor::Accent });
+        message.segments.push_back({ Trans::Format("HUD.Backup.Summary.Success", a_stats.MCMCount), HUDColor::Success });
+        message.segments.push_back({ Trans::Format("HUD.Common.Settings", a_stats.settingCount), HUDColor::Accent });
         if (a_stats.skippedSettingCount > 0) {
-            message.segments.push_back({ Trans::Format("    {} skipped", a_stats.skippedSettingCount), HUDColor::Warning });
+            message.segments.push_back({ Trans::Format("HUD.Common.Skipped", a_stats.skippedSettingCount), HUDColor::Warning });
         }
         if (a_stats.failedMCMCount > 0) {
-            message.segments.push_back({ Trans::Format("    {} MCMs failed", a_stats.failedMCMCount), HUDColor::Error });
+            message.segments.push_back({ Trans::Format("HUD.Backup.Summary.Failed", a_stats.failedMCMCount), HUDColor::Error });
         }
         QueueMessage(std::move(message));
     }
@@ -160,11 +160,11 @@ namespace MCMMemory
 
         HUDMessage message;
         message.type = HUDMessageType::RestoreSummary;
-        message.segments.push_back({ Trans::Format("{} MCMs restored", a_stats.MCMCount), HUDColor::Success });
-        message.segments.push_back({ Trans::Format("    {} changed", a_stats.appliedSettingCount), HUDColor::Accent });
-        message.segments.push_back({ Trans::Format("    {} already set", a_stats.unchangedSettingCount), HUDColor::Muted });
+        message.segments.push_back({ Trans::Format("HUD.Restore.Summary.Success", a_stats.MCMCount), HUDColor::Success });
+        message.segments.push_back({ Trans::Format("HUD.Common.Changed", a_stats.appliedSettingCount), HUDColor::Accent });
+        message.segments.push_back({ Trans::Format("HUD.Common.AlreadySet", a_stats.unchangedSettingCount), HUDColor::Muted });
         if (a_stats.skippedSettingCount > 0) {
-            message.segments.push_back({ Trans::Format("    {} skipped", a_stats.skippedSettingCount), HUDColor::Warning });
+            message.segments.push_back({ Trans::Format("HUD.Common.Skipped", a_stats.skippedSettingCount), HUDColor::Warning });
         }
         QueueMessage(std::move(message));
     }
@@ -177,8 +177,8 @@ namespace MCMMemory
 
         HUDMessage message;
         message.type = HUDMessageType::Cancellation;
-        message.segments.push_back({ Trans::Tr("Backup cancelled"), HUDColor::Warning });
-        message.segments.push_back({ Trans::Format("    Existing profile unchanged; {} MCMs read", a_stats.MCMCount), HUDColor::Muted });
+        message.segments.push_back({ Trans::Tr("HUD.Backup.Cancelled.Title"), HUDColor::Warning });
+        message.segments.push_back({ Trans::Format("HUD.Backup.Cancelled.Detail", a_stats.MCMCount), HUDColor::Muted });
         BeginOperation(std::move(message));
     }
 
@@ -190,12 +190,12 @@ namespace MCMMemory
 
         HUDMessage message;
         message.type = HUDMessageType::Cancellation;
-        message.segments.push_back({ Trans::Tr("Restore cancelled"), HUDColor::Warning });
-        message.segments.push_back({ Trans::Format("    {} settings changed before stopping", a_stats.appliedSettingCount), HUDColor::Muted });
+        message.segments.push_back({ Trans::Tr("HUD.Restore.Cancelled.Title"), HUDColor::Warning });
+        message.segments.push_back({ Trans::Format("HUD.Restore.Cancelled.Detail", a_stats.appliedSettingCount), HUDColor::Muted });
         BeginOperation(std::move(message));
     }
 
-    void HUD::ShowFailure(std::string_view a_title, std::string_view a_detail)
+    void HUD::ShowFailure(std::string_view a_titleKey, std::string_view a_detailKey)
     {
         if (!enabled.load(std::memory_order_relaxed)) {
             return;
@@ -203,9 +203,9 @@ namespace MCMMemory
 
         HUDMessage message;
         message.type = HUDMessageType::Failure;
-        message.segments.push_back({ Trans::Tr(a_title), HUDColor::Error });
-        if (!a_detail.empty()) {
-            message.segments.push_back({ std::format("    {}", Trans::Tr(a_detail)), HUDColor::Muted });
+        message.segments.push_back({ Trans::Tr(a_titleKey), HUDColor::Error });
+        if (!a_detailKey.empty()) {
+            message.segments.push_back({ std::format("    {}", Trans::Tr(a_detailKey)), HUDColor::Muted });
         }
         QueueFailure(std::move(message));
     }
@@ -228,8 +228,8 @@ namespace MCMMemory
     {
         HUDMessage message;
         message.type = HUDMessageType::Preview;
-        message.segments.push_back({ Trans::Tr("42 MCMs backed up"), HUDColor::Success });
-        message.segments.push_back({ Trans::Tr("    318 settings"), HUDColor::Accent });
+        message.segments.push_back({ Trans::Format("HUD.Backup.Summary.Success", 42), HUDColor::Success });
+        message.segments.push_back({ Trans::Format("HUD.Common.Settings", 318), HUDColor::Accent });
 
         gameMenuBlocked = false;
         menuResumeAt = {};
@@ -375,14 +375,14 @@ namespace MCMMemory
 
         const auto elapsedMinutes = std::chrono::duration_cast<std::chrono::minutes>(a_now - a_message.createdAt).count();
         if (elapsedMinutes <= 0) {
-            a_message.segments.push_back({ Trans::Tr("    Last backup: just now"), HUDColor::Muted });
+            a_message.segments.push_back({ Trans::Tr("HUD.Backup.Age.JustNow"), HUDColor::Muted });
         }
         else if (elapsedMinutes < 60) {
-            a_message.segments.push_back({ Trans::Format("    Last backup: {}m ago", elapsedMinutes), HUDColor::Muted });
+            a_message.segments.push_back({ Trans::Format("HUD.Backup.Age.MinutesAgo", elapsedMinutes), HUDColor::Muted });
         }
         else {
             const auto elapsedHours = elapsedMinutes / 60;
-            a_message.segments.push_back({ Trans::Format("    Last backup: {}h ago", elapsedHours), HUDColor::Muted });
+            a_message.segments.push_back({ Trans::Format("HUD.Backup.Age.HoursAgo", elapsedHours), HUDColor::Muted });
         }
     }
 
@@ -487,8 +487,8 @@ namespace MCMMemory
             return;
         }
 
-        const auto title = Trans::Tr("Game menu closed");
-        const auto detail = Trans::Tr("MCM restore is still running");
+        const auto title = Trans::Tr("HUD.Warning.Title");
+        const auto detail = Trans::Tr("HUD.Warning.Detail");
         const GUI::ImVec2 titleSize = GUI::CalcTextSize(title.c_str(), nullptr, false, 0.0F);
         const GUI::ImVec2 detailSize = GUI::CalcTextSize(detail.c_str(), nullptr, false, 0.0F);
         const float textWidth = std::max(titleSize.x, detailSize.x);

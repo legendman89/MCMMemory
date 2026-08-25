@@ -20,7 +20,7 @@ namespace MCMMemory
         const bool profileExists = std::filesystem::exists(ProfileStorage::Path(), error);
         if (error || (profileExists && !ProfileStorage::Load(existingProfile))) {
             logger::error("Full MCM backup refuses to replace an unreadable profile at {}", ToUTF8(ProfileStorage::Path()));
-            HUD::GetSingleton()->ShowFailure("Backup failed", "Existing profile could not be read");
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", "HUD.Failure.ExistingProfileUnreadable");
             return false;
         }
 
@@ -151,7 +151,7 @@ namespace MCMMemory
         }
         if (currentMCMs.empty()) {
             logger::warn("Full MCM backup found none of the selected MCMs in the active registry");
-            HUD::GetSingleton()->ShowFailure("Backup stopped", "No selected MCMs were available");
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupStopped", "HUD.Failure.NoSelectedMCMs");
             status = OperationStatus::Idle;
             return;
         }
@@ -412,7 +412,7 @@ namespace MCMMemory
         Capture::GetSingleton()->MergeSettings(profile);
         if (!ProfileStorage::Save(profile)) {
             logger::error("Full MCM backup failed to save its completed profile");
-            HUD::GetSingleton()->ShowFailure("Backup failed", "Existing profile was not changed");
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", "HUD.Failure.ProfileUnchanged");
             status = OperationStatus::Idle;
             return;
         }

@@ -154,12 +154,12 @@ namespace MCMMemory
 
         inline void ShowBackupStarted()
         {
-            ShowOperationStarted("Backing up MCM settings");
+            ShowOperationStarted("HUD.Operation.BackupStarted");
         }
 
         inline void ShowRestoreStarted()
         {
-            ShowOperationStarted("Restoring MCM settings");
+            ShowOperationStarted("HUD.Operation.RestoreStarted");
         }
 
         void Configure(const Settings& a_settings);
@@ -178,7 +178,7 @@ namespace MCMMemory
 
         void ShowRestoreCancelled(const RestoreStats& a_stats);
 
-        void ShowFailure(std::string_view a_title, std::string_view a_detail);
+        void ShowFailure(std::string_view a_titleKey, std::string_view a_detailKey);
 
         void ShowRestoreMenuWarning();
 
@@ -233,7 +233,7 @@ namespace MCMMemory
             return index < perModNotifications.size() && perModNotifications[index].load(std::memory_order_relaxed);
         }
 
-        void ShowOperationStarted(std::string_view a_text);
+        void ShowOperationStarted(std::string_view a_key);
 
         void BeginOperation(HUDMessage a_message);
 

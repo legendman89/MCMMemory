@@ -1,0 +1,185 @@
+{
+  /* ============================================================
+     COMMON
+     ============================================================ */
+
+  "Common.MCM": "MCM",
+  "Common.None": "None",
+
+  "Common.Action.Create": "Create",
+  "Common.Action.Delete": "Delete",
+  "Common.Action.Cancel": "Cancel",
+  "Common.Action.Clear": "Clear",
+  "Common.Action.Yes": "Yes",
+
+  /* ============================================================
+     MENU TABS
+     ============================================================ */
+
+  "Menu.Tab.Profile": "Profile",
+  "Menu.Tab.Activity": "Activity",
+  "Menu.Tab.Notifications": "HUD Notifications",
+
+  /* ============================================================
+     PROFILE TAB
+     ============================================================ */
+
+  "Profile.Active": "Active Profile",
+
+  "Profile.Action.BackUpNow": "Back Up Now",
+  "Profile.Action.RestoreNow": "Restore Now",
+  "Profile.Action.CancelNow": "Cancel Now",
+  "Profile.Action.Stopping": "Stopping...",
+  "Profile.Action.CancelRestore.Tooltip": "Settings already restored will not be reverted.",
+
+  "Profile.Create.Title": "Create Profile",
+  "Profile.Create.Name": "Name",
+  "Profile.Create.Empty": "Empty profile",
+  "Profile.Create.Duplicate": "Duplicate profile",
+  "Profile.Create.CopyFrom": "Copy from",
+
+  "Profile.Delete.Title": "Delete Profile",
+  "Profile.Delete.Prompt": "Delete {0} profile?",
+
+  "Profile.Automation.Backup": "Automatic backup",
+  "Profile.Automation.Restore": "Automatic restore",
+
+  "Profile.MCM.Header": "MCM Management",
+  "Profile.MCM.Waiting": "Waiting for MCM registration...",
+  "Profile.MCM.NoMatches": "No MCMs match the current filter.",
+  "Profile.MCM.SearchHint": "Search MCMs...",
+  "Profile.MCM.SelectAll": "Select All",
+  "Profile.MCM.HideUnavailable": "Hide unavailable MCMs",
+  "Profile.MCM.BackUpSelected": "Back Up Selected",
+  "Profile.MCM.RestoreSelected": "Restore Selected",
+
+  "Profile.MCM.Column.Selected": "Selected",
+  "Profile.MCM.Column.SavedSettings": "Saved Settings",
+  "Profile.MCM.Column.AutoRestore": "Auto Restore",
+
+  "Profile.MCM.Tooltip.BackupRestore": "Select this MCM to back up or restore its settings.",
+  "Profile.MCM.Tooltip.BackupOnly": "Select this MCM to back it up.",
+  "Profile.MCM.Tooltip.Unavailable": "This MCM is saved in the profile but is not currently registered.",
+
+  "Profile.MCM.Count.Registered": "registered",
+  "Profile.MCM.Count.Selected": "selected",
+
+  "Profile.Error.InvalidName": "Enter a valid profile name.",
+  "Profile.Error.DuplicateName": "A profile with this name already exists.",
+  "Profile.Error.LocationCheck": "The profile location could not be checked.",
+  "Profile.Error.DuplicateFailed": "The selected profile could not be duplicated.",
+  "Profile.Error.CreateFailed": "The profile could not be created.",
+  "Profile.Error.DeleteLast": "The last profile cannot be deleted.",
+  "Profile.Error.DeleteFailed": "The profile file could not be deleted.",
+  "Profile.Error.NotCreated": "This profile has not been created yet.",
+  "Profile.Error.SelectedNameInvalid": "The selected profile name is invalid.",
+  "Profile.Error.SaveSelection": "The selected profile could not be saved.",
+
+  /* ============================================================
+     ACTIVITY TAB
+     ============================================================ */
+
+  "Activity.Empty": "No activity yet.",
+  "Activity.Details.Title": "Activity Details",
+  "Activity.Details.Empty": "No per-mod results were recorded.",
+
+  "Activity.Mode.Automatic": "Automatic",
+  "Activity.Mode.Manual": "Manual",
+
+  "Activity.Result.Completed": "Completed",
+  "Activity.Result.Failed": "Failed",
+  "Activity.Result.Cancelled": "Cancelled",
+
+  "Activity.Column.Result": "Result",
+  "Activity.Column.When": "When",
+  "Activity.Column.Settings": "Settings",
+  "Activity.Column.Changed": "Changed",
+  "Activity.Column.AlreadySet": "Already set",
+  "Activity.Column.Skipped": "Skipped",
+  "Activity.Column.Status": "Status",
+
+  "Activity.Summary.Backup.Completed": "{0} backup: {1} MCMs, {2} settings",
+  "Activity.Summary.Backup.Failed": "{0} backup: {1} MCMs, {2} settings, {3} failed",
+  "Activity.Summary.Backup.Cancelled": "{0} backup cancelled: {1} MCMs, {2} settings read",
+  "Activity.Summary.Restore.Completed": "{0} restore: {1} MCMs, {2} changed, {3} already set",
+  "Activity.Summary.Restore.Cancelled": "{0} restore cancelled: {1} MCMs, {2} changed, {3} already set",
+
+  "Activity.Time.JustNow": "Just now",
+  "Activity.Time.SecondsAgo": "{0}s ago",
+  "Activity.Time.MinutesAgo": "{0}m ago",
+  "Activity.Time.HoursAgo": "{0}h ago",
+  "Activity.Time.DaysAgo": "{0}d ago",
+  "Activity.Time.Exact": "{0:04}-{1:02}-{2:02}  {3:02}:{4:02}:{5:02}",
+
+  /* ============================================================
+     HUD NOTIFICATIONS TAB
+     ============================================================ */
+
+  "Notifications.Enable": "Show backup and restore notifications",
+  "Notifications.PerMod.Automatic": "Show per-mod notifications in auto mode",
+  "Notifications.PerMod.Manual": "Show per-mod notifications in manual mode",
+
+  "Notifications.Appearance.Header": "Appearance",
+  "Notifications.Appearance.Preview": "Preview",
+  "Notifications.Appearance.FontScale": "Font scale",
+  "Notifications.Appearance.HorizontalOffset": "Horizontal offset",
+  "Notifications.Appearance.VerticalOffset": "Vertical offset",
+
+  "Notifications.Timing.Header": "Timing",
+  "Notifications.Timing.StartDelay": "Start delay",
+  "Notifications.Timing.OperationDelay": "Operation delay",
+  "Notifications.Timing.MenuCloseDelay": "Menu close delay",
+  "Notifications.Timing.SummaryDelay": "Summary delay",
+  "Notifications.Timing.MessageGap": "Message gap",
+  "Notifications.Timing.DisplayDuration": "Display duration",
+  "Notifications.Timing.FadeDuration": "Fade duration",
+
+  "Notifications.Warning.Header": "Restore Warning",
+  "Notifications.Warning.Duration": "Warning duration",
+
+  /* ============================================================
+     HUD MESSAGES
+     ============================================================ */
+
+  "HUD.Operation.BackupStarted": "Backing up MCM settings",
+  "HUD.Operation.RestoreStarted": "Restoring MCM settings",
+
+  "HUD.Backup.MCM.Success": "{0} backed up",
+  "HUD.Backup.MCM.Failed": "{0} backup failed",
+  "HUD.Backup.MCM.PreviousKept": "    Previous settings kept",
+  "HUD.Restore.MCM.Success": "{0} restored",
+  "HUD.Restore.MCM.Skipped": "{0} restore skipped",
+
+  "HUD.Backup.Summary.Success": "{0} MCMs backed up",
+  "HUD.Backup.Summary.Failed": "    {0} MCMs failed",
+  "HUD.Restore.Summary.Success": "{0} MCMs restored",
+
+  "HUD.Common.Settings": "    {0} settings",
+  "HUD.Common.Changed": "    {0} changed",
+  "HUD.Common.AlreadySet": "    {0} already set",
+  "HUD.Common.Skipped": "    {0} skipped",
+
+  "HUD.Backup.Cancelled.Title": "Backup cancelled",
+  "HUD.Backup.Cancelled.Detail": "    Existing profile unchanged; {0} MCMs read",
+  "HUD.Restore.Cancelled.Title": "Restore cancelled",
+  "HUD.Restore.Cancelled.Detail": "    {0} settings changed before stopping",
+
+  "HUD.Backup.Age.JustNow": "    Last backup: just now",
+  "HUD.Backup.Age.MinutesAgo": "    Last backup: {0}m ago",
+  "HUD.Backup.Age.HoursAgo": "    Last backup: {0}h ago",
+
+  "HUD.Failure.BackupFailed": "Backup failed",
+  "HUD.Failure.BackupStopped": "Backup stopped",
+  "HUD.Failure.RestoreFailed": "Restore failed",
+  "HUD.Failure.RestoreStopped": "Restore stopped",
+  "HUD.Failure.ExistingProfileUnreadable": "Existing profile could not be read",
+  "HUD.Failure.NoSelectedMCMs": "No selected MCMs were available",
+  "HUD.Failure.ProfileUnchanged": "Existing profile was not changed",
+  "HUD.Failure.ProfileLoadFailed": "Profile could not be loaded",
+  "HUD.Failure.NoRegisteredMCMs": "No MCMs were registered",
+  "HUD.Failure.RegistrationIncomplete": "MCM registration did not finish",
+  "HUD.Failure.NoMatchingMCMs": "No matching MCMs were available",
+
+  "HUD.Warning.Title": "Game menu closed",
+  "HUD.Warning.Detail": "MCM restore is still running"
+}

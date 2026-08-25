@@ -68,13 +68,13 @@ namespace MCMMemory
         configLoaded = true;
         configValid = LoadProfile();
         if (!configValid) {
-            HUD::GetSingleton()->ShowFailure("Restore failed", "Profile could not be loaded");
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreFailed", "HUD.Failure.ProfileLoadFailed");
             return false;
         }
 
         const auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
         if (registeredMCMs.empty()) {
-            HUD::GetSingleton()->ShowFailure("Restore failed", "No MCMs were registered");
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreFailed", "HUD.Failure.NoRegisteredMCMs");
             logger::warn("Manual persistent profile restoration found no registered MCMs");
             return false;
         }
@@ -230,7 +230,7 @@ namespace MCMMemory
         if (result == RegistryWaitResult::Expired) {
             configValid = false;
             logger::error("Persistent profile restore stopped because the MCM registry did not become stable");
-            HUD::GetSingleton()->ShowFailure("Restore failed", "MCM registration did not finish");
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreFailed", "HUD.Failure.RegistrationIncomplete");
             status = OperationStatus::Idle;
             return;
         }
@@ -256,7 +256,7 @@ namespace MCMMemory
         if (actions.empty()) {
             logger::warn("Persistent profile restoration has no actions after finding available MCMs");
             if (operationMode == OperationMode::Manual) {
-                HUD::GetSingleton()->ShowFailure("Restore stopped", "No matching MCMs were available");
+                HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreStopped", "HUD.Failure.NoMatchingMCMs");
             }
             status = OperationStatus::Idle;
             return;

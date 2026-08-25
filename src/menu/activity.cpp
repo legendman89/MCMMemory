@@ -8,10 +8,17 @@
 
 namespace MCMMemory::Menu
 {
-    inline constexpr std::array<std::string_view, ToIndex(OperationMode::Count)> operationModeNames
+    inline constexpr std::array<std::string_view, ToIndex(OperationMode::Count)> operationModeTranslationKeys
     {
-        "Automatic",
-        "Manual"
+        "Activity.Mode.Automatic",
+        "Activity.Mode.Manual"
+    };
+
+    inline constexpr std::array<std::string_view, ToIndex(OperationResult::Count)> operationResultTranslationKeys
+    {
+        "Activity.Result.Completed",
+        "Activity.Result.Failed",
+        "Activity.Result.Cancelled"
     };
 
 #define MAKE_ACTIVITY_COLUMN(label, width, renderer, member) ActivityColumn{ label, width },
@@ -30,20 +37,23 @@ namespace MCMMemory::Menu
 
     std::string ActivityMenu::FormatSummary(const ActivityEntry& a_entry) const
     {
-        const auto mode = operationModeNames[ToIndex(a_entry.mode)];
+        const auto mode = Trans::Tr(operationModeTranslationKeys[ToIndex(a_entry.mode)]);
         const bool cancelled = a_entry.result == OperationResult::Cancelled;
-        const auto separator = cancelled ? " cancelled: " : ": ";
         if (a_entry.type == OperationType::Backup) {
             if (cancelled) {
-                return std::format("{} backup{}{} MCMs, {} settings read", mode, separator, a_entry.backupStats.MCMCount, a_entry.backupStats.settingCount);
+                return Trans::Format("Activity.Summary.Backup.Cancelled", mode, a_entry.backupStats.MCMCount, a_entry.backupStats.settingCount);
             }
             if (a_entry.backupStats.failedMCMCount > 0) {
-                return std::format("{} backup: {} MCMs, {} settings, {} failed", mode, a_entry.backupStats.MCMCount,
+                return Trans::Format("Activity.Summary.Backup.Failed", mode, a_entry.backupStats.MCMCount,
                     a_entry.backupStats.settingCount, a_entry.backupStats.failedMCMCount);
             }
-            return std::format("{} backup: {} MCMs, {} settings", mode, a_entry.backupStats.MCMCount, a_entry.backupStats.settingCount);
+            return Trans::Format("Activity.Summary.Backup.Completed", mode, a_entry.backupStats.MCMCount, a_entry.backupStats.settingCount);
         }
-        return std::format("{} restore{}{} MCMs, {} changed, {} already set", mode, separator, a_entry.restoreStats.MCMCount,
+        if (cancelled) {
+            return Trans::Format("Activity.Summary.Restore.Cancelled", mode, a_entry.restoreStats.MCMCount,
+                a_entry.restoreStats.appliedSettingCount, a_entry.restoreStats.unchangedSettingCount);
+        }
+        return Trans::Format("Activity.Summary.Restore.Completed", mode, a_entry.restoreStats.MCMCount,
             a_entry.restoreStats.appliedSettingCount, a_entry.restoreStats.unchangedSettingCount);
     }
 
@@ -53,24 +63,24 @@ namespace MCMMemory::Menu
         seconds = std::max<int64_t>(seconds, 0);
 
         if (seconds < 5) {
-            return "Just now";
+            return Trans::Tr("Activity.Time.JustNow");
         }
 
         if (seconds < 60) {
-            return std::format("{}s ago", seconds);
+            return Trans::Format("Activity.Time.SecondsAgo", seconds);
         }
 
         const auto minutes = seconds / 60;
         if (minutes < 60) {
-            return std::format("{}m ago", minutes);
+            return Trans::Format("Activity.Time.MinutesAgo", minutes);
         }
 
         const auto hours = minutes / 60;
         if (hours < 24) {
-            return std::format("{}h ago", hours);
+            return Trans::Format("Activity.Time.HoursAgo", hours);
         }
 
-        return std::format("{}d ago", hours / 24);
+        return Trans::Format("Activity.Time.DaysAgo", hours / 24);
     }
 
     std::string ActivityMenu::FormatExactTime(const ActivityEntry& a_entry) const
@@ -78,7 +88,7 @@ namespace MCMMemory::Menu
         const time_t time = std::chrono::system_clock::to_time_t(a_entry.when);
         std::tm localTime{};
         localtime_s(std::addressof(localTime), std::addressof(time));
-        return std::format("{:04}-{:02}-{:02}  {:02}:{:02}:{:02}", localTime.tm_year + 1900, localTime.tm_mon + 1,
+        return Trans::Format("Activity.Time.Exact", localTime.tm_year + 1900, localTime.tm_mon + 1,
             localTime.tm_mday, localTime.tm_hour, localTime.tm_min, localTime.tm_sec);
     }
 
@@ -86,15 +96,15 @@ namespace MCMMemory::Menu
     {
         const auto entries = Activity::GetSingleton()->ReadEntries();
         if (entries->empty()) {
-            GUI::TextUnformatted(Trans::Tr("No activity yet.").c_str());
+            GUI::TextUnformatted(Trans::Tr("Activity.Empty").c_str());
             return;
         }
 
         const auto flags = GUI::ImGuiTableFlags_RowBg | GUI::ImGuiTableFlags_BordersInnerH | GUI::ImGuiTableFlags_Resizable | GUI::ImGuiTableFlags_ScrollY;
         if (GUI::BeginTable("MCM Memory Activity", 2, flags, GUI::ImVec2(0.0F, 320.0F))) {
 
-            GUI::TableSetupColumn(Trans::Tr("Result").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
-            GUI::TableSetupColumn(Trans::Tr("When").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 150.0F);
+            GUI::TableSetupColumn(Trans::Tr("Activity.Column.Result").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
+            GUI::TableSetupColumn(Trans::Tr("Activity.Column.When").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 150.0F);
 
             GUI::TableHeadersRow();
 
@@ -143,7 +153,7 @@ namespace MCMMemory::Menu
 
         GUI::SetNextWindowSize(GUI::ImVec2(780.0F, 430.0F), GUI::ImGuiCond_FirstUseEver);
         CenterNextWindow();
-        const auto windowTitle = std::format("{}###MCM Memory Activity Details", Trans::Tr("Activity Details"));
+        const auto windowTitle = std::format("{}###MCM Memory Activity Details", Trans::Tr("Activity.Details.Title"));
         GUI::PushStyleColor(GUI::ImGuiCol_WindowBg, Color::kOpaqueBackground);
         const bool windowOpen = GUI::Begin(windowTitle.c_str(), std::addressof(detailsOpen), GUI::ImGuiWindowFlags_NoCollapse);
         GUI::PopStyleColor();
@@ -168,7 +178,7 @@ namespace MCMMemory::Menu
     bool ActivityMenu::BeginModTable(const ActivityEntry& a_entry, const char* a_id, const ActivityColumn* a_columns, size_t a_columnCount) const
     {
         if (a_entry.mods.empty()) {
-            GUI::TextUnformatted(Trans::Tr("No per-mod results were recorded.").c_str());
+            GUI::TextUnformatted(Trans::Tr("Activity.Details.Empty").c_str());
             return false;
         }
 
@@ -177,7 +187,7 @@ namespace MCMMemory::Menu
             return false;
         }
 
-        GUI::TableSetupColumn(Trans::Tr("MCM").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
+        GUI::TableSetupColumn(Trans::Tr("Common.MCM").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
         for (size_t index = 0; index < a_columnCount; ++index) {
             GUI::TableSetupColumn(Trans::Tr(a_columns[index].label).c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, a_columns[index].width);
         }
@@ -202,7 +212,7 @@ namespace MCMMemory::Menu
     void ActivityMenu::RenderStatus(OperationResult a_result) const
     {
         GUI::TableNextColumn();
-        GUI::TextUnformatted(Trans::Tr(OperationResultName(a_result)).c_str());
+        GUI::TextUnformatted(Trans::Tr(operationResultTranslationKeys[ToIndex(a_result)]).c_str());
     }
 
     void ActivityMenu::RenderBackupMods(const ActivityEntry& a_entry) const

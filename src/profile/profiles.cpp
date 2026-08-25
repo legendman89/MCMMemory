@@ -34,27 +34,27 @@ namespace MCMMemory
     {
         a_error.clear();
         if (!IsValidName(a_name)) {
-            a_error = "Enter a valid profile name.";
+            a_error = "Profile.Error.InvalidName";
             return false;
         }
 
         std::error_code error;
         if (std::filesystem::exists(ProfileStorage::Path(a_name), error)) {
-            a_error = "A profile with this name already exists.";
+            a_error = "Profile.Error.DuplicateName";
             return false;
         }
         if (error) {
-            a_error = "The profile location could not be checked.";
+            a_error = "Profile.Error.LocationCheck";
             return false;
         }
 
         Profile profile;
         if (!a_source.empty() && !ProfileStorage::Load(a_source, profile)) {
-            a_error = "The selected profile could not be duplicated.";
+            a_error = "Profile.Error.DuplicateFailed";
             return false;
         }
         if (!ProfileStorage::Save(a_name, profile)) {
-            a_error = "The profile could not be created.";
+            a_error = "Profile.Error.CreateFailed";
             return false;
         }
         if (!Select(a_name, a_error)) {
@@ -77,7 +77,7 @@ namespace MCMMemory
         a_error.clear();
         const auto names = ReadNames();
         if (names.size() <= 1) {
-            a_error = "The last profile cannot be deleted.";
+            a_error = "Profile.Error.DeleteLast";
             return false;
         }
 
@@ -94,7 +94,7 @@ namespace MCMMemory
         }
 
         if (!std::filesystem::remove(ProfileStorage::Path(a_name), error)) {
-            a_error = error ? "The profile file could not be deleted." : "This profile has not been created yet.";
+            a_error = error ? "Profile.Error.DeleteFailed" : "Profile.Error.NotCreated";
             std::string rollbackError;
             Select(a_name, rollbackError);
             return false;
@@ -108,7 +108,7 @@ namespace MCMMemory
     {
         a_error.clear();
         if (!IsValidName(a_name)) {
-            a_error = "The selected profile name is invalid.";
+            a_error = "Profile.Error.SelectedNameInvalid";
             return false;
         }
 
@@ -117,7 +117,7 @@ namespace MCMMemory
         settings.activeProfile = a_name;
         if (!SettingsStorage::Save()) {
             settings.activeProfile = previous;
-            a_error = "The selected profile could not be saved.";
+            a_error = "Profile.Error.SaveSelection";
             return false;
         }
 

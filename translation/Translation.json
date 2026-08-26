@@ -170,6 +170,9 @@
   "Notifications.Warning.Duration": "Warning duration",
   "Notifications.Warning.Duration.Tooltip": "Set how long the centered warning remains visible after the game menu is closed during restore.",
 
+  "Notifications.Action.Defaults": "Defaults",
+  "Notifications.Action.Defaults.Tooltip": "Restore every HUD notification option on this page to its default value.",
+
   /* ============================================================
      HUD MESSAGES
      ============================================================ */

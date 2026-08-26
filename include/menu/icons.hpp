@@ -8,4 +8,5 @@ namespace MCMMemory::Menu::Icons
     inline constexpr unsigned kDelete = 0xF056;
     inline constexpr unsigned kPreview = 0xF06E;
     inline constexpr unsigned kCancel = 0xF00D;
+    inline constexpr unsigned kReset = 0xF0E2;
 }

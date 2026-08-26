@@ -42,9 +42,9 @@ namespace MCMMemory::Menu
 
         GUI::Spacing();
 
-#define DRAW_HUD_FONT_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+#define DRAW_HUD_FONT_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, displayFormat) \
         GUI::SetNextItemWidth(hudSliderWidth); \
-        if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
+        if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
             settingsChanged = true; \
         } \
         appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive(); \
@@ -54,10 +54,10 @@ namespace MCMMemory::Menu
 
         const auto compactTableFlags = GUI::ImGuiTableFlags_SizingStretchSame;
         if (GUI::BeginTable("HUD notification offsets", 2, compactTableFlags)) {
-#define DRAW_HUD_OFFSET_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+#define DRAW_HUD_OFFSET_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, displayFormat) \
             GUI::TableNextColumn(); \
             GUI::SetNextItemWidth(hudSliderWidth); \
-            if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
+            if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
                 settingsChanged = true; \
             } \
             appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive(); \
@@ -69,10 +69,10 @@ namespace MCMMemory::Menu
 
         GUI::SeparatorText(Trans::Tr("Notifications.Timing.Header").c_str());
         if (GUI::BeginTable("HUD notification timing", 2, compactTableFlags)) {
-#define DRAW_HUD_TIMING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+#define DRAW_HUD_TIMING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, displayFormat) \
             GUI::TableNextColumn(); \
             GUI::SetNextItemWidth(hudSliderWidth); \
-            if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
+            if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
                 settingsChanged = true; \
             } \
             HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
@@ -85,14 +85,27 @@ namespace MCMMemory::Menu
         GUI::SeparatorText(Trans::Tr("Notifications.Warning.Header").c_str());
 
         // The restore warning remains available when normal notifications are disabled.
-#define DRAW_HUD_WARNING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
+#define DRAW_HUD_WARNING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, displayFormat) \
         GUI::SetNextItemWidth(hudSliderWidth); \
-        if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, format)) { \
+        if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
             settingsChanged = true; \
         } \
         HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
         FOREACH_HUD_WARNING_SETTING(DRAW_HUD_WARNING_SETTING)
 #undef DRAW_HUD_WARNING_SETTING
+
+        const auto defaultsLabel = Trans::Tr("Notifications.Action.Defaults");
+        const auto defaultsMetrics = MeasureIconButton(defaultsLabel.c_str(), Icons::kReset);
+        const auto cursor = GUI::GetCursorPos();
+        const auto contentEnd = GUI::GetWindowContentRegionMax();
+        GUI::SetCursorPosY(std::max(cursor.y, contentEnd.y - defaultsMetrics.buttonSize.y));
+
+        if (IconCTAButton(defaultsLabel.c_str(), !settings.AreNotificationSettingsDefault(), Icons::kReset, Color::kNeutralButtonColors)) {
+            settings.ResetNotificationSettings();
+            settingsChanged = true;
+            appearanceSettingActive = true;
+        }
+        WrappedTooltip(Trans::Tr("Notifications.Action.Defaults.Tooltip").c_str());
 
         if (settingsChanged) {
             HUD::GetSingleton()->Configure(settings);

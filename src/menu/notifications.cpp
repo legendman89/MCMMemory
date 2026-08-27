@@ -12,10 +12,13 @@ namespace MCMMemory::Menu
         auto& settings = GetSettings();
         constexpr float hudSliderWidth = 360.0F;
         bool settingsChanged{};
+        // Sliders update the HUD while moving, but save only when editing ends.
+        bool settingsSaveRequested{};
         bool appearanceSettingActive{};
 
         if (GUI::Checkbox(Trans::Tr("Notifications.Enable").c_str(), std::addressof(settings.notifications))) {
             settingsChanged = true;
+            settingsSaveRequested = true;
         }
         HelpMarker(Trans::Tr("Notifications.Enable.Tooltip").c_str());
 
@@ -23,6 +26,7 @@ namespace MCMMemory::Menu
 
         if (GUI::Checkbox(Trans::Tr("Notifications.PerMod.Automatic").c_str(), std::addressof(settings.perModNotificationsAuto))) {
             settingsChanged = true;
+            settingsSaveRequested = true;
         }
         HelpMarker(Trans::Tr("Notifications.PerMod.Automatic.Tooltip").c_str());
 
@@ -30,6 +34,7 @@ namespace MCMMemory::Menu
 
         if (GUI::Checkbox(Trans::Tr("Notifications.PerMod.Manual").c_str(), std::addressof(settings.perModNotificationsManual))) {
             settingsChanged = true;
+            settingsSaveRequested = true;
         }
         HelpMarker(Trans::Tr("Notifications.PerMod.Manual.Tooltip").c_str());
 
@@ -47,6 +52,7 @@ namespace MCMMemory::Menu
         if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
             settingsChanged = true; \
         } \
+        settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
         appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive(); \
         HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
         FOREACH_HUD_FONT_SETTING(DRAW_HUD_FONT_SETTING)
@@ -60,6 +66,7 @@ namespace MCMMemory::Menu
             if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
                 settingsChanged = true; \
             } \
+            settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
             appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive(); \
             HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
             FOREACH_HUD_OFFSET_SETTING(DRAW_HUD_OFFSET_SETTING)
@@ -75,6 +82,7 @@ namespace MCMMemory::Menu
             if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
                 settingsChanged = true; \
             } \
+            settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
             HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
             FOREACH_HUD_TIMING_SETTING(DRAW_HUD_TIMING_SETTING)
 #undef DRAW_HUD_TIMING_SETTING
@@ -90,6 +98,7 @@ namespace MCMMemory::Menu
         if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
             settingsChanged = true; \
         } \
+        settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
         HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
         FOREACH_HUD_WARNING_SETTING(DRAW_HUD_WARNING_SETTING)
 #undef DRAW_HUD_WARNING_SETTING
@@ -103,15 +112,17 @@ namespace MCMMemory::Menu
         if (IconCTAButton(defaultsLabel.c_str(), !settings.AreNotificationSettingsDefault(), Icons::kReset, Color::kNeutralButtonColors)) {
             settings.ResetNotificationSettings();
             settingsChanged = true;
+            settingsSaveRequested = true;
             appearanceSettingActive = true;
         }
         WrappedTooltip(Trans::Tr("Notifications.Action.Defaults.Tooltip").c_str());
 
         if (settingsChanged) {
             HUD::GetSingleton()->Configure(settings);
-            if (!SettingsStorage::Save()) {
-                logger::error("MCM Memory menu could not save its notification settings");
-            }
+        }
+
+        if (settingsSaveRequested && !SettingsStorage::Save()) {
+            logger::error("MCM Memory menu could not save its notification settings");
         }
 
         if (appearanceSettingActive) {

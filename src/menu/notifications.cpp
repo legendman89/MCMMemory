@@ -103,12 +103,10 @@ namespace MCMMemory::Menu
         FOREACH_HUD_WARNING_SETTING(DRAW_HUD_WARNING_SETTING)
 #undef DRAW_HUD_WARNING_SETTING
 
-        const auto defaultsLabel = Trans::Tr("Notifications.Action.Defaults");
-        const auto defaultsMetrics = MeasureIconButton(defaultsLabel.c_str(), Icons::kReset);
-        const auto cursor = GUI::GetCursorPos();
-        const auto contentEnd = GUI::GetWindowContentRegionMax();
-        GUI::SetCursorPosY(std::max(cursor.y, contentEnd.y - defaultsMetrics.buttonSize.y));
+        GUI::Spacing();
+        GUI::Spacing();
 
+        const auto defaultsLabel = Trans::Tr("Notifications.Action.Defaults");
         if (IconCTAButton(defaultsLabel.c_str(), !settings.AreNotificationSettingsDefault(), Icons::kReset, Color::kNeutralButtonColors)) {
             settings.ResetNotificationSettings();
             settingsChanged = true;

@@ -5,7 +5,10 @@
 
 namespace MCMMemory
 {
-    inline constexpr uint32_t maximumScriptWaitChecks{ 20 };
+    // This is just a failsafe in case a script is too slow to respond, so
+    // the backup will try again this amount of times. In my testing, 
+    // I never experienced a timeout check.
+    inline constexpr uint32_t maximumScriptWaitChecks{ 5 };
 
     bool Backup::Begin(MCMFilter a_filter)
     {

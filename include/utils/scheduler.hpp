@@ -4,6 +4,9 @@
 
 namespace MCMMemory
 {
+
+    inline constexpr float secondsPerFrame = 1.0F / 60.0F;
+
     struct DelayedTask
     {
         // SKSE game task queue.
@@ -26,10 +29,9 @@ namespace MCMMemory
             return std::addressof(singleton);
         }
 
-        // Converts a frame count into seconds and schedules the task.
+        // Schedules the task after k frames.
         inline bool ScheduleAfterFrames(SKSE::TaskInterface::TaskFn a_task, const uint32_t a_delayFrames) const
         {
-            constexpr float secondsPerFrame = 1.0F / 60.0F;
             return ScheduleAfterSeconds(std::move(a_task), static_cast<float>(a_delayFrames) * secondsPerFrame);
         }
 

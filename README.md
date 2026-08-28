@@ -1,2 +1,27 @@
-# MCMMemory
+# MCM Memory
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Build Status](https://github.com/legendman89/MCMMemory/actions/workflows/build.yml/badge.svg)](https://github.com/legendman89/MCMMemory/actions/workflows/build.yml)
+[![C++23](https://img.shields.io/badge/C%2B%2B-23-blue.svg)](https://en.cppreference.com/w/cpp/23)
+[![CommonLibVR: ng](https://img.shields.io/badge/CommonLibVR-ng-green.svg)](https://github.com/alandtse/CommonLibVR/tree/ng)
+
 An SKSE plugin to automatically backup and restore MCMs.
+
+## Prerequisites
+
+Download CommonLibVR, check out the `ng` branch, then set its location in the `COMMONLIB_SSE_FOLDER` environment variable.
+
+```powershell
+git clone --recursive https://github.com/alandtse/CommonLibVR.git
+cd CommonLibVR
+git checkout ng
+```
+
+## Build
+
+Run CMake from a Visual Studio x64 developer environment, or open the project in Visual Studio/Visual Studio Code with CMake support.
+
+```powershell
+cmake --preset debug
+cmake --build build/debug
+```

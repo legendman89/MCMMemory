@@ -12,7 +12,8 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+    # Compatible with Ninja.
+    runs-on: windows-2022
 
     env:
       COMMONLIB_SSE_FOLDER: ${{ github.workspace }}\external\CommonLibVR
@@ -35,6 +36,7 @@ jobs:
         with:
           repository: microsoft/vcpkg
           path: external/vcpkg
+          fetch-depth: 0
 
       - name: Set up MSVC
         uses: ilammy/msvc-dev-cmd@v1
@@ -42,10 +44,50 @@ jobs:
           arch: x64
 
       - name: Bootstrap vcpkg
-        run: .\external\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+        shell: pwsh
+        run: |
+          $maxAttempts = 3
+
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            Write-Host "Bootstrapping vcpkg (attempt $attempt of $maxAttempts)..."
+            & .\external\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+            $bootstrapExitCode = $LASTEXITCODE
+
+            if ($bootstrapExitCode -eq 0) {
+              exit 0
+            }
+
+            if ($attempt -eq $maxAttempts) {
+              exit $bootstrapExitCode
+            }
+
+            Remove-Item .\external\vcpkg\vcpkg.exe -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds (15 * $attempt)
+          }
 
       - name: Configure
-        run: cmake --preset release
+
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}\external\vcpkg
+        shell: pwsh
+        run: |
+          $maxAttempts = 3
+
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            Write-Host "Configuring project (attempt $attempt of $maxAttempts)..."
+            cmake --preset release
+            $configureExitCode = $LASTEXITCODE
+
+            if ($configureExitCode -eq 0) {
+              exit 0
+            }
+
+            if ($attempt -eq $maxAttempts) {
+              exit $configureExitCode
+            }
+
+            Start-Sleep -Seconds (15 * $attempt)
+          }
 
       - name: Build
         run: cmake --build build/release --config Release

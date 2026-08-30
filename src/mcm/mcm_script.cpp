@@ -244,28 +244,76 @@ namespace MCMMemory
         return a_optionIndex >= 0 ? ReadString("_stateOptionMap", static_cast<size_t>(a_optionIndex)) : std::nullopt;
     }
 
-    bool MCMScript::MatchesControl(ControlType a_type, int a_optionIndex, std::string_view a_stateName) const
+    std::optional<ControlType> MCMScript::ReadControlType(int a_optionIndex) const
     {
         if (a_optionIndex < 0) {
-            return false;
+            return std::nullopt;
         }
 
         const size_t index = static_cast<size_t>(a_optionIndex);
         auto flag = ReadNumber("_optionFlagsBuf", index);
         if (!flag) {
-            return false;
+            return std::nullopt;
         }
 
         const int skyUIType = static_cast<int>(*flag) % 256;
-        if (skyUIType < 0 || static_cast<size_t>(skyUIType) >= skyUIControlTypes.size() || skyUIControlTypes[static_cast<size_t>(skyUIType)] != a_type) {
+        if (skyUIType < 0 || static_cast<size_t>(skyUIType) >= skyUIControlTypes.size()) {
+            return std::nullopt;
+        }
+        return skyUIControlTypes[static_cast<size_t>(skyUIType)];
+    }
+
+    bool MCMScript::MatchesControl(ControlType a_type, int a_optionIndex, std::string_view a_stateName) const
+    {
+        if (ReadControlType(a_optionIndex) != a_type) {
             return false;
         }
 
         if (!a_stateName.empty()) {
-            auto stateName = ReadString("_stateOptionMap", index);
+            auto stateName = ReadStateName(a_optionIndex);
             return stateName && *stateName == a_stateName;
         }
         return true;
+    }
+
+    std::optional<MCMControl> MCMScript::ReadControl(int a_optionIndex) const
+    {
+        auto type = ReadControlType(a_optionIndex);
+        auto label = ReadOptionLabel(a_optionIndex);
+        if (!type || !label || label->empty()) {
+            return std::nullopt;
+        }
+
+        MCMControl control;
+        control.optionLabel = std::move(*label);
+        control.stateName = ReadStateName(a_optionIndex).value_or("");
+        control.type = *type;
+        return control;
+    }
+
+    std::optional<int> MCMScript::FindControlIndex(const MCMControl& a_control, int a_previousIndex) const
+    {
+        if (a_control.stateName.empty()) {
+            // Without a state name, do not guess which similar rows moved.
+            auto label = ReadOptionLabel(a_previousIndex);
+            return MatchesControl(a_control.type, a_previousIndex, "") && label && *label == a_control.optionLabel ? std::optional<int>(a_previousIndex) : std::nullopt;
+        }
+
+        auto flags = ReadArray("_optionFlagsBuf");
+        if (!flags) {
+            return std::nullopt;
+        }
+
+        std::optional<int> result;
+        for (uint32_t index = 0; index < flags->size(); ++index) {
+            if (MatchesControl(a_control.type, static_cast<int>(index), a_control.stateName)) {
+                if (result) {
+                    return std::nullopt;
+                }
+                result = static_cast<int>(index);
+            }
+        }
+        return result;
     }
 
     bool MCMScript::IsConfigOpen() const

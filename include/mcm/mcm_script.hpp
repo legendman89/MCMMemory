@@ -50,6 +50,12 @@ namespace MCMMemory
 
         std::optional<std::string> ReadStateName(int a_optionIndex) const;
 
+        std::optional<MCMControl> ReadControl(int a_optionIndex) const;
+
+        // A state-based toggle can move to another row after a page reset.
+        // Some mods clear the page to hide disabled controls.
+        std::optional<int> FindControlIndex(const MCMControl& a_control, int a_previousIndex) const;
+
         // Confirms the saved setting still points to the same live control before restore.
         bool MatchesControl(ControlType a_type, int a_optionIndex, std::string_view a_stateName) const;
 
@@ -79,6 +85,8 @@ namespace MCMMemory
         std::optional<float> ReadNumber(std::string_view a_name, size_t a_index) const;
 
         std::optional<std::string> ReadString(std::string_view a_name, size_t a_index) const;
+
+        std::optional<ControlType> ReadControlType(int a_optionIndex) const;
 
         inline std::optional<int> ReadInteger(std::string_view a_name) const
         {

@@ -122,11 +122,46 @@ namespace MCMMemory
             if (type != a_other.type || selection.identity.modID != a_other.selection.identity.modID) {
                 return false;
             }
-            if (!stateName.empty() && !a_other.stateName.empty() && stateName == a_other.stateName) {
-                return true;
+            if (!stateName.empty() && !a_other.stateName.empty()) {
+                // A redraw can put a different control at the old row index.
+                return stateName == a_other.stateName;
             }
             return selection.pageIndex == a_other.selection.pageIndex && selection.pageName == a_other.selection.pageName && selection.optionIndex == a_other.selection.optionIndex;
         }
+    };
+
+    // Keeps a row identity while its MCM rebuilds the page.
+    struct MCMControl
+    {
+        std::string optionLabel;
+
+        std::string stateName;
+
+        ControlType type{ ControlType::Unknown };
+    };
+
+    // Keeps the raw event and menu state for Capture.json debugging.
+    struct CaptureRecord
+    {
+        // Stores strArg from the callback.
+        std::string stringArgument;
+
+        MCMSelection selection;
+
+        // Stores menu states read safely after the callback and after a short delay.
+        nlohmann::json state;
+        nlohmann::json stateAfter;
+
+        // Read before a redraw; not part of the saved profile format.
+        std::optional<MCMControl> control;
+
+        uint64_t eventID{};
+
+        EventType type{ EventType::Unknown };
+
+        float numberArgument{};
+
+        RE::FormID senderFormID{};
     };
 
     // Adds a setting or replaces an older capture of the same setting.
@@ -146,27 +181,6 @@ namespace MCMMemory
             a_settings.push_back(std::move(a_setting));
         }
     }
-
-    // Keeps the raw event and menu state for Capture.json debugging.
-    struct CaptureRecord
-    {
-        // Stores strArg from the callback.
-        std::string stringArgument;
-
-        MCMSelection selection;
-
-        // Stores menu states read safely after the callback and after a short delay.
-        nlohmann::json state;
-        nlohmann::json stateAfter;
-
-        uint64_t eventID{};
-
-        EventType type{ EventType::Unknown };
-
-        float numberArgument{};
-
-        RE::FormID senderFormID{};
-    };
 }
 
 #undef DECLARE_CONTROL_TYPE

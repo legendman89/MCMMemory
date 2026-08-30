@@ -7,6 +7,9 @@ namespace MCMMemory
 
     // Some values may become readable a few frames after the callback.
     constexpr int QueueDelayFrames = 2;
+    // Check busy toggles every 0.1 seconds, for about five seconds.
+    inline constexpr uint32_t toggleReadDelayFrames = 6;
+    inline constexpr uint32_t maximumToggleReads = 50;
     // Raw records are only for debugging, so keep their memory use bounded.
     constexpr size_t maximumRecords = 4096;
 
@@ -44,6 +47,7 @@ namespace MCMMemory
         // Old scheduled tasks will stop when they see a different loaded game session.
         ++loadedGameSession;
         eventCount = 0;
+        menuOpenedEventID = 0;
         selection = {};
         mcmIdentities.clear();
         records.clear();
@@ -92,17 +96,26 @@ namespace MCMMemory
 
         record->state = MCMMenu::ReadState();
         if (record->selection.modIndex == selection.modIndex) {
-            UpdateSelectionFromMenu(record->type, record->state);
+            FindActiveMCMIdentity(record->type, record->state);
+        }
+
+        if (record->type == EventType::OptionHighlighted || ControlTypeForEvent(record->type) == ControlType::Option) {
+            RememberControl(*record);
         }
 
         QueueCaptureCompletion(a_request, QueueDelayFrames);
     }
 
-    void Capture::CompleteCapture(uint64_t a_eventID, bool a_persist)
+    void Capture::CompleteCapture(CaptureRequest a_request)
     {
         // Find the raw record made before the menu finished updating.
-        auto* record = FindRecord(a_eventID);
+        auto* record = FindRecord(a_request.eventID);
         if (!record) {
+            return;
+        }
+
+        if (ControlTypeForEvent(record->type) == ControlType::Option && !IsCapturePageCurrent(*record)) {
+            logger::info("Stopped toggle capture {} after navigation or a newer change", a_request.eventID);
             return;
         }
 
@@ -113,9 +126,19 @@ namespace MCMMemory
         }
         if (IsValueChange(record->type)) {
             // Only accepted or selected values become profile settings.
-            ProcessCapturedEvent(*record);
+            if (!ProcessCapturedEvent(*record)) {
+                if (!record->stateAfter.contains("error") && a_request.readAttempts < maximumToggleReads) {
+                    if (a_request.readAttempts == 0) {
+                        logger::debug("Waiting for toggle capture {}: mod='{}', page='{}', option={}", a_request.eventID, record->selection.identity.modName, record->selection.pageName, record->selection.optionIndex);
+                    }
+                    ++a_request.readAttempts;
+                    QueueCaptureCompletion(a_request, toggleReadDelayFrames);
+                    return;
+                }
+                logger::warn("Toggle capture {} could not finish: mod='{}', page='{}', option={}; saved profile left unchanged", a_request.eventID, record->selection.identity.modName, record->selection.pageName, record->selection.optionIndex);
+            }
         }
-        if (a_persist) {
+        if (a_request.persist) {
             CaptureStorage::Save(records, settings, GetSettings().captureRawRecords);
         }
     }
@@ -128,6 +151,7 @@ namespace MCMMemory
 
         std::scoped_lock lock(captureMutex);
         if (a_event->opening) {
+            menuOpenedEventID = eventCount;
             pendingAutoBackupSettings.clear();
             logger::info("Journal Menu opened; watching for MCM configuration events");
         }

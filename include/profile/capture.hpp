@@ -10,6 +10,8 @@
 
 namespace MCMMemory
 {
+    class MCMScript;
+
     struct CaptureRequest
     {
         // Identifies the event being processed.
@@ -17,6 +19,9 @@ namespace MCMMemory
 
         // Identifies the loaded game in which the event happened.
         uint64_t loadedGameSession{};
+
+        // Bounds the extra reads while a toggle handler or page reset is running.
+        uint32_t readAttempts{};
 
         // Saves the capture after a modified setting event finishes.
         bool persist{};
@@ -94,14 +99,14 @@ namespace MCMMemory
         inline void QueueCaptureCompletion(CaptureRequest a_request, uint32_t a_delayFrames)
         {
             if (!Scheduler::GetSingleton()->ScheduleAfterFrames(FinishCaptureTask{ a_request }, a_delayFrames)) {
-                CompleteCapture(a_request.eventID, a_request.persist);
+                logger::error("Captured MCM event {} could not schedule its completion", a_request.eventID);
             }
         }
 
         // Checks the loaded game session before accessing the menu.
         inline bool IsCurrentRequest(const CaptureRequest& a_request) const
         {
-            return a_request.loadedGameSession == loadedGameSession;
+            return a_request.loadedGameSession == loadedGameSession && a_request.eventID > menuOpenedEventID;
         }
 
         inline void ReadMenuIfCurrentSession(const CaptureRequest& a_request)
@@ -116,7 +121,7 @@ namespace MCMMemory
         {
             std::scoped_lock lock(captureMutex);
             if (IsCurrentRequest(a_request)) {
-                CompleteCapture(a_request.eventID, a_request.persist);
+                CompleteCapture(a_request);
             }
         }
 
@@ -131,13 +136,22 @@ namespace MCMMemory
         void ReadMenu(const CaptureRequest& a_request);
 
         // Takes the second menu read and finishes one capture.
-        void CompleteCapture(uint64_t a_eventID, bool a_persist);
+        void CompleteCapture(CaptureRequest a_request);
 
         // Queues one result per changed MCM when the Journal Menu closes.
         void ShowAutoBackupResults();
 
-        // Converts a raw record into a setting that can enter the profile.
-        void ProcessCapturedEvent(CaptureRecord& a_record);
+        // Returns false when a toggle still needs another read before saving.
+        bool ProcessCapturedEvent(CaptureRecord& a_record);
+
+        // Keeps the highlighted toggle label and state before its handler redraws the page.
+        // Needed for mods that clear a page to hide disabled controls.
+        void RememberControl(CaptureRecord& a_record);
+
+        // Stops old reads after navigation or a newer setting change.
+        bool IsCapturePageCurrent(const CaptureRecord& a_record) const;
+
+        bool ReadToggleSetting(const CaptureRecord& a_record, const MCMScript& a_script, CapturedSetting& a_setting) const;
 
         // Reads the option label from the current menu state or an earlier read of the same row.
         std::string ReadOptionLabel(const CaptureRecord& a_record) const;
@@ -184,6 +198,9 @@ namespace MCMMemory
 
         // Changes whenever a new game starts or another save is loaded.
         uint64_t loadedGameSession{};
+
+        // Old reads must not run against a newly opened Journal Menu.
+        uint64_t menuOpenedEventID{};
 
         // Prevents the event listeners from being installed twice.
         bool installed{};

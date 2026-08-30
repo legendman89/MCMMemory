@@ -62,7 +62,95 @@ namespace MCMMemory
         return {};
     }
 
-    void Capture::ProcessCapturedEvent(CaptureRecord& a_record)
+    bool Capture::IsCapturePageCurrent(const CaptureRecord& a_record) const
+    {
+        if (selection.modIndex != a_record.selection.modIndex || selection.pageIndex != a_record.selection.pageIndex || selection.pageName != a_record.selection.pageName) {
+            return false;
+        }
+
+        for (auto later = records.rbegin(); later != records.rend() && later->eventID > a_record.eventID; ++later) {
+            if (later->type == EventType::ModSelected || IsValueChange(later->type)) {
+                return false;
+            }
+            if (later->type == EventType::PageSelected && (later->selection.pageIndex != a_record.selection.pageIndex || later->selection.pageName != a_record.selection.pageName)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    void Capture::RememberControl(CaptureRecord& a_record)
+    {
+        if (a_record.control) {
+            return;
+        }
+
+        // A page reset may already be running. Prefer the identity read while hovering.
+        for (auto previous = records.rbegin(); previous != records.rend(); ++previous) {
+            if (previous->eventID >= a_record.eventID) {
+                continue;
+            }
+            if (previous->eventID <= menuOpenedEventID || Role(previous->type) == EventRole::Navigation || IsValueChange(previous->type)) {
+                break;
+            }
+            if (previous->selection.modIndex == a_record.selection.modIndex && previous->selection.pageIndex == a_record.selection.pageIndex && previous->selection.optionIndex == a_record.selection.optionIndex && previous->control) {
+                a_record.control = previous->control;
+                return;
+            }
+        }
+
+        if (!IsCapturePageCurrent(a_record)) {
+            return;
+        }
+        for (auto later = records.rbegin(); later != records.rend() && later->eventID > a_record.eventID; ++later) {
+            if (later->type == EventType::PageSelected) {
+                return;
+            }
+        }
+
+        auto activeMCM = MCMRegistry().ReadActiveMCM();
+        if (activeMCM && activeMCM->identity.modID == a_record.selection.identity.modID) {
+            MCMScript script(activeMCM->mcmScript);
+            if (script.IsPageReady(a_record.selection.pageIndex)) {
+                a_record.control = script.ReadControl(a_record.selection.optionIndex);
+            }
+        }
+    }
+
+    bool Capture::ReadToggleSetting(const CaptureRecord& a_record, const MCMScript& a_script, CapturedSetting& a_setting) const
+    {
+        if (!a_record.control || !a_record.stateAfter.contains("fields")) {
+            return false;
+        }
+
+        // The menu becomes ready only after the handler and any requested page reset finish.
+        // This fix allows us to correctly capture the new toggle state after a page reset, 
+        // instead of the old state before the reset.
+        auto panelState = JSON::ReadNumber(a_record.stateAfter["fields"], "PanelState");
+        if (!panelState || *panelState != 0.0) {
+            return false;
+        }
+
+        if (!a_script.IsPageReady(a_setting.selection.pageIndex)) {
+            return false;
+        }
+
+        auto index = a_script.FindControlIndex(*a_record.control, a_setting.selection.optionIndex);
+        auto value = index ? a_script.ReadCurrentValue(ControlType::Option, *index) : std::nullopt;
+        if (!value) {
+            return false;
+        }
+
+        a_setting.selection.optionIndex = *index;
+        a_setting.optionLabel = a_record.control->optionLabel;
+        a_setting.stateName = a_record.control->stateName;
+        a_setting.value = std::move(*value);
+        a_setting.valueSource = "script._numValueBuf";
+        logger::info("Finished toggle capture {}: mod='{}', option='{}', state='{}', value={}", a_record.eventID, a_setting.selection.identity.modName, a_setting.optionLabel, a_setting.stateName, a_setting.value.dump());
+        return true;
+    }
+
+    bool Capture::ProcessCapturedEvent(CaptureRecord& a_record)
     {
         // Turn a raw callback into one setting that can be restored later.
         CapturedSetting setting;
@@ -75,7 +163,17 @@ namespace MCMMemory
             activeMCMScript = activeMCM->mcmScript;
         }
         MCMScript mcmScript(activeMCMScript);
-        if (activeMCMScript) {
+        if (setting.type == ControlType::Option) {
+            RememberControl(a_record);
+            // Text buttons send optionSelected too, but are not saved toggles.
+            if (a_record.control && a_record.control->type != ControlType::Option) {
+                return true;
+            }
+            if (!activeMCMScript || !ReadToggleSetting(a_record, mcmScript, setting)) {
+                return false;
+            }
+        }
+        else if (activeMCMScript) {
             auto optionLabel = mcmScript.ReadOptionLabel(setting.selection.optionIndex);
             if (optionLabel) {
                 setting.optionLabel = std::move(*optionLabel);
@@ -89,14 +187,6 @@ namespace MCMMemory
 
         if (setting.optionLabel.empty()) {
             setting.optionLabel = ReadOptionLabel(a_record);
-        }
-
-        // Do not take a label or value from a different highlighted option.
-        const auto& state = a_record.stateAfter;
-        bool cursorMatches = false;
-        if (state.contains("fields")) {
-            auto cursorIndex = JSON::ReadNumber(state["fields"], "OptionCursorIndex");
-            cursorMatches = cursorIndex && static_cast<int>(*cursorIndex) == setting.selection.optionIndex;
         }
 
         // Each control reports its accepted value in a different place.
@@ -124,24 +214,6 @@ namespace MCMMemory
                     }
                 }
                 break;
-            case EventType::OptionSelected:
-            case EventType::OptionDefaulted:
-                // numArg is the option index. The new toggle value is read after the menu updates.
-                if (cursorMatches && state.contains("optionCursorMembers")) {
-                    auto value = JSON::ReadNumber(state["optionCursorMembers"], "numValue");
-                    if (value) {
-                        setting.value = *value;
-                        setting.valueSource = "stateAfter.optionCursor.numValue";
-                    }
-                }
-                if (cursorMatches && setting.valueSource.empty() && state.contains("fields")) {
-                    auto value = JSON::ReadNumber(state["fields"], "OptionCursorNumberValue");
-                    if (value) {
-                        setting.value = *value;
-                        setting.valueSource = "stateAfter.OptionCursorNumberValue";
-                    }
-                }
-                break;
             default:
                 break;
 
@@ -163,6 +235,8 @@ namespace MCMMemory
         }
 
         Deduplicate(settings, std::move(setting));
+        
+        return true;
     }
 
 }

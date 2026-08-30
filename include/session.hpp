@@ -3,6 +3,7 @@
 #include "plugin.hpp"
 
 #include "menu/hud.hpp"
+#include "mcm/mcm_support.hpp"
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "profile/restore.hpp"
@@ -31,6 +32,7 @@ namespace MCMMemory
         {
             waitingForLoadMessage = false;
             HUD::GetSingleton()->Reset();
+            MCMRegistry::Reset();
             Backup::GetSingleton()->Reset();
             Capture::GetSingleton()->Reset();
             Restore::GetSingleton()->Reset(a_autoRestoreAllowed);

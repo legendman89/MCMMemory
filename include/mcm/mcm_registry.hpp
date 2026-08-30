@@ -2,14 +2,11 @@
 
 #include "profile/types.hpp"
 
-// SkyUI and MCM Unlocked both keep the live scripts we need to restore registered MCMs.
+// Each supported MCM manager gives us the live scripts needed by backup and restore.
 
 namespace MCMMemory
 {
-    inline constexpr RE::FormID markerBaseLocalFormID{ 0x800 };
-    inline constexpr RE::FormID markerCellLocalFormID{ 0x801 };
-    inline constexpr std::string_view mcmUnlockedPluginName{ "MCM Unlocked.esp" };
-    inline constexpr std::string_view markerScriptName{ "MCMUnlockedMarkerScript" };
+
     inline constexpr uint32_t maximumRegistryChecks{ 30 };
     inline constexpr uint32_t requiredStableRegistryChecks{ 2 };
     inline constexpr float registryCheckDelaySeconds{ 5.0F };
@@ -58,14 +55,8 @@ namespace MCMMemory
         }
     };
 
-    // Sorts marker references by FormID for a stable registry order.
-    struct MCMMarkerFormIDLess
-    {
-        bool operator()(const RE::NiPointer<RE::TESObjectREFR>& a_left, const RE::NiPointer<RE::TESObjectREFR>& a_right) const noexcept
-        {
-            return a_left->GetFormID() < a_right->GetFormID();
-        }
-    };
+    // Forward it to keep it private to the implementation.
+    class MCMMenuRedoneRegistry;
 
     class MCMRegistry
     {
@@ -75,19 +66,29 @@ namespace MCMMemory
         {
             return RE::TESForm::LookupByEditorID<RE::TESQuest>("SKI_ConfigManagerInstance") != nullptr;
         }
+        
+        static void Install();
 
-        // Reads MCM Unlocked markers when available, otherwise reads SkyUI registry array.
+        static void Reset();
+
+        static void Refresh();
+
+        static bool IsRefreshing();
+
+        static uint64_t CacheGeneration();
+
+        static bool IsMCMMenuRedoneAvailable();
+
+        // Uses the registry supplied by MCM Menu Redone, MCM Unlocked, or SkyUI.
         std::vector<MCMRegistryEntry> ReadRegisteredMCMs() const;
 
         std::optional<MCMRegistryEntry> ReadActiveMCM() const;
 
     private:
 
-        static bool IsMCMUnlockedAvailable()
-        {
-            auto* dataHandler = RE::TESDataHandler::GetSingleton();
-            return dataHandler && dataHandler->LookupForm<RE::TESObjectACTI>(markerBaseLocalFormID, mcmUnlockedPluginName) && dataHandler->LookupForm<RE::TESObjectCELL>(markerCellLocalFormID, mcmUnlockedPluginName);
-        }
+        // Allows the MCM Menu Redone registry to use the private CreateRegistryEntry helper.
+        friend class MCMMenuRedoneRegistry;
+
 
         static const char* ReadScriptName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript)
         {
@@ -104,6 +105,8 @@ namespace MCMMemory
             }
             return std::format("{}::{}", scriptName, a_modName);
         }
+
+        static bool IsMCMUnlockedAvailable();
 
         static std::optional<std::string> ReadModName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript, std::string* a_failureReason = nullptr);
 

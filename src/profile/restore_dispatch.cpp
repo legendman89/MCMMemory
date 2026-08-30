@@ -31,6 +31,11 @@ namespace MCMMemory
             return true;
         }
 
+        // The displayed key can match while its stored setting or runtime binding still needs the callback.
+        if (a_action.type == RestoreActionType::SetIntegerSetting || a_action.type == RestoreActionType::ChangeKeymap || a_action.type == RestoreActionType::ChangeStateKeymap) {
+            return true;
+        }
+
         MCMScript script(restoreMCMs[a_action.mcmIndex].mcmScript);
         if (a_action.type == RestoreActionType::SetMenuIndex) {
             auto currentIndex = script.ReadMenuIndex();
@@ -64,7 +69,15 @@ namespace MCMMemory
         }
 
         auto functionName = RestoreActionFunctionName(a_action.type);
-        logger::debug("Profile restore calls '{}' on '{}'", functionName, restoreMCMs[a_action.mcmIndex].identity.modID);
+        if (a_action.type == RestoreActionType::SetIntegerSetting) {
+            logger::debug("Profile restore calls '{}' on '{}' for setting '{}' (key {})", functionName, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.stringValue, a_action.integerValue);
+        }
+        else if (a_action.controlType == ControlType::Keymap && IsRestoreApplyAction(a_action.type)) {
+            logger::debug("Profile restore calls '{}' on '{}' for '{}' (option {}, key {})", functionName, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.optionLabel, a_action.optionIndex, a_action.integerValue);
+        }
+        else {
+            logger::debug("Profile restore calls '{}' on '{}'", functionName, restoreMCMs[a_action.mcmIndex].identity.modID);
+        }
         // Build the argument list expected by this script call.
         switch (GetRestoreArgumentType(a_action.type)) {
         case RestoreArgumentType::None:
@@ -79,6 +92,8 @@ namespace MCMMemory
             return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(float{ a_action.floatValue }), std::move(a_result));
         case RestoreArgumentType::StringValue:
             return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(std::string{ a_action.stringValue }), std::move(a_result));
+        case RestoreArgumentType::SettingIntegerValue:
+            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(std::string{ a_action.stringValue }, int{ a_action.integerValue }), std::move(a_result));
         case RestoreArgumentType::KeymapValue:
             return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.optionIndex }, int{ a_action.integerValue }, std::string{}, std::string{}), std::move(a_result));
         case RestoreArgumentType::ToggleValue:

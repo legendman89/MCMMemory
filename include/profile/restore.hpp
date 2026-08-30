@@ -25,6 +25,7 @@ namespace MCMMemory
         IntegerValue,
         FloatValue,
         StringValue,
+        SettingIntegerValue,
         KeymapValue,
         ToggleValue
     };
@@ -160,11 +161,20 @@ namespace MCMMemory
         return action;
     }
 
-    // Creates a RemapKey action with its option and key code.
-    inline RestoreAction MakeKeymapAction(size_t a_mcmIndex, int a_optionIndex, int a_keyCode)
+    // Calls normal keymaps directly while state-based controls keep SkyUI's state.
+    inline RestoreAction MakeKeymapAction(size_t a_mcmIndex, int a_optionIndex, int a_keyCode, bool a_stateControl)
     {
-        auto action = MakeOptionAction(RestoreActionType::RemapKey, a_mcmIndex, a_optionIndex);
+        auto type = a_stateControl ? RestoreActionType::ChangeStateKeymap : RestoreActionType::ChangeKeymap;
+        auto action = MakeOptionAction(type, a_mcmIndex, a_optionIndex);
         action.integerValue = a_keyCode;
+        return action;
+    }
+
+    // Creates a setting call that needs its stable ID and an integer value.
+    inline RestoreAction MakeSettingIntegerAction(size_t a_mcmIndex, std::string_view a_settingID, int a_value)
+    {
+        auto action = MakeStringAction(RestoreActionType::SetIntegerSetting, a_mcmIndex, a_settingID);
+        action.integerValue = a_value;
         return action;
     }
 

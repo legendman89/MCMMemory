@@ -99,6 +99,9 @@ namespace MCMMemory
 
         std::string optionLabel;
 
+        // MCM Helper setting name.
+        std::string settingID;
+
         // Stable Papyrus state used by state-based MCM options.
         std::string stateName;
 
@@ -152,7 +155,7 @@ namespace MCMMemory
 
         MCMSelection selection;
 
-        // Stores the menu state taken when the callback arrived and after a short delay.
+        // Stores menu states read safely after the callback and after a short delay.
         nlohmann::json state;
         nlohmann::json stateAfter;
 

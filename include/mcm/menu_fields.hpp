@@ -14,5 +14,4 @@
     MENU_FIELD(OptionCursorIndex, "_root.ConfigPanelFader.configPanel.optionCursorIndex") \
     MENU_FIELD(OptionCursorText, "_root.ConfigPanelFader.configPanel.optionCursor.text") \
     MENU_FIELD(OptionCursorStringValue, "_root.ConfigPanelFader.configPanel.optionCursor.strValue") \
-    MENU_FIELD(OptionCursorNumberValue, "_root.ConfigPanelFader.configPanel.optionCursor.numValue") \
-    MENU_FIELD(SelectedKeyCode, "_root.ConfigPanelFader.configPanel.selectedKeyCode")
+    MENU_FIELD(OptionCursorNumberValue, "_root.ConfigPanelFader.configPanel.optionCursor.numValue")

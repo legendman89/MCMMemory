@@ -12,5 +12,8 @@
     RESTORE_ACTION(SetColorValue, SetColorValue, IntegerValue, true) \
     RESTORE_ACTION(RequestInputDialogData, RequestInputDialogData, OptionIndex, false) \
     RESTORE_ACTION(SetInputText, SetInputText, StringValue, true) \
-    RESTORE_ACTION(RemapKey, RemapKey, KeymapValue, true) \
+    RESTORE_ACTION(SetIntegerSetting, SetModSettingInt, SettingIntegerValue, true) \
+    RESTORE_ACTION(NotifySettingChanged, OnSettingChange, StringValue, false) \
+    RESTORE_ACTION(ChangeKeymap, OnOptionKeyMapChange, KeymapValue, true) \
+    RESTORE_ACTION(ChangeStateKeymap, RemapKey, KeymapValue, true) \
     RESTORE_ACTION(CloseConfig, CloseConfig, None, false)

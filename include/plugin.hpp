@@ -46,9 +46,14 @@ namespace MCMMemory
         gameLoaded.store(a_loaded, std::memory_order_relaxed);
     }
 
-    inline std::filesystem::path GetPluginDataPath()
+    inline std::filesystem::path GetGameDataPath()
     {
         auto executable = std::filesystem::path(REL::Module::get().filename());
-        return executable.parent_path() / "Data" / "SKSE" / "Plugins" / PRODUCT_NAME;
+        return executable.parent_path() / "Data";
+    }
+
+    inline std::filesystem::path GetPluginDataPath()
+    {
+        return GetGameDataPath() / "SKSE" / "Plugins" / PRODUCT_NAME;
     }
 }

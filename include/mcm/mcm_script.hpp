@@ -60,6 +60,11 @@ namespace MCMMemory
 
         bool IsMenuReady(int a_optionIndex) const;
 
+        inline std::optional<std::string> ReadOptionLabel(int a_optionIndex) const
+        {
+            return a_optionIndex >= 0 ? ReadString("_textBuf", static_cast<size_t>(a_optionIndex)) : std::nullopt;
+        }
+
     private:
 
         // Supports normal variables, properties, and their generated Papyrus backing names.

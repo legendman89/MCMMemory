@@ -1,4 +1,5 @@
 #include "menu/hud.hpp"
+#include "mcm/mcm_support.hpp"
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "utils/helper.hpp"
@@ -54,6 +55,7 @@ namespace MCMMemory
         menuIndex = 0;
         stats.Reset();
         mcmStats.Reset();
+        registryWait.Reset();
         scriptWaitCount = 0;
         scheduledTaskID = 0;
         step = BackupStep::ReadRegistry;
@@ -143,6 +145,16 @@ namespace MCMMemory
     void Backup::ReadRegistry()
     {
         auto currentMCMs = MCMRegistry().ReadRegisteredMCMs();
+        if (MCMRegistry::IsMCMMenuRedoneAvailable() && (currentMCMs.empty() || MCMRegistry::IsRefreshing())) {
+            const auto result = registryWait.Update({});
+            if (result != RegistryWaitResult::Expired) {
+                MCMRegistry::Refresh();
+                logger::debug("Full MCM backup is waiting for the MCM Menu Redone registry (check {})", registryWait.checkCount);
+                QueueNext(GetSettings().actionTrialDelaySeconds);
+                return;
+            }
+        }
+
         auto mcm = currentMCMs.begin();
         while (mcm != currentMCMs.end()) {
             if (!AllowsMCM(mcmFilter, mcm->identity.modID)) {
@@ -274,6 +286,7 @@ namespace MCMMemory
         }
 
         for (size_t index = 0; index < pageSettings.size(); ++index) {
+            MCMHelperSupport::GetSingleton()->ReadKeymapSetting(registeredMCMs[mcmIndex].mcmScript, pageSettings[index]);
             if (pageSettings[index].type == ControlType::Menu) {
                 menuSettings.push_back(index);
             }

@@ -35,6 +35,7 @@ namespace MCMMemory
                 if (!Profiles::CheckSelection()) {
                     logger::error("MCM Memory could not save its selected profile");
                 }
+                MCMRegistry::Install();
                 HUD::GetSingleton()->Configure(GetSettings());
                 if (!Activity::GetSingleton()->Load()) {
                     logger::error("MCM Memory activity history could not be loaded");

@@ -40,7 +40,10 @@ namespace MCMMemory
 
         RestoreAction requestAction;
         RestoreAction applyAction;
+        // Used for MCM helper keymap changes.
+        RestoreAction settingChangedAction;
         bool hasRequest{};
+        bool hasSettingChangedAction{};
 
         // Check the saved value and build the calls needed by this control.
         switch (a_setting.type) {
@@ -117,7 +120,14 @@ namespace MCMMemory
                     logger::warn("Skipping keymap with an invalid key code: {} option {}", a_setting.selection.identity.modID, a_setting.selection.optionIndex);
                     return false;
                 }
-                applyAction = MakeKeymapAction(0, a_setting.selection.optionIndex, desiredKeyCode);
+                if (!a_setting.settingID.empty()) {
+                    applyAction = MakeSettingIntegerAction(0, a_setting.settingID, desiredKeyCode);
+                    settingChangedAction = MakeStringAction(RestoreActionType::NotifySettingChanged, 0, a_setting.settingID);
+                    hasSettingChangedAction = true;
+                }
+                else {
+                    applyAction = MakeKeymapAction(0, a_setting.selection.optionIndex, desiredKeyCode, !a_setting.stateName.empty());
+                }
                 break;
             }
             default:
@@ -128,6 +138,7 @@ namespace MCMMemory
         size_t mcmIndex = GetOrAddMCM(a_setting);
         requestAction.mcmIndex = mcmIndex;
         applyAction.mcmIndex = mcmIndex;
+        settingChangedAction.mcmIndex = mcmIndex;
         requestAction.controlType = a_setting.type;
         applyAction.controlType = a_setting.type;
         requestAction.optionIndex = a_setting.selection.optionIndex;
@@ -141,6 +152,9 @@ namespace MCMMemory
             restoreMCMs[mcmIndex].settingActions.push_back(std::move(requestAction));
         }
         restoreMCMs[mcmIndex].settingActions.push_back(std::move(applyAction));
+        if (hasSettingChangedAction) {
+            restoreMCMs[mcmIndex].settingActions.push_back(std::move(settingChangedAction));
+        }
         return true;
     }
 

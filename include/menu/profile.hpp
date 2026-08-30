@@ -111,6 +111,8 @@ namespace MCMMemory::Menu
 
         std::chrono::steady_clock::time_point nextRegistryRefresh{};
 
+        uint64_t registryCacheGeneration{};
+
         std::array<char, 128> search{};
 
         bool loaded{};

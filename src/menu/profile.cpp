@@ -1,6 +1,6 @@
 #include "menu/profile.hpp"
 
-#include "mcm/mcm_registry.hpp"
+#include "mcm/mcm_support.hpp"
 #include "menu/icons.hpp"
 #include "menu/translate.hpp"
 #include "profile/backup.hpp"
@@ -132,6 +132,9 @@ namespace MCMMemory::Menu
         if (IsGameLoaded() != gameLoaded) {
             return true;
         }
+        if (MCMRegistry::CacheGeneration() != registryCacheGeneration) {
+            return true;
+        }
 
         std::error_code error;
         const bool exists = std::filesystem::exists(ProfileStorage::Path(), error);
@@ -195,7 +198,7 @@ namespace MCMMemory::Menu
         if (currentGameLoaded) {
             const auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
             const auto registryResult = registryWait.Update(registeredMCMs);
-            registrySettled = registryResult == RegistryWaitResult::Ready;
+            registrySettled = registryResult == RegistryWaitResult::Ready && !MCMRegistry::IsRefreshing();
             if (registryResult == RegistryWaitResult::Expired) {
                 registryWait.Reset();
             }
@@ -203,6 +206,9 @@ namespace MCMMemory::Menu
                 auto& mcm = FindOrAddMCM(registeredMCM.identity, selectedMCMs);
                 mcm.identity = registeredMCM.identity;
                 mcm.available = true;
+            }
+            if (!registrySettled) {
+                MCMRegistry::Refresh();
             }
         }
         gameLoaded = currentGameLoaded;
@@ -216,6 +222,7 @@ namespace MCMMemory::Menu
             profileWriteTime = std::filesystem::last_write_time(ProfileStorage::Path(), error);
         }
         nextRegistryRefresh = std::chrono::steady_clock::now() + registryRefreshInterval;
+        registryCacheGeneration = MCMRegistry::CacheGeneration();
         loaded = true;
     }
 

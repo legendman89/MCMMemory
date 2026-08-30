@@ -137,6 +137,8 @@ namespace MCMMemory
 
         Profile profile;
 
+        RegistryWait registryWait;
+
         size_t mcmIndex{};
 
         size_t pageIndex{};

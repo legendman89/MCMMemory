@@ -91,6 +91,9 @@ namespace MCMMemory
             document["sourceEventID"] = a_setting.sourceEventID;
             document["controlType"] = std::string(ControlTypeName(a_setting.type));
             document["optionLabel"] = a_setting.optionLabel;
+            if (!a_setting.settingID.empty()) {
+                document["settingID"] = a_setting.settingID;
+            }
             document["stateName"] = a_setting.stateName;
             document["value"] = a_setting.value;
             document["valueSource"] = a_setting.valueSource;

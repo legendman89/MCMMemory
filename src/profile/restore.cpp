@@ -1,6 +1,8 @@
 #include "menu/hud.hpp"
 #include "profile/restore.hpp"
 
+#include "mcm/mcm_support.hpp"
+
 namespace MCMMemory
 {
     bool Restore::Install()
@@ -72,15 +74,24 @@ namespace MCMMemory
             return false;
         }
 
+        status = OperationStatus::Running;
+        HUD::GetSingleton()->ShowRestoreStarted();
+
         const auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
+        if (MCMRegistry::IsMCMMenuRedoneAvailable() && (registeredMCMs.empty() || MCMRegistry::IsRefreshing())) {
+            MCMRegistry::Refresh();
+            QueueRegistryCheck(GetSettings().actionTrialDelaySeconds);
+            logger::info("Manual persistent profile restoration is waiting for the MCM Menu Redone registry");
+            return status == OperationStatus::Running;
+        }
+
         if (registeredMCMs.empty()) {
             HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreFailed", "HUD.Failure.NoRegisteredMCMs");
             logger::warn("Manual persistent profile restoration found no registered MCMs");
+            status = OperationStatus::Idle;
             return false;
         }
 
-        status = OperationStatus::Running;
-        HUD::GetSingleton()->ShowRestoreStarted();
         MatchRegisteredMCMs(registeredMCMs);
         StartRestore();
         logger::info("Manual persistent profile restoration started from {} registered MCMs", registeredMCMs.size());
@@ -221,6 +232,32 @@ namespace MCMMemory
 
         // The ready event can arrive before every MCM is registered, so wait for an unchanged list.
         auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
+        if (MCMRegistry::IsRefreshing()) {
+            logger::debug("Persistent profile restore is waiting for the MCM Menu Redone registry query");
+            QueueRegistryCheck(operationMode == OperationMode::Manual ? GetSettings().actionTrialDelaySeconds : registryCheckDelaySeconds);
+            return;
+        }
+
+        if (operationMode == OperationMode::Manual) {
+            if (!registeredMCMs.empty()) {
+                MatchRegisteredMCMs(registeredMCMs);
+                StartRestore();
+                return;
+            }
+
+            const auto result = registryWait.Update(registeredMCMs);
+            if (result == RegistryWaitResult::Expired) {
+                logger::error("Manual persistent profile restoration found no registered MCMs");
+                HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreFailed", "HUD.Failure.NoRegisteredMCMs");
+                status = OperationStatus::Idle;
+                return;
+            }
+
+            MCMRegistry::Refresh();
+            QueueRegistryCheck(GetSettings().actionTrialDelaySeconds);
+            return;
+        }
+
         const auto result = registryWait.Update(registeredMCMs);
         if (result == RegistryWaitResult::Ready) {
             MatchRegisteredMCMs(registeredMCMs);
@@ -244,6 +281,7 @@ namespace MCMMemory
             logger::info("Persistent profile restore registry is unchanged (quiet check {} of {})", registryWait.quietCheckCount, requiredStableRegistryChecks);
         }
 
+        MCMRegistry::Refresh();
         QueueRegistryCheck(registryCheckDelaySeconds);
     }
 

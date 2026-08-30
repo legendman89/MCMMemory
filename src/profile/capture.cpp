@@ -74,26 +74,35 @@ namespace MCMMemory
             return RE::BSEventNotifyControl::kContinue;
         }
 
-        // Combine the callback data with the values currently shown in the menu.
+        // Keep the callback data now, then read Scaleform after this callback returns.
         UpdateSelectionFromEvent(type, *a_event);
 
-        auto state = MCMMenu::ReadState();
-
-        UpdateSelectionFromMenu(type, state);
-
-        auto eventID = RecordEvent(type, *a_event, std::move(state));
-
-        QueueCaptureCompletion(eventID, QueueDelayFrames, IsValueChange(type));
+        auto eventID = RecordEvent(type, *a_event);
+        QueueMenuRead(CaptureRequest{ eventID, loadedGameSession, IsValueChange(type) });
 
         return RE::BSEventNotifyControl::kContinue;
+    }
+
+    void Capture::ReadMenu(const CaptureRequest& a_request)
+    {
+        auto* record = FindRecord(a_request.eventID);
+        if (!record) {
+            return;
+        }
+
+        record->state = MCMMenu::ReadState();
+        if (record->selection.modIndex == selection.modIndex) {
+            UpdateSelectionFromMenu(record->type, record->state);
+        }
+
+        QueueCaptureCompletion(a_request, QueueDelayFrames);
     }
 
     void Capture::CompleteCapture(uint64_t a_eventID, bool a_persist)
     {
         // Find the raw record made before the menu finished updating.
-        auto record = records.rbegin();
-        for (; record != records.rend() && record->eventID != a_eventID; ++record) {}
-        if (record == records.rend()) {
+        auto* record = FindRecord(a_eventID);
+        if (!record) {
             return;
         }
 
@@ -170,7 +179,7 @@ namespace MCMMemory
         pendingAutoBackupSettings.clear();
     }
 
-    uint64_t Capture::RecordEvent(EventType a_type, const SKSE::ModCallbackEvent& a_event, nlohmann::json a_state)
+    uint64_t Capture::RecordEvent(EventType a_type, const SKSE::ModCallbackEvent& a_event)
     {
         if (records.size() == maximumRecords) {
             records.erase(records.begin());
@@ -184,11 +193,10 @@ namespace MCMMemory
         record.numberArgument = a_event.numArg;
         record.senderFormID = a_event.sender ? a_event.sender->GetFormID() : 0;
         record.selection = selection;
-        record.state = std::move(a_state);
         records.push_back(std::move(record));
 
         logger::info("Captured {}: mod='{}', modID='{}', page='{}', option={}, str='{}', num={}", EventName(a_type), selection.identity.modName, selection.identity.modID, selection.pageName, selection.optionIndex, a_event.strArg.c_str(), a_event.numArg);
-        
+
         return eventCount;
     }
 

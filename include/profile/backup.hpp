@@ -24,13 +24,6 @@ namespace MCMMemory
         Finish
     };
 
-    struct BackupPage
-    {
-        std::string name;
-
-        int index{-1};
-    };
-
     struct BackupTask
     {
         uint64_t loadedGameSession{};
@@ -123,7 +116,7 @@ namespace MCMMemory
 
         std::vector<MCMRegistryEntry> registeredMCMs;
 
-        std::vector<BackupPage> pages;
+        std::vector<MCMPage> pages;
 
         std::vector<CapturedSetting> pageSettings;
 

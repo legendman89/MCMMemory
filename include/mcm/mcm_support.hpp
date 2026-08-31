@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mcm/mcm_registry.hpp"
+#include "mcm/mcm_script.hpp"
 #include "utils/scheduler.hpp"
 
 namespace MCMMemory
@@ -11,6 +12,18 @@ namespace MCMMemory
     inline constexpr std::string_view markerScriptName{ "MCMUnlockedMarkerScript" };
     inline constexpr std::string_view mcmMenuRedoneScriptName{ "MCMR_Native" };
     inline constexpr std::string_view mcmHelperBaseScriptName{ "MCM_ConfigBase" };
+    inline constexpr std::string_view nlMCMBaseScriptName{ "nl_mcm" };
+
+    // NL_MCM still uses SkyUI controls, but each page owns its setting states.
+    struct NLMCMSupport
+    {
+        NLMCMSupport() = delete;
+
+        static bool IsSupported(const MCMScript& a_script)
+        {
+            return a_script.IsBasedOn(nlMCMBaseScriptName);
+        }
+    };
 
     // Sorts MCM Unlocked markers by FormID so registry reads have a stable order.
     struct MCMMarkerFormIDLess
@@ -62,7 +75,10 @@ namespace MCMMemory
 
     private:
 
-        bool IsMCMHelperScript(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript) const;
+        bool IsMCMHelperScript(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript) const
+        {
+            return MCMScript(a_mcmScript).IsBasedOn(mcmHelperBaseScriptName);
+        }
 
         std::optional<std::string> ReadConfigModName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript) const;
 

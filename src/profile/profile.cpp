@@ -107,6 +107,7 @@ namespace MCMMemory
         JSON::ReadValue(a_document, "optionLabel", a_setting.optionLabel);
         JSON::ReadValue(a_document, "settingID", a_setting.settingID);
         JSON::ReadValue(a_document, "stateName", a_setting.stateName);
+        JSON::ReadValue(a_document, "pageScopedState", a_setting.pageScopedState);
         JSON::ReadValue(a_document, "valueSource", a_setting.valueSource);
         JSON::ReadValue(a_document, "identityComplete", a_setting.identityComplete);
         JSON::ReadValue(a_document, "value", a_setting.value);

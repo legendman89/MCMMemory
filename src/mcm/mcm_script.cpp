@@ -1,4 +1,5 @@
 #include "mcm/mcm_script.hpp"
+#include "mcm/mcm_support.hpp"
 
 namespace MCMMemory
 {
@@ -24,6 +25,35 @@ namespace MCMMemory
 
         auto mcmScript = script;
         return vm->DispatchMethodCall(mcmScript, RE::BSFixedString(a_functionName), a_arguments, a_result);
+    }
+
+    bool MCMScript::IsBasedOn(std::string_view a_scriptName) const
+    {
+        auto* typeInfo = script ? script->GetTypeInfo() : nullptr;
+        for (; typeInfo; typeInfo = typeInfo->GetParent()) {
+            const auto* name = typeInfo->GetName();
+            if (name && a_scriptName == name) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::optional<MCMPage> MCMScript::ReadCurrentPage() const
+    {
+        auto pageNumber = ReadInteger("_currentPageNum");
+        const auto* pageName = FindVariable("_currentPage");
+        if (!IsConfigOpen() || !pageNumber || *pageNumber < 0 || !pageName || !pageName->IsString()) {
+            return std::nullopt;
+        }
+
+        MCMPage page{ std::string(pageName->GetString()), *pageNumber - 1 };
+        if (page.index < 0) {
+            return page.name.empty() ? std::optional<MCMPage>(std::move(page)) : std::nullopt;
+        }
+
+        auto registeredName = ReadString("Pages", static_cast<size_t>(page.index));
+        return registeredName && *registeredName == page.name ? std::optional<MCMPage>(std::move(page)) : std::nullopt;
     }
 
     const RE::BSScript::Variable* MCMScript::FindVariable(std::string_view a_name) const
@@ -112,6 +142,7 @@ namespace MCMMemory
         }
 
         const size_t optionCount = std::min({ static_cast<size_t>(flags->size()), static_cast<size_t>(labels->size()), static_cast<size_t>(numbers->size()), static_cast<size_t>(strings->size()) });
+        const bool pageScopedState = NLMCMSupport::IsSupported(*this);
         for (size_t optionIndex = 0; optionIndex < optionCount; ++optionIndex) {
             const auto& flagValue = (*flags)[static_cast<uint32_t>(optionIndex)];
             if (!flagValue.IsInt()) {
@@ -131,6 +162,7 @@ namespace MCMMemory
             }
 
             CapturedSetting setting;
+            setting.pageScopedState = pageScopedState;
             setting.selection.identity = a_identity;
             setting.selection.pageName = a_pageName;
             setting.selection.pageIndex = a_pageIndex;

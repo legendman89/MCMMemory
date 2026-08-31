@@ -197,6 +197,9 @@ namespace MCMMemory
         mcmStarted = true;
 
         MCMScript script(registeredMCMs[mcmIndex].mcmScript);
+        if (NLMCMSupport::IsSupported(script)) {
+            logger::info("Full MCM backup using NL_MCM page support for '{}'", registeredMCMs[mcmIndex].identity.modID);
+        }
         if (!CallAndContinue(script, "OpenConfig", RE::MakeFunctionArguments(), BackupStep::ReadPages)) {
             logger::error("Full MCM backup could not open '{}'", registeredMCMs[mcmIndex].identity.modID);
             mcmFailed = true;
@@ -210,7 +213,15 @@ namespace MCMMemory
     void Backup::ReadPages()
     {
         MCMScript script(registeredMCMs[mcmIndex].mcmScript);
-        if (!script.IsConfigOpen()) {
+        std::optional<MCMPage> openingPage;
+        if (NLMCMSupport::IsSupported(script)) {
+            openingPage = script.ReadCurrentPage();
+        }
+        else if (script.IsConfigOpen()) {
+            // Ordinary SkyUI MCMs keep their existing blank-first scan.
+            openingPage.emplace();
+        }
+        if (!openingPage) {
             if (++scriptWaitCount < maximumScriptWaitChecks) {
                 QueueNext(GetSettings().actionTrialDelaySeconds);
             }
@@ -223,11 +234,17 @@ namespace MCMMemory
             return;
         }
 
-        pages.push_back(BackupPage{ std::string{}, -1 });
         auto pageNames = script.ReadPages();
         pages.reserve(pageNames.size() + 1);
+        // OpenConfig may redirect to a named page. Read it once, under its real name.
+        pages.push_back(*openingPage);
         for (size_t index = 0; index < pageNames.size(); ++index) {
-            pages.push_back(BackupPage{ std::move(pageNames[index]), static_cast<int>(index) });
+            if (static_cast<int>(index) != openingPage->index) {
+                pages.push_back(MCMPage{ std::move(pageNames[index]), static_cast<int>(index) });
+            }
+        }
+        if (openingPage->index >= 0) {
+            logger::info("Full MCM backup opened '{}' on opening page '{}' (index {})", registeredMCMs[mcmIndex].identity.modID, openingPage->name, openingPage->index);
         }
 
         scriptWaitCount = 0;
@@ -390,6 +407,8 @@ namespace MCMMemory
     {
         const auto& modID = registeredMCMs[mcmIndex].identity.modID;
         if (!mcmFailed) {
+            // Fresh scan values win. Older captures only fill controls hidden from this scan.
+            Capture::GetSingleton()->MergeSettings(mcmSettings, modID);
             auto setting = profile.begin();
             while (setting != profile.end()) {
                 if (setting->selection.identity.modID == modID) {
@@ -425,7 +444,6 @@ namespace MCMMemory
 
     void Backup::Finish()
     {
-        Capture::GetSingleton()->MergeSettings(profile);
         if (!ProfileStorage::Save(profile)) {
             logger::error("Full MCM backup failed to save its completed profile");
             HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", "HUD.Failure.ProfileUnchanged");

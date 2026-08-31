@@ -6,18 +6,6 @@
 
 namespace MCMMemory
 {
-    bool MCMHelperSupport::IsMCMHelperScript(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript) const
-    {
-        auto* typeInfo = a_mcmScript ? a_mcmScript->GetTypeInfo() : nullptr;
-        for (; typeInfo; typeInfo = typeInfo->GetParent()) {
-            const auto* name = typeInfo->GetName();
-            if (name && mcmHelperBaseScriptName == name) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     std::optional<std::string> MCMHelperSupport::ReadConfigModName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript) const
     {
         if (!IsMCMHelperScript(a_mcmScript)) {

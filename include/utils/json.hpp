@@ -95,6 +95,9 @@ namespace MCMMemory
                 document["settingID"] = a_setting.settingID;
             }
             document["stateName"] = a_setting.stateName;
+            if (a_setting.pageScopedState) {
+                document["pageScopedState"] = true;
+            }
             document["value"] = a_setting.value;
             document["valueSource"] = a_setting.valueSource;
             document["identityComplete"] = a_setting.identityComplete;

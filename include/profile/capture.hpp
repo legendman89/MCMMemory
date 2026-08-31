@@ -72,8 +72,8 @@ namespace MCMMemory
         // Clears capture data when a game is started or loaded.
         void Reset();
 
-        // Applies settings changed during a full scan before the profile is written.
-        void MergeSettings(Profile& a_profile);
+        // Keeps captured settings hidden from this MCM's scan, without replacing fresh reads.
+        void MergeSettings(Profile& a_profile, std::string_view a_modID);
 
         // Receives MCM callbacks such as sliderAccepted and optionSelected.
         RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;
@@ -151,7 +151,7 @@ namespace MCMMemory
         // Stops old reads after navigation or a newer setting change.
         bool IsCapturePageCurrent(const CaptureRecord& a_record) const;
 
-        bool ReadToggleSetting(const CaptureRecord& a_record, const MCMScript& a_script, CapturedSetting& a_setting) const;
+        bool ReadToggleSetting(CaptureRecord& a_record, const MCMScript& a_script, CapturedSetting& a_setting) const;
 
         // Reads the option label from the current menu state or an earlier read of the same row.
         std::string ReadOptionLabel(const CaptureRecord& a_record) const;
@@ -161,6 +161,9 @@ namespace MCMMemory
 
         // Propagates the stable ID into recent events for the same MCM that were recorded before the ID became available.
         void SyncMCMIdentity();
+
+        // Returns false while an opening page is still being rebuilt.
+        bool SyncOpeningPage(CaptureRecord& a_record);
 
         // Gets the stable MCM name and ID from the active config script.
         // Ex. script type: TrueHUD_MCM, mod name: TrueHUD, then modID is TrueHUD_MCM::TrueHUD.

@@ -7,9 +7,9 @@ namespace MCMMemory
 
     // Some values may become readable a few frames after the callback.
     constexpr int QueueDelayFrames = 2;
-    // Check busy toggles every 0.1 seconds, for about five seconds.
-    inline constexpr uint32_t toggleReadDelayFrames = 6;
-    inline constexpr uint32_t maximumToggleReads = 50;
+    // Check busy toggles and opening pages every 0.1 seconds, for about five seconds.
+    inline constexpr uint32_t captureReadDelayFrames = 6;
+    inline constexpr uint32_t maximumCaptureReads = 50;
     // Raw records are only for debugging, so keep their memory use bounded.
     constexpr size_t maximumRecords = 4096;
 
@@ -56,12 +56,12 @@ namespace MCMMemory
         logger::info("Capture session reset");
     }
 
-    void Capture::MergeSettings(Profile& a_profile)
+    void Capture::MergeSettings(Profile& a_profile, std::string_view a_modID)
     {
         std::scoped_lock lock(captureMutex);
         for (const auto& setting : settings) {
-            if (setting.identityComplete) {
-                Deduplicate(a_profile, setting);
+            if (setting.identityComplete && setting.selection.identity.modID == a_modID) {
+                Deduplicate(a_profile, setting, false);
             }
         }
     }
@@ -99,6 +99,7 @@ namespace MCMMemory
             FindActiveMCMIdentity(record->type, record->state);
         }
 
+        SyncOpeningPage(*record);
         if (record->type == EventType::OptionHighlighted || ControlTypeForEvent(record->type) == ControlType::Option) {
             RememberControl(*record);
         }
@@ -114,7 +115,8 @@ namespace MCMMemory
             return;
         }
 
-        if (ControlTypeForEvent(record->type) == ControlType::Option && !IsCapturePageCurrent(*record)) {
+        const bool pageReady = SyncOpeningPage(*record);
+        if (pageReady && ControlTypeForEvent(record->type) == ControlType::Option && !IsCapturePageCurrent(*record)) {
             logger::info("Stopped toggle capture {} after navigation or a newer change", a_request.eventID);
             return;
         }
@@ -126,16 +128,16 @@ namespace MCMMemory
         }
         if (IsValueChange(record->type)) {
             // Only accepted or selected values become profile settings.
-            if (!ProcessCapturedEvent(*record)) {
-                if (!record->stateAfter.contains("error") && a_request.readAttempts < maximumToggleReads) {
+            if (!pageReady || !ProcessCapturedEvent(*record)) {
+                if (!record->stateAfter.contains("error") && a_request.readAttempts < maximumCaptureReads) {
                     if (a_request.readAttempts == 0) {
-                        logger::debug("Waiting for toggle capture {}: mod='{}', page='{}', option={}", a_request.eventID, record->selection.identity.modName, record->selection.pageName, record->selection.optionIndex);
+                        logger::debug("Waiting for MCM capture {}: mod='{}', page='{}', option={}", a_request.eventID, record->selection.identity.modName, record->selection.pageName, record->selection.optionIndex);
                     }
                     ++a_request.readAttempts;
-                    QueueCaptureCompletion(a_request, toggleReadDelayFrames);
+                    QueueCaptureCompletion(a_request, captureReadDelayFrames);
                     return;
                 }
-                logger::warn("Toggle capture {} could not finish: mod='{}', page='{}', option={}; saved profile left unchanged", a_request.eventID, record->selection.identity.modName, record->selection.pageName, record->selection.optionIndex);
+                logger::warn("MCM capture {} could not finish: mod='{}', page='{}', option={}; saved profile left unchanged", a_request.eventID, record->selection.identity.modName, record->selection.pageName, record->selection.optionIndex);
             }
         }
         if (a_request.persist) {

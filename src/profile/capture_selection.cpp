@@ -1,4 +1,5 @@
 #include "profile/capture.hpp"
+#include "mcm/mcm_support.hpp"
 #include "utils/json.hpp"
 
 namespace MCMMemory
@@ -103,6 +104,52 @@ namespace MCMMemory
         if (previousID.empty() && !selection.identity.modID.empty()) {
             logger::info("Locked MCM index {} to stable ID '{}'", selection.modIndex, selection.identity.modID);
         }
+    }
+
+    bool Capture::SyncOpeningPage(CaptureRecord& a_record)
+    {
+        if (a_record.type == EventType::ModSelected || (a_record.selection.pageIndex >= 0 && selection.pageIndex >= 0) || a_record.selection.modIndex != selection.modIndex) {
+            return true;
+        }
+
+        // Do not attach an older event to a page the player opened afterward.
+        for (auto later = records.rbegin(); later != records.rend() && later->eventID > a_record.eventID; ++later) {
+            if (later->type == EventType::ModSelected || (later->type == EventType::PageSelected && later->numberArgument >= 0.0F)) {
+                return true;
+            }
+        }
+
+        auto activeMCM = MCMRegistry().ReadActiveMCM();
+        if (!activeMCM || activeMCM->identity.modID != a_record.selection.identity.modID) {
+            return true;
+        }
+        MCMScript script(activeMCM->mcmScript);
+        if (!NLMCMSupport::IsSupported(script)) {
+            return true;
+        }
+        auto page = script.ReadCurrentPage();
+        if (!page) {
+            return false;
+        }
+        if (page->index < 0 || (selection.pageIndex >= 0 && !page->Matches(selection.pageName, selection.pageIndex)) || (a_record.selection.pageIndex >= 0 && !page->Matches(a_record.selection.pageName, a_record.selection.pageIndex))) {
+            return true;
+        }
+
+        selection.pageName = page->name;
+        selection.pageIndex = page->index;
+
+        // Keep earlier highlights and same-page resets tied to this opening page too.
+        for (auto record = records.rbegin(); record != records.rend() && record->eventID > menuOpenedEventID; ++record) {
+            if (record->selection.modIndex != selection.modIndex || record->type == EventType::ModSelected || (record->type == EventType::PageSelected && record->numberArgument >= 0.0F)) {
+                break;
+            }
+            if (record->selection.pageIndex < 0) {
+                record->selection.pageName = page->name;
+                record->selection.pageIndex = page->index;
+            }
+        }
+        logger::debug("Capture resolved NL_MCM opening page '{}' (index {}) for '{}'", page->name, page->index, activeMCM->identity.modID);
+        return true;
     }
 
     void Capture::SyncMCMIdentity()

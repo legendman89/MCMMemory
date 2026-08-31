@@ -26,6 +26,45 @@ namespace MCMMemory
         return output;
     }
 
+    nlohmann::json MCMMenu::ReadOption(int a_optionIndex)
+    {
+        auto output = nlohmann::json::object();
+        auto* ui = RE::UI::GetSingleton();
+        if (a_optionIndex < 0 || !ui || !ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
+            return output;
+        }
+
+        auto movie = ui->GetMovieView(RE::JournalMenu::MENU_NAME);
+        if (!movie) {
+            return output;
+        }
+
+        RE::GFxValue entries;
+        RE::GFxValue option;
+        if (movie->GetVariable(std::addressof(entries), "_root.ConfigPanelFader.configPanel._optionsList.entryList") && entries.IsArray()) {
+            const auto index = static_cast<uint32_t>(a_optionIndex);
+            if (index >= entries.GetArraySize() || !entries.GetElement(index, std::addressof(option))) {
+                return output;
+            }
+        }
+        else {
+            // A replacement menu may expose only the public cursor, which must still name this row.
+            RE::GFxValue cursorIndex;
+            if (!movie->GetVariable(std::addressof(cursorIndex), "_root.ConfigPanelFader.configPanel.optionCursorIndex") || !cursorIndex.IsNumber() || cursorIndex.GetNumber() != a_optionIndex) {
+                return output;
+            }
+            if (!movie->GetVariable(std::addressof(option), "_root.ConfigPanelFader.configPanel.optionCursor")) {
+                return output;
+            }
+        }
+
+        if (option.IsObject()) {
+            MenuMemberCollector collector(output);
+            option.VisitMembers(std::addressof(collector));
+        }
+        return output;
+    }
+
     std::optional<nlohmann::json> MCMMenu::ValueToJson(const RE::GFxValue& a_value)
     {
         if (a_value.IsBool()) {

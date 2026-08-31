@@ -41,6 +41,11 @@ namespace MCMMemory
 
         std::vector<std::string> ReadPages() const;
 
+        // Includes inherited script types, not just the mod's own script name.
+        bool IsBasedOn(std::string_view a_scriptName) const;
+
+        std::optional<MCMPage> ReadCurrentPage() const;
+
         // Reads the controls SkyUI prepared for the currently loaded page.
         bool ReadPage(const MCMIdentity& a_identity, std::string_view a_pageName, int a_pageIndex, std::vector<CapturedSetting>& a_settings) const;
 

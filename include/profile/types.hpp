@@ -73,6 +73,19 @@ namespace MCMMemory
         std::string modID;
     };
 
+    // The page actually loaded in the script, which may be an opening page.
+    struct MCMPage
+    {
+        std::string name;
+
+        int index{-1};
+
+        bool Matches(std::string_view a_name, int a_index) const
+        {
+            return name == a_name && index == a_index;
+        }
+    };
+
     // Tracks the MCM page and option the player is currently using.
     struct MCMSelection
     {
@@ -115,11 +128,17 @@ namespace MCMMemory
 
         bool identityComplete{};
 
+        // NL_MCM pages have separate scripts and can reuse the same state names.
+        bool pageScopedState{};
+
         // Checks whether another captured setting refers to the same MCM option.
         // This avoids duplicate profile entries.
         bool IsSameSetting(const CapturedSetting& a_other) const
         {
             if (type != a_other.type || selection.identity.modID != a_other.selection.identity.modID) {
+                return false;
+            }
+            if ((pageScopedState || a_other.pageScopedState) && selection.pageName != a_other.selection.pageName) {
                 return false;
             }
             if (!stateName.empty() && !a_other.stateName.empty()) {
@@ -164,8 +183,8 @@ namespace MCMMemory
         RE::FormID senderFormID{};
     };
 
-    // Adds a setting or replaces an older capture of the same setting.
-    inline void Deduplicate(std::vector<CapturedSetting>& a_settings, CapturedSetting a_setting)
+    // Adds a setting; callers can keep an existing value when it came from a fresher read.
+    inline void Deduplicate(std::vector<CapturedSetting>& a_settings, CapturedSetting a_setting, bool a_replaceExisting = true)
     {
         auto existing = a_settings.begin();
         if (a_setting.identityComplete) {
@@ -175,7 +194,9 @@ namespace MCMMemory
             for (; existing != a_settings.end() && existing->sourceEventID != a_setting.sourceEventID; ++existing) {}
         }
         if (existing != a_settings.end()) {
-            *existing = std::move(a_setting);
+            if (a_replaceExisting) {
+                *existing = std::move(a_setting);
+            }
         }
         else {
             a_settings.push_back(std::move(a_setting));

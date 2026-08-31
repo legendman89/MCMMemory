@@ -12,6 +12,9 @@ namespace MCMMemory
         // Reads the useful fields from the currently open MCM menu.
         static nlohmann::json ReadState();
 
+        // Reads one live row without moving the cursor. Call only from a queued game task.
+        static nlohmann::json ReadOption(int a_optionIndex);
+
         // Converts one simple Scaleform value into a JSON value.
         static std::optional<nlohmann::json> ValueToJson(const RE::GFxValue& a_value);
 

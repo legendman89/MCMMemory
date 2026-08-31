@@ -71,8 +71,6 @@ if(DEFINED ENV{SKYRIM_MODS_FOLDER} AND IS_DIRECTORY "$ENV{SKYRIM_MODS_FOLDER}")
         COMMAND ${CMAKE_COMMAND} -E rm -f "${LEGACY_PLUGIN_OUTPUT_FOLDER}/MCMSettingsLoader.dll"
         COMMAND ${CMAKE_COMMAND} -E rm -f "${LEGACY_PLUGIN_OUTPUT_FOLDER}/MCMSettingsLoader.pdb"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${PROJECT_NAME}>" "${PLUGIN_OUTPUT_FOLDER}/$<TARGET_FILE_NAME:${PROJECT_NAME}>"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/assets/Profile.example.json" "${PLUGIN_CONFIG_OUTPUT_FOLDER}/Profile.example.json"
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/assets/Settings.example.json" "${PLUGIN_CONFIG_OUTPUT_FOLDER}/Settings.example.json"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_CURRENT_SOURCE_DIR}/translation/Translation.json" "${PLUGIN_TRANSLATION_OUTPUT_FOLDER}/Translation.json"
         COMMAND_EXPAND_LISTS
         VERBATIM

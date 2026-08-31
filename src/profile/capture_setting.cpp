@@ -117,7 +117,7 @@ namespace MCMMemory
         }
     }
 
-    bool Capture::ReadToggleSetting(const CaptureRecord& a_record, const MCMScript& a_script, CapturedSetting& a_setting) const
+    bool Capture::ReadToggleSetting(CaptureRecord& a_record, const MCMScript& a_script, CapturedSetting& a_setting) const
     {
         if (!a_record.control || !a_record.stateAfter.contains("fields")) {
             return false;
@@ -127,7 +127,9 @@ namespace MCMMemory
         // This fix allows us to correctly capture the new toggle state after a page reset, 
         // instead of the old state before the reset.
         auto panelState = JSON::ReadNumber(a_record.stateAfter["fields"], "PanelState");
-        if (!panelState || *panelState != 0.0) {
+        bool pageResetRequested{};
+        JSON::ReadValue(a_record.stateAfter["fields"], "PageResetRequested", pageResetRequested);
+        if (!panelState || *panelState != 0.0 || pageResetRequested) {
             return false;
         }
 
@@ -136,16 +138,27 @@ namespace MCMMemory
         }
 
         auto index = a_script.FindControlIndex(*a_record.control, a_setting.selection.optionIndex);
-        auto value = index ? a_script.ReadCurrentValue(ControlType::Option, *index) : std::nullopt;
-        if (!value) {
+        if (!index) {
+            return false;
+        }
+
+        // SetToggleOptionValue updates the menu row, not the script's original page buffer.
+        // Read the resolved row even if a redraw or mouse movement changed the cursor.
+        auto& option = a_record.stateAfter["changedOptionMembers"];
+        option = MCMMenu::ReadOption(*index);
+        auto type = JSON::ReadNumber(option, "optionType");
+        auto value = JSON::ReadNumber(option, "numValue");
+        auto label = JSON::ReadString(option, "text");
+        // SkyUI translates this text. FindControlIndex already checked the script's control identity.
+        if (!type || *type != 3.0 || !value || !label) {
             return false;
         }
 
         a_setting.selection.optionIndex = *index;
         a_setting.optionLabel = a_record.control->optionLabel;
         a_setting.stateName = a_record.control->stateName;
-        a_setting.value = std::move(*value);
-        a_setting.valueSource = "script._numValueBuf";
+        a_setting.value = *value != 0.0;
+        a_setting.valueSource = "menu.option.numValue";
         logger::info("Finished toggle capture {}: mod='{}', option='{}', state='{}', value={}", a_record.eventID, a_setting.selection.identity.modName, a_setting.optionLabel, a_setting.stateName, a_setting.value.dump());
         return true;
     }
@@ -163,6 +176,11 @@ namespace MCMMemory
             activeMCMScript = activeMCM->mcmScript;
         }
         MCMScript mcmScript(activeMCMScript);
+        setting.pageScopedState = NLMCMSupport::IsSupported(mcmScript);
+        if (setting.pageScopedState && !IsCapturePageCurrent(a_record)) {
+            logger::debug("Stopped NL_MCM capture {} after navigation or a newer change", a_record.eventID);
+            return true;
+        }
         if (setting.type == ControlType::Option) {
             RememberControl(a_record);
             // Text buttons send optionSelected too, but are not saved toggles.

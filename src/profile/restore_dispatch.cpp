@@ -1,4 +1,5 @@
 #include "profile/restore.hpp"
+#include "mcm/mcm_support.hpp"
 
 #include <cmath>
 
@@ -22,12 +23,25 @@ namespace MCMMemory
         if (a_action.controlType == ControlType::Unknown || a_action.mcmIndex >= restoreMCMs.size()) {
             return true;
         }
-        return MCMScript(restoreMCMs[a_action.mcmIndex].mcmScript).MatchesControl(a_action.controlType, a_action.optionIndex, a_action.stateName);
+        MCMScript script(restoreMCMs[a_action.mcmIndex].mcmScript);
+        if (NLMCMSupport::IsSupported(script)) {
+            // A matching state on another NL_MCM page belongs to a different module.
+            auto page = script.ReadCurrentPage();
+            if (!page || !page->Matches(a_action.pageName, a_action.pageIndex)) {
+                return false;
+            }
+        }
+        return script.MatchesControl(a_action.controlType, a_action.optionIndex, a_action.stateName);
     }
 
     bool Restore::IsActionNeeded(const RestoreAction& a_action) const
     {
         if (a_action.controlType == ControlType::Unknown || a_action.mcmIndex >= restoreMCMs.size()) {
+            return true;
+        }
+
+        // Do not call a setting unchanged by reading the wrong page or control.
+        if (!IsActionValid(a_action)) {
             return true;
         }
 

@@ -136,17 +136,16 @@ namespace MCMMemory
 
         // Add the page call first, then the control specific calls.
         size_t mcmIndex = GetOrAddMCM(a_setting);
-        requestAction.mcmIndex = mcmIndex;
-        applyAction.mcmIndex = mcmIndex;
         settingChangedAction.mcmIndex = mcmIndex;
-        requestAction.controlType = a_setting.type;
-        applyAction.controlType = a_setting.type;
-        requestAction.optionIndex = a_setting.selection.optionIndex;
-        applyAction.optionIndex = a_setting.selection.optionIndex;
-        requestAction.optionLabel = a_setting.optionLabel;
-        applyAction.optionLabel = a_setting.optionLabel;
-        requestAction.stateName = a_setting.stateName;
-        applyAction.stateName = a_setting.stateName;
+        for (auto* action : { &requestAction, &applyAction }) {
+            action->mcmIndex = mcmIndex;
+            action->controlType = a_setting.type;
+            action->optionIndex = a_setting.selection.optionIndex;
+            action->optionLabel = a_setting.optionLabel;
+            action->stateName = a_setting.stateName;
+            action->pageName = a_setting.selection.pageName;
+            action->pageIndex = a_setting.selection.pageIndex;
+        }
         AddPageAction(mcmIndex, a_setting.selection);
         if (hasRequest) {
             restoreMCMs[mcmIndex].settingActions.push_back(std::move(requestAction));

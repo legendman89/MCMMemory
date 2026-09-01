@@ -3,23 +3,11 @@
 
 namespace MCMMemory
 {
-    // Variable is the value return by Papyrus but we don't care about it.
-    // () allows the created object to be called like a function. 
-    // See new MCMCallResult in RunNextAction.
-    void MCMCallResult::operator()(RE::BSScript::Variable)
-    {
-        auto* tasks = SKSE::GetTaskInterface();
-        if (!tasks || !task) {
-            logger::error("A completed MCM script call could not reach the game task queue");
-            return;
-        }
-        tasks->AddTask(std::move(task));
-    }
-
     bool MCMScript::Call(std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result) const
     {
         auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
         if (!vm || !script) {
+            delete a_arguments;
             return false;
         }
 

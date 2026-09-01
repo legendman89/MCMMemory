@@ -2,6 +2,7 @@
 
 #include "mcm/mcm_registry.hpp"
 #include "mcm/mcm_script.hpp"
+#include "mcm/mcm_calls.hpp"
 #include "profile/activity.hpp"
 #include "profile/profile.hpp"
 #include "profile/restore_defs.hpp"
@@ -109,6 +110,9 @@ namespace MCMMemory
 
         // Desired state used when restoring a toggle.
         bool boolValue{};
+
+        // A final retry must not repeat a setting or follow-up that already finished.
+        bool completed{};
     };
 
     // Creates an action that does not need a value.
@@ -200,9 +204,16 @@ namespace MCMMemory
         // MCM Registry gives us this live MCM script after registration.
         RE::BSTSmartPointer<RE::BSScript::Object> mcmScript;
 
+        RestoreStats previousStats;
+
         int queuedPageIndex{-1};
 
         bool hasQueuedPage{};
+
+        bool retryQueued{};
+
+        // A skipped confirmation stays incomplete even if the other settings retry successfully.
+        bool confirmationRequired{};
     };
 
     struct RegistryCheckTask
@@ -267,6 +278,20 @@ namespace MCMMemory
 
         friend struct RestoreTask;
 
+        friend struct MCMWatchTask<Restore>;
+
+        void CheckCalls(uint64_t a_loadedGameSession);
+
+        void HandleExpiredCall();
+
+        bool QueueWatch();
+
+        void FailMCM();
+
+        void CompleteMCM();
+
+        size_t FindMCMClose() const;
+
         // Finds the RestoreMCM for a setting or creates it.
         size_t GetOrAddMCM(const CapturedSetting& a_setting);
 
@@ -284,17 +309,17 @@ namespace MCMMemory
         void BuildActionQueue();
 
         // Sends one queued action to its matching MCM script.
-        bool RunAction(const RestoreAction& a_action, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result);
+        bool RunAction(const RestoreAction& a_action, SKSE::TaskInterface::TaskFn a_result);
 
         bool IsActionNeeded(const RestoreAction& a_action) const;
 
         bool IsActionValid(const RestoreAction& a_action) const;
 
         // Calls one function on a live MCM script.
-        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result);
+        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_result);
 
         // Flips a toggle only when its current state differs from the profile.
-        bool RestoreToggle(const RestoreAction& a_action, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result);
+        bool RestoreToggle(const RestoreAction& a_action, SKSE::TaskInterface::TaskFn a_result);
 
         // Schedules the next action after the requested delay.
         inline void QueueNextAction(float a_delaySeconds)
@@ -302,8 +327,7 @@ namespace MCMMemory
             const uint64_t taskID = ++scheduledTaskID;
             if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RestoreTask{ loadedGameSession, taskID }, a_delaySeconds)) {
                 logger::error("Persistent profile restore could not schedule action {}", currentActionIndex);
-                restoring = false;
-                status = OperationStatus::Idle;
+                FinishCancellation(OperationResult::Failed, callWatch.HasCall() || mcmOpen);
             }
         }
 
@@ -335,7 +359,7 @@ namespace MCMMemory
 
         void ContinueCancellation();
 
-        void FinishCancellation();
+        void FinishCancellation(OperationResult a_result = OperationResult::Cancelled, bool a_unsafe = false);
 
         // Adds the current MCM result to the full restore result.
         void FinishMCMStats(size_t a_mcmIndex, OperationResult a_result = OperationResult::Completed);
@@ -358,6 +382,12 @@ namespace MCMMemory
         MCMFilter mcmFilter;
 
         RegistryWait registryWait;
+
+        MCMCallWatch callWatch;
+
+        size_t firstActionIndex{};
+
+        size_t pendingActionIndex{ static_cast<size_t>(-1) };
 
         // Points to the next action in the final queue.
         size_t currentActionIndex{};
@@ -409,6 +439,8 @@ namespace MCMMemory
         bool mcmOpen{};
 
         bool mcmStatsRecorded{};
+
+        bool mcmFailed{};
     };
 
     inline void RegistryCheckTask::operator()() const

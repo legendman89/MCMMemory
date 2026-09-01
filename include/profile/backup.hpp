@@ -2,6 +2,7 @@
 
 #include "mcm/mcm_registry.hpp"
 #include "mcm/mcm_script.hpp"
+#include "mcm/mcm_calls.hpp"
 #include "profile/activity.hpp"
 #include "profile/profile.hpp"
 #include "profile/stats.hpp"
@@ -67,12 +68,20 @@ namespace MCMMemory
 
         friend struct BackupTask;
 
+        friend struct MCMWatchTask<Backup>;
+
+        void CheckCalls(uint64_t a_loadedGameSession);
+
+        void HandleExpiredCall();
+
+        bool QueueWatch();
+
         inline void QueueNext(float a_delaySeconds)
         {
             const uint64_t taskID = ++scheduledTaskID;
             if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(BackupTask{ loadedGameSession, taskID }, a_delaySeconds)) {
                 logger::error("Full MCM backup could not schedule its next step");
-                status = OperationStatus::Idle;
+                FinishCancellation(OperationResult::Failed, callWatch.HasCall() || mcmOpen);
             }
         }
 
@@ -102,7 +111,7 @@ namespace MCMMemory
 
         void ContinueCancellation();
 
-        void FinishCancellation();
+        void FinishCancellation(OperationResult a_result = OperationResult::Cancelled, bool a_unsafe = false);
 
         void Clear();
 
@@ -131,6 +140,10 @@ namespace MCMMemory
         Profile profile;
 
         RegistryWait registryWait;
+
+        MCMCallWatch callWatch;
+
+        size_t firstPassCount{};
 
         size_t mcmIndex{};
 

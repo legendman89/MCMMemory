@@ -1,6 +1,7 @@
 #include "menu/hud.hpp"
 #include "profile/activity.hpp"
 #include "profile/capture.hpp"
+#include "mcm/mcm_calls.hpp"
 
 namespace MCMMemory
 {
@@ -68,7 +69,7 @@ namespace MCMMemory
 
     RE::BSEventNotifyControl Capture::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
     {
-        if (!a_event) {
+        if (!a_event || MCMCallWatch::IsBusy()) {
             return RE::BSEventNotifyControl::kContinue;
         }
 
@@ -109,6 +110,9 @@ namespace MCMMemory
 
     void Capture::CompleteCapture(CaptureRequest a_request)
     {
+        if (MCMCallWatch::IsBusy()) {
+            return;
+        }
         // Find the raw record made before the menu finished updating.
         auto* record = FindRecord(a_request.eventID);
         if (!record) {

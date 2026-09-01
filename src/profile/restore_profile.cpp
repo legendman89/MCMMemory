@@ -1,4 +1,5 @@
 #include "profile/restore.hpp"
+#include "mcm/mcm_support.hpp"
 #include "utils/helper.hpp"
 
 namespace MCMMemory
@@ -167,11 +168,28 @@ namespace MCMMemory
 
         size_t supportedSettingCount{};
         size_t excludedSettingCount{};
+        MCMFilter loggedExclusions;
         for (const auto& setting : profile) {
             const auto& modID = setting.selection.identity.modID;
             const bool selected = AllowsMCM(mcmFilter, modID);
             const bool automaticEnabled = operationMode != OperationMode::Automatic || GetSettings().IsAutoRestoreEnabled(modID);
             if (!selected || !automaticEnabled) {
+                ++excludedSettingCount;
+                continue;
+            }
+            if (const auto reason = GetMCMExclusionReason(modID); !reason.empty()) {
+                if (!ContainsMCMID(loggedExclusions, modID)) {
+                    logger::info("MCM restore skipped '{}': {}; saved settings are kept", modID, reason);
+                    loggedExclusions.push_back(modID);
+                }
+                ++excludedSettingCount;
+                continue;
+            }
+            if (MCMCallWatch::IsUnavailable(modID)) {
+                if (!ContainsMCMID(loggedExclusions, modID)) {
+                    logger::warn("MCM restore skipped '{}' because its script was unresponsive earlier in this game session", modID);
+                    loggedExclusions.push_back(modID);
+                }
                 ++excludedSettingCount;
                 continue;
             }

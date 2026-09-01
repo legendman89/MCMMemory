@@ -66,6 +66,10 @@ namespace MCMMemory
             logger::error("actionTrialDelaySeconds {} is outside the supported range 0.05 through 10.0", settings.actionTrialDelaySeconds);
             return false;
         }
+        if (!(settings.scriptCallTimeoutSeconds >= 1.0F && settings.scriptCallTimeoutSeconds <= 300.0F)) {
+            logger::error("scriptCallTimeoutSeconds must be between 1 and 300 seconds");
+            return false;
+        }
 #define VALIDATE_HUD_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
         if (settings.settingName < minimum || settings.settingName > maximum) { \
             logger::error(#settingName " {} is outside the supported range {} through {}", settings.settingName, minimum, maximum); \

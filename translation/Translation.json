@@ -77,6 +77,10 @@
   "Profile.MCM.Tooltip.BackupRestore": "Select this MCM to back up or restore its settings.",
   "Profile.MCM.Tooltip.BackupOnly": "Select this MCM to back it up.",
   "Profile.MCM.Tooltip.Unavailable": "This MCM is saved in the profile but is not currently registered.",
+  "Profile.MCM.Excluded": "Excluded",
+  "Profile.MCM.Tooltip.Excluded": "Ignored by MCM Memory.",
+  "Profile.MCM.Unresponsive": "Unavailable",
+  "Profile.MCM.Tooltip.Unresponsive": "Skipped because this MCM did not finish an earlier scripted operation. Manual changes are still captured.",
 
   "Profile.MCM.Count.Registered": "registered",
   "Profile.MCM.Count.Selected": "selected",
@@ -206,6 +210,8 @@
 
   "HUD.Failure.BackupFailed": "Backup failed",
   "HUD.Failure.BackupStopped": "Backup stopped",
+  "HUD.Failure.ScriptBusy": "Another MCM operation is running, or a script did not finish safely.",
+  "HUD.Failure.RestoreIncomplete": "Some MCM settings could not be restored. See Activity and the log.",
   "HUD.Failure.RestoreFailed": "Restore failed",
   "HUD.Failure.RestoreStopped": "Restore stopped",
   "HUD.Failure.ExistingProfileUnreadable": "Existing profile could not be read",

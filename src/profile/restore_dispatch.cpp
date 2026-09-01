@@ -5,15 +5,17 @@
 
 namespace MCMMemory
 {
-    bool Restore::CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result)
+    bool Restore::CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_result)
     {
         if (a_mcmIndex >= restoreMCMs.size()) {
+            delete a_arguments;
             return false;
         }
-        return MCMScript(restoreMCMs[a_mcmIndex].mcmScript).Call(a_functionName, a_arguments, std::move(a_result));
+        const auto& mcm = restoreMCMs[a_mcmIndex];
+        return callWatch.Call(MCMScript(mcm.mcmScript), mcm.identity.modID, a_functionName, a_arguments, std::move(a_result));
     }
 
-    bool Restore::RestoreToggle(const RestoreAction& a_action, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result)
+    bool Restore::RestoreToggle(const RestoreAction& a_action, SKSE::TaskInterface::TaskFn a_result)
     {
         return CallMCMFunction(a_action.mcmIndex, RestoreActionFunctionName(a_action.type), RE::MakeFunctionArguments(int{ a_action.optionIndex }), std::move(a_result));
     }
@@ -76,7 +78,7 @@ namespace MCMMemory
         }
     }
 
-    bool Restore::RunAction(const RestoreAction& a_action, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result)
+    bool Restore::RunAction(const RestoreAction& a_action, SKSE::TaskInterface::TaskFn a_result)
     {
         if (a_action.mcmIndex >= restoreMCMs.size()) {
             return false;
@@ -88,9 +90,6 @@ namespace MCMMemory
         }
         else if (a_action.controlType == ControlType::Keymap && IsRestoreApplyAction(a_action.type)) {
             logger::debug("Profile restore calls '{}' on '{}' for '{}' (option {}, key {})", functionName, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.optionLabel, a_action.optionIndex, a_action.integerValue);
-        }
-        else {
-            logger::debug("Profile restore calls '{}' on '{}'", functionName, restoreMCMs[a_action.mcmIndex].identity.modID);
         }
         // Build the argument list expected by this script call.
         switch (GetRestoreArgumentType(a_action.type)) {

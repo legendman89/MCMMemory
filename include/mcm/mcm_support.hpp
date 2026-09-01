@@ -14,6 +14,17 @@ namespace MCMMemory
     inline constexpr std::string_view mcmHelperBaseScriptName{ "MCM_ConfigBase" };
     inline constexpr std::string_view nlMCMBaseScriptName{ "nl_mcm" };
 
+    inline std::string_view GetMCMExclusionReason(std::string_view a_modID)
+    {
+        // Match the script, not a name the player can rename or translate.
+        constexpr std::string_view checklistScript{ "dbm_dynamicmcmscript" };
+        const auto scriptName = a_modID.substr(0, a_modID.find("::"));
+        if (scriptName.size() == checklistScript.size() && ContainsCaseInsensitive(scriptName, checklistScript)) {
+            return "LOTD Checklist is ignored because it displays dynamic checklist status rather than configurable settings";
+        }
+        return {};
+    }
+
     // NL_MCM still uses SkyUI controls, but each page owns its setting states.
     struct NLMCMSupport
     {

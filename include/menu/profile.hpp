@@ -1,6 +1,7 @@
 #pragma once
 
-#include "mcm/mcm_registry.hpp"
+#include "mcm/mcm_support.hpp"
+#include "mcm/mcm_calls.hpp"
 #include "menu/menu.hpp"
 #include "profile/types.hpp"
 
@@ -8,6 +9,15 @@ namespace MCMMemory::Menu
 {
     struct ProfileMCMRow
     {
+        bool CanSelect() const
+        {
+            return available && !IsExcluded() && !IsUnresponsive();
+        }
+
+        bool IsExcluded() const { return !GetMCMExclusionReason(identity.modID).empty(); }
+
+        bool IsUnresponsive() const { return unresponsive; }
+
         MCMIdentity identity;
 
         uint32_t settingCount{};
@@ -15,6 +25,8 @@ namespace MCMMemory::Menu
         bool available{};
 
         bool selected{};
+
+        bool unresponsive{};
     };
 
     struct SelectedMCMFilters
@@ -112,6 +124,8 @@ namespace MCMMemory::Menu
         std::chrono::steady_clock::time_point nextRegistryRefresh{};
 
         uint64_t registryCacheGeneration{};
+
+        uint64_t unavailableGeneration{};
 
         std::array<char, 128> search{};
 

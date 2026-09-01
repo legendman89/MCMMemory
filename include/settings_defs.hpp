@@ -13,6 +13,8 @@
 #define FOREACH_SETTING(SETTING) \
     /* Controls how often backup checks a script that has not finished updating its buffers. */ \
     SETTING(float, actionTrialDelaySeconds, 0.5F) \
+    /* Times out each awaited Papyrus call before recovery starts. */ \
+    SETTING(float, scriptCallTimeoutSeconds, 30.0F) \
     FOREACH_HUD_SETTING(SETTING) \
     /* Keeps the profile updated when an MCM setting changes. */ \
     SETTING(bool, autoBackup, true) \
@@ -21,5 +23,7 @@
     FOREACH_NOTIFICATION_TOGGLE_SETTING(SETTING) \
     /* Lets COC start a temporary game session when testing from the main menu. */ \
     SETTING(bool, allowCOCForTesting, false) \
+    /* Makes one matching MCM call appear unresponsive for testing recovery. */ \
+    SETTING(std::string, testUnresponsiveMCM, std::string{}) \
     /* Controls whether Capture.json includes extra MCM menu data for debugging. */ \
     SETTING(bool, captureRawRecords, false)

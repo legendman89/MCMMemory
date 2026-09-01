@@ -165,6 +165,11 @@ namespace MCMMemory
 
     bool Capture::ProcessCapturedEvent(CaptureRecord& a_record)
     {
+        if (const auto reason = GetMCMExclusionReason(a_record.selection.identity.modID); !reason.empty()) {
+            logger::debug("Skipped capture {}: {}", a_record.eventID, reason);
+            return true;
+        }
+
         // Turn a raw callback into one setting that can be restored later.
         CapturedSetting setting;
         setting.sourceEventID = a_record.eventID;

@@ -18,18 +18,6 @@ namespace MCMMemory
         ControlType::Input
     };
 
-    struct MCMCallResult : public RE::BSScript::IStackCallbackFunctor
-    {
-        // Runs the next backup or restore step after the Papyrus call finishes.
-        SKSE::TaskInterface::TaskFn task;
-
-        explicit MCMCallResult(SKSE::TaskInterface::TaskFn a_task) : task(std::move(a_task)) {}
-
-        void operator()(RE::BSScript::Variable a_result) override;
-
-        void SetObject(const RE::BSTSmartPointer<RE::BSScript::Object>&) override {}
-    };
-
     class MCMScript
     {
     public:

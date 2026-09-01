@@ -4,6 +4,7 @@
 
 #include "menu/hud.hpp"
 #include "mcm/mcm_support.hpp"
+#include "mcm/mcm_calls.hpp"
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "profile/restore.hpp"
@@ -36,6 +37,7 @@ namespace MCMMemory
             Backup::GetSingleton()->Reset();
             Capture::GetSingleton()->Reset();
             Restore::GetSingleton()->Reset(a_autoRestoreAllowed);
+            MCMCallWatch::ResetSession();
             SetGameLoaded(true);
             logger::info("Game session started from {}; automatic restore allowed = {}", a_reason, a_autoRestoreAllowed);
         }

@@ -6,6 +6,7 @@
 #include "profile/restore.hpp"
 #include "profile/activity.hpp"
 #include "mcm/mcm_registry.hpp"
+#include "mcm/mcm_messages.hpp"
 
 #include "debug/coc_test.hpp"
 
@@ -36,6 +37,7 @@ namespace MCMMemory
                     logger::error("MCM Memory could not save its selected profile");
                 }
                 MCMRegistry::Install();
+                MCMMessages::Install();
                 HUD::GetSingleton()->Configure(GetSettings());
                 if (!Activity::GetSingleton()->Load()) {
                     logger::error("MCM Memory activity history could not be loaded");

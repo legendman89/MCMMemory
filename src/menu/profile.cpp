@@ -1,6 +1,5 @@
 #include "menu/profile.hpp"
 
-#include "mcm/mcm_support.hpp"
 #include "menu/icons.hpp"
 #include "menu/translate.hpp"
 #include "profile/backup.hpp"
@@ -135,6 +134,9 @@ namespace MCMMemory::Menu
         if (MCMRegistry::CacheGeneration() != registryCacheGeneration) {
             return true;
         }
+        if (MCMCallWatch::UnavailableGeneration() != unavailableGeneration) {
+            return true;
+        }
 
         std::error_code error;
         const bool exists = std::filesystem::exists(ProfileStorage::Path(), error);
@@ -151,7 +153,7 @@ namespace MCMMemory::Menu
     {
         SelectedMCMFilters selectedMCMs;
         for (const auto& mcm : mcms) {
-            if (mcm.selected) {
+            if (mcm.selected && mcm.CanSelect()) {
                 selectedMCMs.backup.push_back(mcm.identity.modID);
                 if (mcm.settingCount > 0) {
                     selectedMCMs.restore.push_back(mcm.identity.modID);
@@ -213,7 +215,8 @@ namespace MCMMemory::Menu
         }
         gameLoaded = currentGameLoaded;
         for (auto& mcm : mcms) {
-            if (!mcm.available) {
+            mcm.unresponsive = MCMCallWatch::IsUnavailable(mcm.identity.modID);
+            if (!mcm.CanSelect()) {
                 mcm.selected = false;
             }
         }
@@ -223,6 +226,7 @@ namespace MCMMemory::Menu
         }
         nextRegistryRefresh = std::chrono::steady_clock::now() + registryRefreshInterval;
         registryCacheGeneration = MCMRegistry::CacheGeneration();
+        unavailableGeneration = MCMCallWatch::UnavailableGeneration();
         loaded = true;
     }
 
@@ -240,7 +244,7 @@ namespace MCMMemory::Menu
                 mcm.selected = false;
                 continue;
             }
-            if (mcm.available && IsVisible(mcm)) {
+            if (mcm.CanSelect() && IsVisible(mcm)) {
                 mcm.selected = true;
             }
         }
@@ -530,11 +534,13 @@ namespace MCMMemory::Menu
             }
 
             GUI::PushID(mcm.identity.modID.c_str());
+            const bool excluded = mcm.IsExcluded();
+            const bool unresponsive = mcm.IsUnresponsive();
 
             GUI::TableNextRow();
 
             GUI::TableSetColumnIndex(0);
-            GUI::BeginDisabled(!mcm.available || !a_operationAvailable);
+            GUI::BeginDisabled(!mcm.CanSelect() || !a_operationAvailable);
 
             CenterNextItem(GUI::GetFrameHeight());
             GUI::Checkbox("##Selected", std::addressof(mcm.selected));
@@ -544,7 +550,13 @@ namespace MCMMemory::Menu
 
             GUI::TableSetColumnIndex(1);
             const auto modName = GetDisplayModName(mcm.identity.modName);
-            if (mcm.selected) {
+            if (excluded) {
+                GUI::TextDisabled("%s (%s)", modName.c_str(), Trans::Tr("Profile.MCM.Excluded").c_str());
+            }
+            else if (unresponsive) {
+                GUI::TextDisabled("%s (%s)", modName.c_str(), Trans::Tr("Profile.MCM.Unresponsive").c_str());
+            }
+            else if (mcm.selected) {
                 GUI::TextColored(Color::kCountNumber, "%s", modName.c_str());
             }
             else if (mcm.available) {
@@ -553,7 +565,13 @@ namespace MCMMemory::Menu
             else {
                 GUI::TextDisabled("%s", modName.c_str());
             }
-            if (mcm.available && mcm.settingCount > 0) {
+            if (excluded) {
+                WrappedTooltip(Trans::Tr("Profile.MCM.Tooltip.Excluded").c_str());
+            }
+            else if (unresponsive) {
+                WrappedTooltip(Trans::Tr("Profile.MCM.Tooltip.Unresponsive").c_str());
+            }
+            else if (mcm.available && mcm.settingCount > 0) {
                 WrappedTooltip(Trans::Tr("Profile.MCM.Tooltip.BackupRestore").c_str());
             }
             else if (mcm.available) {
@@ -582,12 +600,14 @@ namespace MCMMemory::Menu
             }
 
             GUI::TableSetColumnIndex(3);
-            bool autoRestore = settings.IsAutoRestoreEnabled(mcm.identity.modID);
+            bool autoRestore = !excluded && !unresponsive && settings.IsAutoRestoreEnabled(mcm.identity.modID);
+            GUI::BeginDisabled(excluded || unresponsive);
             CenterNextItem(GUI::GetFrameHeight());
             if (GUI::Checkbox("##AutoRestore", std::addressof(autoRestore))) {
                 settings.SetAutoRestoreEnabled(mcm.identity.modID, autoRestore);
                 settingsChanged = true;
             }
+            GUI::EndDisabled();
             WrappedTooltip(Trans::Tr("Profile.MCM.Column.AutoRestore.Tooltip").c_str());
             GUI::PopID();
         }

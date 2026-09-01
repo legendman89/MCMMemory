@@ -39,6 +39,14 @@ namespace MCMMemory
 #undef ADD_STAT
             return *this;
         }
+
+        BackupStats& operator-=(const BackupStats& a_other)
+        {
+#define SUBTRACT_STAT(name) name -= a_other.name;
+            FOREACH_BACKUP_STAT(SUBTRACT_STAT)
+#undef SUBTRACT_STAT
+            return *this;
+        }
     };
 
     struct RestoreStats
@@ -57,6 +65,14 @@ namespace MCMMemory
 #define ADD_STAT(name) name += a_other.name;
             FOREACH_RESTORE_STAT(ADD_STAT)
 #undef ADD_STAT
+            return *this;
+        }
+
+        RestoreStats& operator-=(const RestoreStats& a_other)
+        {
+#define SUBTRACT_STAT(name) name -= a_other.name;
+            FOREACH_RESTORE_STAT(SUBTRACT_STAT)
+#undef SUBTRACT_STAT
             return *this;
         }
     };

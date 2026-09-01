@@ -58,6 +58,32 @@ namespace MCMMemory
         OperationResult result{ OperationResult::Completed };
     };
 
+    inline OperationResult MCMResultsStatus(const std::vector<ActivityModResult>& a_results)
+    {
+        for (const auto& result : a_results) {
+            if (result.result != OperationResult::Completed) {
+                return OperationResult::Failed;
+            }
+        }
+        return OperationResult::Completed;
+    }
+
+    // A final retry replaces the earlier attempt instead of counting the MCM twice.
+    template <class Stats>
+    inline void UpdateMCMResult(std::vector<ActivityModResult>& a_results, ActivityModResult a_result, Stats ActivityModResult::* a_member, Stats& a_total)
+    {
+        for (auto& result : a_results) {
+            if (result.modID == a_result.modID) {
+                a_total -= result.*a_member;
+                a_total += a_result.*a_member;
+                result = std::move(a_result);
+                return;
+            }
+        }
+        a_total += a_result.*a_member;
+        a_results.push_back(std::move(a_result));
+    }
+
     struct ActivityEntry
     {
         std::vector<ActivityModResult> mods;

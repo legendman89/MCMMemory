@@ -27,8 +27,6 @@
 #include <vector>
 
 #include <nlohmann/json.hpp>
-#include <spdlog/sinks/basic_file_sink.h>
-
 using namespace std::literals;
 namespace logger = SKSE::log;
 

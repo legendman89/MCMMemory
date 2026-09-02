@@ -8,15 +8,9 @@ namespace MCMMemory
     nlohmann::json MCMMenu::ReadState()
     {
         nlohmann::json output = nlohmann::json::object();
-        auto ui = RE::UI::GetSingleton();
-        if (!ui) {
-            output["error"] = "UI singleton unavailable";
-            return output;
-        }
-
-        auto movie = ui->GetMovieView(RE::JournalMenu::MENU_NAME);
+        auto movie = GetOpenJournalMovie();
         if (!movie) {
-            output["error"] = "Journal Menu movie unavailable";
+            output["error"] = "Journal Menu unavailable";
             return output;
         }
 
@@ -29,12 +23,11 @@ namespace MCMMemory
     nlohmann::json MCMMenu::ReadOption(int a_optionIndex)
     {
         auto output = nlohmann::json::object();
-        auto* ui = RE::UI::GetSingleton();
-        if (a_optionIndex < 0 || !ui || !ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
+        if (a_optionIndex < 0) {
             return output;
         }
 
-        auto movie = ui->GetMovieView(RE::JournalMenu::MENU_NAME);
+        auto movie = GetOpenJournalMovie();
         if (!movie) {
             return output;
         }

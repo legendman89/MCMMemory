@@ -34,7 +34,7 @@ namespace MCMMemory
         void operator()() const;
     };
 
-    class Backup
+    class Backup : public RE::BSTEventSink<RE::MenuOpenCloseEvent>
     {
     public:
 
@@ -60,9 +60,13 @@ namespace MCMMemory
             return status;
         }
 
+        bool Install();
+
         bool Cancel();
 
         void Reset();
+
+        RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) override;
 
     private:
 
@@ -112,6 +116,8 @@ namespace MCMMemory
         void ContinueCancellation();
 
         void FinishCancellation(OperationResult a_result = OperationResult::Cancelled, bool a_unsafe = false);
+
+        void CloseJournalMenu();
 
         void Clear();
 
@@ -170,6 +176,8 @@ namespace MCMMemory
         bool mcmStarted{};
 
         bool mcmOpen{};
+
+        bool installed{};
     };
 
     inline void BackupTask::operator()() const

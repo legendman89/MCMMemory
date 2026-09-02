@@ -12,13 +12,22 @@ namespace MCMMemory
         // Reads the useful fields from the currently open MCM menu.
         static nlohmann::json ReadState();
 
-        // Reads one live row without moving the cursor. Call only from a queued game task.
+        // Reads one live row without moving the cursor. Call only from a queued UI task.
         static nlohmann::json ReadOption(int a_optionIndex);
 
         // Converts one simple Scaleform value into a JSON value.
         static std::optional<nlohmann::json> ValueToJson(const RE::GFxValue& a_value);
 
     private:
+
+        static RE::GPtr<RE::GFxMovieView> GetOpenJournalMovie()
+        {
+            auto* ui = RE::UI::GetSingleton();
+            if (!ui || !ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
+                return {};
+            }
+            return ui->GetMovieView(RE::JournalMenu::MENU_NAME);
+        }
 
         // Reads the menu paths listed in menu_fields.hpp.
         static void ReadFields(RE::GFxMovieView& a_movie, nlohmann::json& a_output);

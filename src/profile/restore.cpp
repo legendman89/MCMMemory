@@ -2,6 +2,7 @@
 #include "profile/restore.hpp"
 
 #include "mcm/mcm_support.hpp"
+#include "utils/helper.hpp"
 
 namespace MCMMemory
 {
@@ -37,6 +38,7 @@ namespace MCMMemory
         configValid = false;
         started = false;
         restoring = false;
+        waitingForCharacterCreation = false;
         registryCheckQueued = false;
         currentActionIndex = 0;
         activeMCMIndex = 0;
@@ -160,6 +162,8 @@ namespace MCMMemory
         ++loadedGameSession;
         Clear();
         autoRestoreAllowed = a_autoRestoreAllowed;
+        waitingForCharacterCreation = a_autoRestoreAllowed;
+        HUD::GetSingleton()->HideMenuWarning();
         logger::info("Persistent profile restore event reset; automatic restore allowed={}", autoRestoreAllowed);
     }
 
@@ -222,6 +226,7 @@ namespace MCMMemory
                     logger::info("Character creation opened; MCM registry checks are paused");
                 }
                 else {
+                    waitingForCharacterCreation = false;
                     logger::info("Character creation closed; MCM registry stability will be checked again");
                 }
                 if (!characterCreationOpen && configValid && !registryCheckQueued) {
@@ -257,6 +262,22 @@ namespace MCMMemory
 
         auto* ui = RE::UI::GetSingleton();
         const bool characterMenuOpen = ui && ui->IsMenuOpen(RE::RaceSexMenu::MENU_NAME);
+        if (operationMode == OperationMode::Automatic && waitingForCharacterCreation) {
+            if (characterMenuOpen) {
+                characterCreationOpen = true;
+            }
+            else if (characterCreationOpen) {
+                characterCreationOpen = false;
+                waitingForCharacterCreation = false;
+                registryWait.Reset();
+                logger::info("Character creation has closed; starting the MCM registry stability check");
+            }
+
+            if (waitingForCharacterCreation) {
+                QueueRegistryCheck(registryCheckDelaySeconds);
+                return;
+            }
+        }
         if (characterMenuOpen) {
             if (!characterCreationOpen) {
                 logger::info("Character creation is open; MCM registry checks are paused");
@@ -372,7 +393,7 @@ namespace MCMMemory
         callWatch.Release();
         restoring = false;
         status = OperationStatus::Idle;
-        HUD::GetSingleton()->HideRestoreMenuWarning();
+        HUD::GetSingleton()->HideMenuWarning();
         logger::info("Persistent profile restoration completed: {} applied, {} unchanged, {} skipped", stats.appliedSettingCount, stats.unchangedSettingCount, stats.skippedSettingCount);
         const auto result = MCMResultsStatus(activityMods);
         Activity::GetSingleton()->RecordRestore(operationMode, stats, activityMods, result);
@@ -477,14 +498,12 @@ namespace MCMMemory
 
     void Restore::CloseJournalMenu()
     {
-        auto* messages = RE::UIMessageQueue::GetSingleton();
-        if (!messages) {
+        if (!RequestJournalMenuClose()) {
             logger::error("Persistent profile restore could not close the Journal Menu");
             return;
         }
 
-        messages->AddMessage(RE::JournalMenu::MENU_NAME.data(), RE::UI_MESSAGE_TYPE::kHide, nullptr);
-        HUD::GetSingleton()->ShowRestoreMenuWarning();
+        HUD::GetSingleton()->ShowMenuWarning("HUD.Warning.Restore.Detail");
         logger::warn("Journal Menu opened during profile restore and was closed");
     }
 
@@ -687,7 +706,7 @@ namespace MCMMemory
         status = OperationStatus::Idle;
         callWatch.Release(a_unsafe);
         mcmOpen = false;
-        HUD::GetSingleton()->HideRestoreMenuWarning();
+        HUD::GetSingleton()->HideMenuWarning();
         Activity::GetSingleton()->RecordRestore(operationMode, stats, activityMods, a_result);
         if (a_unsafe || a_result == OperationResult::Failed) {
             HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreStopped", a_unsafe ? "HUD.Failure.ScriptBusy" : "HUD.Failure.RestoreIncomplete");

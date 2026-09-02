@@ -21,7 +21,7 @@ namespace MCMMemory
         }
 
         try {
-            auto document = nlohmann::json::parse(stream);
+            auto document = JSON::DecodeDocumentText(nlohmann::json::parse(stream));
             if (!document.is_object()) {
                 logger::error("Profile root is not an object in {}", ToUTF8(path));
                 return false;

@@ -38,7 +38,7 @@ namespace MCMMemory
         }
 
         try {
-            auto document = nlohmann::json::parse(stream);
+            auto document = JSON::DecodeDocumentText(nlohmann::json::parse(stream));
             JSON::ReadValue(document, "activeProfile", settings.activeProfile);
             JSON::ReadValue(document, "autoRestoreExcludedMCMs", settings.autoRestoreExcludedMCMs);
 #define READ_SETTING(type, name, defaultValue, ...) JSON::ReadValue(document, #name, settings.name);

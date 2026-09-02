@@ -35,6 +35,7 @@
   "Profile.Action.Delete.Tooltip": "Delete the active profile. At least one profile is always kept.",
   "Profile.Action.BackUpNow.Tooltip": "Back up every registered MCM to the active profile.",
   "Profile.Action.RestoreNow.Tooltip": "Restore every available MCM saved in the active profile.",
+  "Profile.Action.JournalMenuOpen.Tooltip": "Close the Journal Menu first to protect backup and restore operations.",
   "Profile.Action.CancelBackup.Tooltip": "Stop after the current safe point. The existing profile will not be replaced.",
   "Profile.Action.CancelRestore.Tooltip": "Settings already restored will not be reverted.",
 
@@ -223,5 +224,6 @@
   "HUD.Failure.NoMatchingMCMs": "No matching MCMs were available",
 
   "HUD.Warning.Title": "Game menu closed",
-  "HUD.Warning.Detail": "MCM restore is still running"
+  "HUD.Warning.Backup.Detail": "MCM backup is still running. Cancel or wait till completion.",
+  "HUD.Warning.Restore.Detail": "MCM restore is still running. Cancel or wait till completion."
 }

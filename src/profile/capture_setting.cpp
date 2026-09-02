@@ -157,9 +157,10 @@ namespace MCMMemory
         a_setting.selection.optionIndex = *index;
         a_setting.optionLabel = a_record.control->optionLabel;
         a_setting.stateName = a_record.control->stateName;
-        a_setting.value = *value != 0.0;
+        const bool enabled = *value != 0.0;
+        a_setting.value = enabled;
         a_setting.valueSource = "menu.option.numValue";
-        logger::info("Finished toggle capture {}: mod='{}', option='{}', state='{}', value={}", a_record.eventID, a_setting.selection.identity.modName, a_setting.optionLabel, a_setting.stateName, a_setting.value.dump());
+        logger::info("Finished toggle capture {}: mod='{}', option='{}', state='{}', value={}", a_record.eventID, a_setting.selection.identity.modName, a_setting.optionLabel, a_setting.stateName, enabled);
         return true;
     }
 

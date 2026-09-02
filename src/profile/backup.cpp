@@ -9,6 +9,25 @@ namespace MCMMemory
     // Buffer checks are separate from the deadline for a Papyrus call to return.
     inline constexpr uint32_t maximumScriptWaitChecks{ 5 };
 
+    bool Backup::Install()
+    {
+        std::lock_guard lock(backupMutex);
+        if (installed) {
+            return true;
+        }
+
+        auto* ui = RE::UI::GetSingleton();
+        if (!ui) {
+            logger::error("Full MCM backup could not find the menu event source");
+            return false;
+        }
+
+        ui->AddEventSink<RE::MenuOpenCloseEvent>(this);
+        installed = true;
+        logger::info("Full MCM backup menu protection installed");
+        return true;
+    }
+
     bool Backup::Begin(MCMFilter a_filter)
     {
         std::lock_guard lock(backupMutex);
@@ -78,7 +97,21 @@ namespace MCMMemory
         std::lock_guard lock(backupMutex);
         ++loadedGameSession;
         Clear();
+        HUD::GetSingleton()->HideMenuWarning();
         logger::info("Full MCM backup reset");
+    }
+
+    RE::BSEventNotifyControl Backup::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
+    {
+        if (!a_event || !a_event->opening || std::string_view(a_event->menuName.c_str()) != RE::JournalMenu::MENU_NAME) {
+            return RE::BSEventNotifyControl::kContinue;
+        }
+
+        std::lock_guard lock(backupMutex);
+        if (status != OperationStatus::Idle) {
+            CloseJournalMenu();
+        }
+        return RE::BSEventNotifyControl::kContinue;
     }
 
     bool Backup::Cancel()
@@ -540,6 +573,7 @@ namespace MCMMemory
         if (!ProfileStorage::Save(profile)) {
             logger::error("Full MCM backup failed to save its completed profile");
             HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", "HUD.Failure.ProfileUnchanged");
+            HUD::GetSingleton()->HideMenuWarning();
             status = OperationStatus::Idle;
             callWatch.Release();
             return;
@@ -548,6 +582,7 @@ namespace MCMMemory
         logger::info("Full MCM backup completed: {} settings from {} MCMs, {} skipped, {} MCMs failed", stats.settingCount, stats.MCMCount, stats.skippedSettingCount, stats.failedMCMCount);
         Activity::GetSingleton()->RecordBackup(OperationMode::Manual, stats, activityMods, MCMResultsStatus(activityMods));
         HUD::GetSingleton()->ShowBackupSummary(stats);
+        HUD::GetSingleton()->HideMenuWarning();
         status = OperationStatus::Idle;
         callWatch.Release();
     }
@@ -586,6 +621,7 @@ namespace MCMMemory
         status = OperationStatus::Idle;
         callWatch.Release(a_unsafe);
         mcmOpen = false;
+        HUD::GetSingleton()->HideMenuWarning();
         Activity::GetSingleton()->RecordBackup(OperationMode::Manual, stats, activityMods, a_result);
         if (a_unsafe || a_result == OperationResult::Failed) {
             HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupStopped", a_unsafe ? "HUD.Failure.ScriptBusy" : "HUD.Failure.ProfileUnchanged");
@@ -594,5 +630,16 @@ namespace MCMMemory
             HUD::GetSingleton()->ShowBackupCancelled(stats);
         }
         logger::info("Full MCM backup ended ({}): {} settings read from {} MCMs; the existing profile was not changed", OperationResultName(a_result), stats.settingCount, stats.MCMCount);
+    }
+
+    void Backup::CloseJournalMenu()
+    {
+        if (!RequestJournalMenuClose()) {
+            logger::error("Full MCM backup could not close the Journal Menu");
+            return;
+        }
+
+        HUD::GetSingleton()->ShowMenuWarning("HUD.Warning.Backup.Detail");
+        logger::warn("Journal Menu opened during profile backup and was closed");
     }
 }

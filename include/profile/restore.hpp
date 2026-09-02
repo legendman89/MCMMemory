@@ -425,6 +425,9 @@ namespace MCMMemory
         // Keeps the Journal Menu closed until the final script call finishes.
         bool restoring{};
 
+        // A new game must finish character creation before automatic restore can inspect the registry.
+        bool waitingForCharacterCreation{};
+
         // Prevents repeated ready events from queuing the same registry check.
         bool registryCheckQueued{};
 

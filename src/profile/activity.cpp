@@ -26,7 +26,7 @@ namespace MCMMemory
         std::deque<ActivityEntry> loadedEntries;
         uint64_t loadedNextID{ 1 };
         try {
-            const auto document = nlohmann::json::parse(stream);
+            const auto document = JSON::DecodeDocumentText(nlohmann::json::parse(stream));
             int formatVersion{};
             if (!document.is_object() || !JSON::ReadValue(document, "formatVersion", formatVersion) || formatVersion != 1 ||
                 !document.contains("entries") || !document["entries"].is_array()) {

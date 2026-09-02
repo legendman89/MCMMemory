@@ -49,6 +49,7 @@ namespace MCMMemory
         ++loadedGameSession;
         eventCount = 0;
         menuOpenedEventID = 0;
+        journalMenuOpen = false;
         selection = {};
         mcmIdentities.clear();
         records.clear();
@@ -157,11 +158,14 @@ namespace MCMMemory
 
         std::scoped_lock lock(captureMutex);
         if (a_event->opening) {
+            journalMenuOpen = true;
             menuOpenedEventID = eventCount;
             pendingAutoBackupSettings.clear();
             logger::info("Journal Menu opened; watching for MCM configuration events");
         }
         else {
+            journalMenuOpen = false;
+            menuOpenedEventID = eventCount;
             if (!records.empty()) {
                 CaptureStorage::Save(records, settings, GetSettings().captureRawRecords);
             }

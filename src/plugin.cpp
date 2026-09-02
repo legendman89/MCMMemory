@@ -2,6 +2,7 @@
 #include "menu/menu.hpp"
 #include "utils/logger.hpp"
 #include "profile/capture.hpp"
+#include "profile/backup.hpp"
 #include "profile/profiles.hpp"
 #include "profile/restore.hpp"
 #include "profile/activity.hpp"
@@ -24,6 +25,10 @@ namespace MCMMemory
 
         switch (a_message->type) {
 
+            case SKSE::MessagingInterface::kPostLoad:
+                Menu::Register();
+                break;
+
             case SKSE::MessagingInterface::kDataLoaded:
                 if (!MCMRegistry::IsSkyUIAvailable()) {
                     logger::critical("SkyUI is required, but its MCM manager quest is unavailable");
@@ -42,6 +47,7 @@ namespace MCMMemory
                 if (!Activity::GetSingleton()->Load()) {
                     logger::error("MCM Memory activity history could not be loaded");
                 }
+                Backup::GetSingleton()->Install();
                 Capture::GetSingleton()->Install();
                 Restore::GetSingleton()->Install();
                 if (GetSettings().allowCOCForTesting) {
@@ -77,8 +83,6 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
         logger::critical("Failed to register SKSE message listener");
         return false;
     }
-
-    MCMMemory::Menu::Register();
 
     logger::info("{} plugin is loaded", BEAUTIFUL_NAME);
 

@@ -257,7 +257,9 @@ namespace MCMMemory::Menu
         const auto backupStatus = backup->GetStatus();
         const auto restoreStatus = restore->GetStatus();
         const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
-        const bool operationAvailable = IsGameLoaded() && !operationRunning && !createProfileWindow.open && !deleteProfileWindow.open;
+        const bool journalMenuOpen = IsJournalMenuOpen();
+        const bool journalBlocksOperation = !operationRunning && journalMenuOpen;
+        const bool operationAvailable = IsGameLoaded() && !operationRunning && !journalMenuOpen && !createProfileWindow.open && !deleteProfileWindow.open;
         std::string backupLabel = Trans::Tr("Profile.Action.BackUpNow");
         std::string restoreLabel = Trans::Tr("Profile.Action.RestoreNow");
         unsigned backupIcon = Icons::kSave;
@@ -296,7 +298,8 @@ namespace MCMMemory::Menu
                 backup->Start();
             }
         }
-        WrappedTooltip(Trans::Tr(backupStatus == OperationStatus::Idle ? "Profile.Action.BackUpNow.Tooltip" : "Profile.Action.CancelBackup.Tooltip").c_str());
+        const auto backupTooltip = backupStatus == OperationStatus::Idle && journalBlocksOperation ? "Profile.Action.JournalMenuOpen.Tooltip" : backupStatus == OperationStatus::Idle ? "Profile.Action.BackUpNow.Tooltip" : "Profile.Action.CancelBackup.Tooltip";
+        WrappedTooltip(Trans::Tr(backupTooltip).c_str());
 
         GUI::SameLine(0.0F, 14.0F);
         if (IconCTAButton(restoreLabel.c_str(), restoreEnabled, restoreIcon, *restoreColors, GUI::ImVec2{ a_restoreWidth, 0.0F })) {
@@ -307,7 +310,8 @@ namespace MCMMemory::Menu
                 restore->Start();
             }
         }
-        WrappedTooltip(Trans::Tr(restoreStatus == OperationStatus::Idle ? "Profile.Action.RestoreNow.Tooltip" : "Profile.Action.CancelRestore.Tooltip").c_str());
+        const auto restoreTooltip = restoreStatus == OperationStatus::Idle && journalBlocksOperation ? "Profile.Action.JournalMenuOpen.Tooltip" : restoreStatus == OperationStatus::Idle ? "Profile.Action.RestoreNow.Tooltip" : "Profile.Action.CancelRestore.Tooltip";
+        WrappedTooltip(Trans::Tr(restoreTooltip).c_str());
     }
 
     void ProfileMenu::RenderCreateProfileWindow()
@@ -647,7 +651,9 @@ namespace MCMMemory::Menu
 
         const auto backupStatus = Backup::GetSingleton()->GetStatus();
         const auto restoreStatus = Restore::GetSingleton()->GetStatus();
+        const bool journalMenuOpen = IsJournalMenuOpen();
         const bool operationAvailable = IsGameLoaded() && backupStatus == OperationStatus::Idle && restoreStatus == OperationStatus::Idle;
+        const bool journalBlocksOperation = operationAvailable && journalMenuOpen;
         const auto backupLabel = Trans::Tr("Profile.MCM.BackUpSelected");
         const auto restoreLabel = Trans::Tr("Profile.MCM.RestoreSelected");
 
@@ -675,8 +681,8 @@ namespace MCMMemory::Menu
         HelpMarker(Trans::Tr("Profile.MCM.HideUnavailable.Tooltip").c_str());
 
         const auto selectedMCMs = ReadSelectedMCMs();
-        const bool selectedBackupAvailable = operationAvailable && !selectedMCMs.backup.empty();
-        const bool selectedRestoreAvailable = operationAvailable && !selectedMCMs.restore.empty();
+        const bool selectedBackupAvailable = operationAvailable && !journalMenuOpen && !selectedMCMs.backup.empty();
+        const bool selectedRestoreAvailable = operationAvailable && !journalMenuOpen && !selectedMCMs.restore.empty();
 
         GUI::SameLine(0.0F, 18.0F);
 
@@ -687,14 +693,14 @@ namespace MCMMemory::Menu
         if (IconCTAButton(backupLabel.c_str(), selectedBackupAvailable, Icons::kSave, Color::kBackupButtonColors)) {
             Backup::GetSingleton()->StartSelected(selectedMCMs.backup);
         }
-        WrappedTooltip(Trans::Tr("Profile.MCM.BackUpSelected.Tooltip").c_str());
+        WrappedTooltip(Trans::Tr(journalBlocksOperation ? "Profile.Action.JournalMenuOpen.Tooltip" : "Profile.MCM.BackUpSelected.Tooltip").c_str());
 
         GUI::SameLine(0.0F, 14.0F);
 
         if (IconCTAButton(restoreLabel.c_str(), selectedRestoreAvailable, Icons::kRestore, Color::kRestoreButtonColors)) {
             Restore::GetSingleton()->StartSelected(selectedMCMs.restore);
         }
-        WrappedTooltip(Trans::Tr("Profile.MCM.RestoreSelected.Tooltip").c_str());
+        WrappedTooltip(Trans::Tr(journalBlocksOperation ? "Profile.Action.JournalMenuOpen.Tooltip" : "Profile.MCM.RestoreSelected.Tooltip").c_str());
 
         GUI::Spacing();
 

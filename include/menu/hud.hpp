@@ -108,6 +108,8 @@ namespace MCMMemory
 
     struct HUDWarning
     {
+        std::string detailKey;
+
         std::chrono::steady_clock::time_point startedAt{};
 
         std::chrono::steady_clock::time_point pausedAt{};
@@ -116,6 +118,7 @@ namespace MCMMemory
 
         void Reset()
         {
+            detailKey.clear();
             startedAt = {};
             pausedAt = {};
             active = false;
@@ -180,9 +183,9 @@ namespace MCMMemory
 
         void ShowFailure(std::string_view a_titleKey, std::string_view a_detailKey);
 
-        void ShowRestoreMenuWarning();
+        void ShowMenuWarning(std::string_view a_detailKey);
 
-        void HideRestoreMenuWarning();
+        void HideMenuWarning();
 
         void Preview();
 
@@ -251,9 +254,9 @@ namespace MCMMemory
 
         void DrawMessage(const HUDMessage& a_message, float a_alpha) const;
 
-        void UpdateRestoreMenuWarning(bool a_blocked, const std::chrono::steady_clock::time_point& a_now);
+        void UpdateMenuWarning(bool a_blocked, const std::chrono::steady_clock::time_point& a_now);
 
-        void DrawRestoreMenuWarning(float a_alpha) const;
+        void DrawMenuWarning(float a_alpha) const;
 
         std::mutex hudMutex;
 

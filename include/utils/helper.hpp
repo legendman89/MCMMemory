@@ -73,4 +73,20 @@ namespace MCMMemory
         }
         return modName;
     }
+
+    inline bool IsJournalMenuOpen()
+    {
+        auto* ui = RE::UI::GetSingleton();
+        return ui && ui->IsMenuOpen(RE::JournalMenu::MENU_NAME);
+    }
+
+    inline bool RequestJournalMenuClose()
+    {
+        auto* messages = RE::UIMessageQueue::GetSingleton();
+        if (!messages) {
+            return false;
+        }
+        messages->AddMessage(RE::JournalMenu::MENU_NAME.data(), RE::UI_MESSAGE_TYPE::kHide, nullptr);
+        return true;
+    }
 }

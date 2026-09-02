@@ -210,15 +210,16 @@ namespace MCMMemory
         QueueFailure(std::move(message));
     }
 
-    void HUD::ShowRestoreMenuWarning()
+    void HUD::ShowMenuWarning(std::string_view a_detailKey)
     {
         std::lock_guard lock(hudMutex);
+        warning.detailKey = a_detailKey;
         warning.startedAt = {};
         warning.pausedAt = {};
         warning.active = true;
     }
 
-    void HUD::HideRestoreMenuWarning()
+    void HUD::HideMenuWarning()
     {
         std::lock_guard lock(hudMutex);
         warning.Reset();
@@ -444,7 +445,7 @@ namespace MCMMemory
         }
     }
 
-    void HUD::UpdateRestoreMenuWarning(bool a_blocked, const std::chrono::steady_clock::time_point& a_now)
+    void HUD::UpdateMenuWarning(bool a_blocked, const std::chrono::steady_clock::time_point& a_now)
     {
         if (!warning.active) {
             return;
@@ -471,10 +472,10 @@ namespace MCMMemory
 
         const float fadeSeconds = std::min(options.fadeSeconds, options.warningDurationSeconds);
         const float fadeAt = options.warningDurationSeconds - fadeSeconds;
-        DrawRestoreMenuWarning(FadeAlpha(age, fadeAt, fadeSeconds));
+        DrawMenuWarning(FadeAlpha(age, fadeAt, fadeSeconds));
     }
 
-    void HUD::DrawRestoreMenuWarning(float a_alpha) const
+    void HUD::DrawMenuWarning(float a_alpha) const
     {
         if (a_alpha <= 0.0F) {
             return;
@@ -488,7 +489,7 @@ namespace MCMMemory
         }
 
         const auto title = Trans::Tr("HUD.Warning.Title");
-        const auto detail = Trans::Tr("HUD.Warning.Detail");
+        const auto detail = Trans::Tr(warning.detailKey);
         const GUI::ImVec2 titleSize = GUI::CalcTextSize(title.c_str(), nullptr, false, 0.0F);
         const GUI::ImVec2 detailSize = GUI::CalcTextSize(detail.c_str(), nullptr, false, 0.0F);
         const float textWidth = std::max(titleSize.x, detailSize.x);
@@ -531,7 +532,7 @@ namespace MCMMemory
         const bool menuOpen = menuWindow && menuWindow->IsOpen.load(std::memory_order_relaxed);
 
         std::lock_guard lock(hudMutex);
-        UpdateRestoreMenuWarning(blocked && !menuOpen, now);
+        UpdateMenuWarning(blocked && !menuOpen, now);
         if (!enabled.load(std::memory_order_relaxed)) {
             return;
         }

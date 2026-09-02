@@ -6,13 +6,6 @@ namespace MCMMemory
 {
     bool CaptureStorage::Save(const std::vector<CaptureRecord>& a_records, const std::vector<CapturedSetting>& a_settings, bool a_includeRawRecords)
     {
-        std::error_code error;
-        std::filesystem::create_directories(GetPluginDataPath(), error);
-        if (error) {
-            logger::error("Failed to create capture directory: {}", error.message());
-            return false;
-        }
-
         nlohmann::json document;
         document["formatVersion"] = 1;
         document["purpose"] = "Current-session MCM registry capture debugging";
@@ -28,13 +21,9 @@ namespace MCMMemory
             document["settings"].push_back(JSON::ToJson(setting));
         }
 
-        std::ofstream stream(Path(), std::ios::trunc);
-        if (!stream) {
-            logger::error("Failed to open capture file: {}", ToUTF8(Path()));
+        if (!JSON::WriteFile(Path(), document)) {
             return false;
         }
-
-        stream << document.dump(2);
         logger::info("Saved {} settings and {} raw records to {}", a_settings.size(), a_includeRawRecords ? a_records.size() : 0, ToUTF8(Path()));
         return true;
     }

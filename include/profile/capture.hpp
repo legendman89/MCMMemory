@@ -90,23 +90,23 @@ namespace MCMMemory
         // Leaves the current Scaleform callback before reading the menu.
         inline void QueueMenuRead(CaptureRequest a_request)
         {
-            if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(ReadCaptureTask{ a_request }, 0.0F)) {
-                logger::error("Captured MCM event {} could not reach the game task queue", a_request.eventID);
+            if (!Scheduler::GetSingleton()->ScheduleUIAfterFrames(ReadCaptureTask{ a_request }, 0)) {
+                logger::error("Captured MCM event {} could not reach the UI task queue", a_request.eventID);
             }
         }
 
         // Schedules the second menu read after SkyUI updates the control.
         inline void QueueCaptureCompletion(CaptureRequest a_request, uint32_t a_delayFrames)
         {
-            if (!Scheduler::GetSingleton()->ScheduleAfterFrames(FinishCaptureTask{ a_request }, a_delayFrames)) {
+            if (!Scheduler::GetSingleton()->ScheduleUIAfterFrames(FinishCaptureTask{ a_request }, a_delayFrames)) {
                 logger::error("Captured MCM event {} could not schedule its completion", a_request.eventID);
             }
         }
 
-        // Checks the loaded game session before accessing the menu.
+        // Checks the loaded game session and Journal Menu visit before accessing Scaleform.
         inline bool IsCurrentRequest(const CaptureRequest& a_request) const
         {
-            return a_request.loadedGameSession == loadedGameSession && a_request.eventID > menuOpenedEventID;
+            return journalMenuOpen && a_request.loadedGameSession == loadedGameSession && a_request.eventID > menuOpenedEventID;
         }
 
         inline void ReadMenuIfCurrentSession(const CaptureRequest& a_request)
@@ -207,6 +207,9 @@ namespace MCMMemory
 
         // Prevents the event listeners from being installed twice.
         bool installed{};
+
+        // Rejects delayed reads after the Journal Menu closes.
+        bool journalMenuOpen{};
 
     };
 

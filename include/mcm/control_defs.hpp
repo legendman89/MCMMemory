@@ -7,4 +7,5 @@
     CONTROL_TYPE(Menu, "menu") \
     CONTROL_TYPE(Color, "color") \
     CONTROL_TYPE(Input, "input") \
-    CONTROL_TYPE(Keymap, "keymap")
+    CONTROL_TYPE(Keymap, "keymap") \
+    CONTROL_TYPE(Cycle, "cycle")

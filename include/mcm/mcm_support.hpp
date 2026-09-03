@@ -14,6 +14,67 @@ namespace MCMMemory
     inline constexpr std::string_view mcmHelperBaseScriptName{ "MCM_ConfigBase" };
     inline constexpr std::string_view nlMCMBaseScriptName{ "nl_mcm" };
 
+    // Kicker resets SkyUI after a delay; a quiet registry before that reset is not reliable.
+    class MCMKickerSupport : public RE::BSTEventSink<SKSE::ModCallbackEvent>
+    {
+    public:
+
+        enum class Status { Inactive, Waiting, Ready, Failed };
+
+        static MCMKickerSupport* GetSingleton()
+        {
+            static MCMKickerSupport singleton;
+            return std::addressof(singleton);
+        }
+
+        void Install();
+
+        void Reset();
+
+        Status GetStatus()
+        {
+            std::lock_guard lock(kickerMutex);
+            return status;
+        }
+
+        uint64_t CacheGeneration() const { return cacheGeneration.load(); }
+
+        RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*) override;
+
+    private:
+
+        struct CheckTask
+        {
+            uint64_t loadedGameSession{};
+
+            void operator()() const { GetSingleton()->Check(loadedGameSession); }
+        };
+
+        bool IsKickDue() const;
+
+        void Check(uint64_t a_loadedGameSession);
+
+        void QueueCheck();
+
+        std::mutex kickerMutex;
+
+        RegistryWait registryWait;
+
+        std::atomic<uint64_t> cacheGeneration{};
+
+        uint64_t loadedGameSession{};
+
+        RE::TESQuest* kickerQuest{};
+
+        RE::TESQuest* managerQuest{};
+
+        Status status{ Status::Inactive };
+
+        bool installed{};
+
+        bool resetObserved{};
+    };
+
     inline std::string_view GetMCMExclusionReason(std::string_view a_modID)
     {
         // Match the script, not a name the player can rename or translate.
@@ -34,6 +95,81 @@ namespace MCMMemory
         {
             return a_script.IsBasedOn(nlMCMBaseScriptName);
         }
+    };
+
+    // Identifies a cycling text setting without relying on its translated label alone.
+    struct MCMCycleSetting
+    {
+        std::string_view optionVariable;
+
+        std::string_view valueVariable;
+
+        std::string_view optionLabel;
+
+        int valueCount{};
+    };
+
+    // VioLens uses text buttons for several settings. Only these known buttons may be replayed.
+    struct VioLensSupport
+    {
+        VioLensSupport() = delete;
+
+        static constexpr std::string_view scriptName{ "VL_ConfigMenu" };
+
+        static constexpr std::array<MCMCycleSetting, 6> cyclingSettings{{
+            { "KillmoveOID", "KillmoveListIndex", "$Killmoves", 4 },
+            { "RangedModeOID", "RangedModeListIndex", "$Selection Mode", 2 },
+            { "MoveAnimationsOID", "MoveAnimationsListIndex", "$Advancing Killmoves", 3 },
+            { "DecapitationOID", "DecapitationListIndex", "$Decapitations", 3 },
+            { "RangedKillmoveOID", "RangedKillmoveListIndex", "$Killmoves", 3 },
+            { "RangedPerspectiveOID", "RangedPerspectiveListIndex", "$Camera View", 2 }
+        }};
+
+        static bool IsSupported(const MCMScript& a_script) { return a_script.IsBasedOn(scriptName); }
+
+        static bool IsSupported(std::string_view a_modID)
+        {
+            const auto name = a_modID.substr(0, a_modID.find("::"));
+            return name.size() == scriptName.size() && ContainsCaseInsensitive(name, scriptName);
+        }
+
+        static bool IsCommand(std::string_view a_modID, std::string_view a_stateName, int a_pageIndex, std::string_view a_optionLabel);
+
+        static const MCMCycleSetting* FindCycle(std::string_view a_settingID);
+
+        static const MCMCycleSetting* FindCycle(const MCMScript& a_script, int a_optionIndex);
+
+        // A disabled camera value can be read, but a click still requires an enabled control.
+        static std::optional<int> FindCycleIndex(const MCMScript& a_script, const MCMCycleSetting& a_setting, bool a_requireEnabled = false);
+
+        static std::optional<int> ReadCycleValue(const MCMScript& a_script, const MCMCycleSetting& a_setting);
+
+        static bool ReadCycleSetting(const MCMScript& a_script, CapturedSetting& a_setting);
+
+        static void OrderSettings(std::vector<CapturedSetting>& a_settings);
+
+        static int RestoreOrder(const CapturedSetting& a_setting)
+        {
+            if (a_setting.settingID == "KillmoveOID") {
+                return 0;
+            }
+            if (a_setting.type == ControlType::Menu && a_setting.stateName.empty() && a_setting.optionLabel == "$Camera View") {
+                return 1;
+            }
+            if (a_setting.stateName == "CameraSettingMenu") {
+                return 2;
+            }
+            if (a_setting.settingID == "RangedModeOID") {
+                return 3;
+            }
+            // Ranged Killmoves set to Off disables the camera control.
+            return a_setting.settingID == "RangedPerspectiveOID" ? 4 : 5;
+        }
+    };
+
+    struct VioLensSettingOrder
+    {
+        bool operator()(const CapturedSetting& a_left, const CapturedSetting& a_right) const;
     };
 
     // Sorts MCM Unlocked markers by FormID so registry reads have a stable order.

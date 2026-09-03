@@ -149,7 +149,7 @@ namespace MCMMemory
             }
             else {
                 const auto* scriptName = ReadScriptName(mcmScript);
-                logger::debug("SkyUI registry skipped entry {}: script='{}', {}", registryIndices[index], scriptName ? scriptName : "<unknown>", failureReason);
+                logger::debug("SkyUI registry skipped entry {} with script '{}', {}", registryIndices[index], scriptName ? scriptName : "<unknown>", failureReason);
             }
         }
 

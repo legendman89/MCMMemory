@@ -39,7 +39,7 @@ namespace MCMMemory
             Restore::GetSingleton()->Reset(a_autoRestoreAllowed);
             MCMCallWatch::ResetSession();
             SetGameLoaded(true);
-            logger::info("Game session started from {}; automatic restore allowed = {}", a_reason, a_autoRestoreAllowed);
+            logger::info("Game session started from {}; automatic restore allowed: {}", a_reason, a_autoRestoreAllowed);
         }
 
         inline bool IsWaitingForLoadMessage() const

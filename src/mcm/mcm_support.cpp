@@ -6,6 +6,283 @@
 
 namespace MCMMemory
 {
+    bool VioLensSupport::IsCommand(std::string_view a_modID, std::string_view a_stateName, int a_pageIndex, std::string_view a_optionLabel)
+    {
+        if (!IsSupported(a_modID)) {
+            return false;
+        }
+
+        // File operations, batch edits and subpage navigation are not saved settings.
+        constexpr std::array<std::string_view, 8> commands{
+            "SaveMainProfileMenu", "LoadMainProfileMenu", "DeleteMainProfileMenu",
+            "SaveCustomizeKillmoveProfileMenu", "LoadCustomizeKillmoveProfileMenu", "DeleteCustomizeKillmoveProfileMenu",
+            "VL_SettingsMenu", "CustomizeWeaponMenu"
+        };
+        if (std::ranges::find(commands, a_stateName) != commands.end()) {
+            return true;
+        }
+
+        // Disabled versions have no state; older captures may also contain the English label without '$'.
+        if (a_optionLabel.starts_with('$')) {
+            a_optionLabel.remove_prefix(1);
+        }
+        if (a_pageIndex == 2) {
+            return a_optionLabel == "Page" || a_optionLabel == "Add/Remove";
+        }
+        if (a_pageIndex == 3) {
+            return a_optionLabel == "Save" || a_optionLabel == "Load" || a_optionLabel == "Delete";
+        }
+        return false;
+    }
+
+    const MCMCycleSetting* VioLensSupport::FindCycle(std::string_view a_settingID)
+    {
+        for (const auto& setting : cyclingSettings) {
+            if (setting.optionVariable == a_settingID) {
+                return &setting;
+            }
+        }
+        return nullptr;
+    }
+
+    std::optional<int> VioLensSupport::FindCycleIndex(const MCMScript& a_script, const MCMCycleSetting& a_setting, bool a_requireEnabled)
+    {
+        auto page = a_script.ReadCurrentPage();
+        if (!IsSupported(a_script) || !page || page->index != 0) {
+            return std::nullopt;
+        }
+        auto option = a_script.ReadInteger(a_setting.optionVariable);
+        // SkyUI IDs include the page number in their high byte; the buffer index does not.
+        if (!option || *option < 256 || *option >= 384) {
+            return std::nullopt;
+        }
+        const int index = *option - 256;
+        auto flags = a_script.ReadNumber("_optionFlagsBuf", static_cast<size_t>(index));
+        auto label = a_script.ReadOptionLabel(index);
+        if (!flags || !label || *label != a_setting.optionLabel) {
+            return std::nullopt;
+        }
+        if (static_cast<int>(*flags) == 2) {
+            return index;
+        }
+
+        // Only the real disabled camera row is readable. Reject the "$Disabled" placeholder,
+        // which can occupy the same slot while the script still holds an old option ID.
+        if (!a_requireEnabled && static_cast<int>(*flags) == 258 && a_setting.optionVariable == "RangedPerspectiveOID") {
+            auto value = ReadCycleValue(a_script, a_setting);
+            auto text = a_script.ReadString("_strValueBuf", static_cast<size_t>(index));
+            auto expected = value ? a_script.ReadString("RangedPerspectiveList", static_cast<size_t>(*value)) : std::nullopt;
+            if (text && expected && *text == *expected) {
+                return index;
+            }
+        }
+        return std::nullopt;
+    }
+
+    const MCMCycleSetting* VioLensSupport::FindCycle(const MCMScript& a_script, int a_optionIndex)
+    {
+        if (a_optionIndex < 0 || !IsSupported(a_script)) {
+            return nullptr;
+        }
+        for (const auto& setting : cyclingSettings) {
+            if (FindCycleIndex(a_script, setting) == a_optionIndex) {
+                return &setting;
+            }
+        }
+        return nullptr;
+    }
+
+    std::optional<int> VioLensSupport::ReadCycleValue(const MCMScript& a_script, const MCMCycleSetting& a_setting)
+    {
+        if (!IsSupported(a_script)) {
+            return std::nullopt;
+        }
+        auto value = a_script.ReadInteger(a_setting.valueVariable);
+        return value && *value >= 0 && *value < a_setting.valueCount ? value : std::nullopt;
+    }
+
+    bool VioLensSupport::ReadCycleSetting(const MCMScript& a_script, CapturedSetting& a_setting)
+    {
+        const auto* cycle = FindCycle(a_script, a_setting.selection.optionIndex);
+        if (!cycle) {
+            return false;
+        }
+        auto value = ReadCycleValue(a_script, *cycle);
+        if (!value) {
+            return false;
+        }
+        a_setting.type = ControlType::Cycle;
+        a_setting.settingID = cycle->optionVariable;
+        a_setting.optionLabel = cycle->optionLabel;
+        a_setting.value = *value;
+        a_setting.valueSource = std::format("script.{}", cycle->valueVariable);
+        return true;
+    }
+
+    bool VioLensSettingOrder::operator()(const CapturedSetting& a_left, const CapturedSetting& a_right) const
+    {
+        if (a_left.selection.identity.modID != a_right.selection.identity.modID) {
+            return a_left.selection.identity.modID < a_right.selection.identity.modID;
+        }
+        if (a_left.selection.pageIndex != a_right.selection.pageIndex) {
+            return a_left.selection.pageIndex < a_right.selection.pageIndex;
+        }
+        return VioLensSupport::RestoreOrder(a_left) < VioLensSupport::RestoreOrder(a_right);
+    }
+
+    void VioLensSupport::OrderSettings(std::vector<CapturedSetting>& a_settings)
+    {
+        std::vector<size_t> positions;
+        std::vector<CapturedSetting> settings;
+        for (size_t index = 0; index < a_settings.size(); ++index) {
+            if (IsSupported(a_settings[index].selection.identity.modID)) {
+                positions.push_back(index);
+                settings.push_back(std::move(a_settings[index]));
+            }
+        }
+        // Selection Mode resets ranged Killmoves. Apply the mode first, even in older profiles.
+        std::stable_sort(settings.begin(), settings.end(), VioLensSettingOrder{});
+        for (size_t index = 0; index < positions.size(); ++index) {
+            a_settings[positions[index]] = std::move(settings[index]);
+        }
+    }
+
+    void MCMKickerSupport::Install()
+    {
+        kickerQuest = RE::TESForm::LookupByEditorID<RE::TESQuest>("JaxonzMCMKicker");
+        managerQuest = RE::TESForm::LookupByEditorID<RE::TESQuest>("SKI_ConfigManagerInstance");
+        if (!kickerQuest || installed) {
+            return;
+        }
+        auto* events = SKSE::GetModCallbackEventSource();
+        if (!events) {
+            logger::error("MCM Kicker support could not find the registration event source");
+            return;
+        }
+        events->AddEventSink(this);
+        installed = true;
+        logger::info("Jaxonz MCM Kicker detected; scripted operations will wait for its reset and registration");
+    }
+
+    void MCMKickerSupport::Reset()
+    {
+        std::lock_guard lock(kickerMutex);
+        ++loadedGameSession;
+        ++cacheGeneration;
+        registryWait.Reset();
+        resetObserved = false;
+        status = !kickerQuest ? Status::Inactive : installed ? Status::Waiting : Status::Failed;
+        if (status == Status::Waiting) {
+            logger::info("Waiting for MCM Kicker to reset the registry in this game session");
+            QueueCheck();
+        }
+    }
+
+    bool MCMKickerSupport::IsKickDue() const
+    {
+        auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+        auto* policy = vm ? vm->GetObjectHandlePolicy() : nullptr;
+        if (!policy || !kickerQuest) {
+            return false;
+        }
+        for (auto* alias : kickerQuest->aliases) {
+            if (!alias) {
+                continue;
+            }
+            const auto handle = policy->GetHandleForObject(alias->GetVMTypeID(), alias);
+            RE::BSTSmartPointer<RE::BSScript::Object> script;
+            if (handle == policy->EmptyHandle() || !vm->FindBoundObject(handle, "JaxonzMCMKicker", script) || !script) {
+                continue;
+            }
+            const auto* elapsed = script->GetVariable("iWaitSeconds");
+            const auto* delay = script->GetVariable("iMCMregdelay");
+            const auto* limit = script->GetVariable("iMaxWait");
+            const auto* ready = script->GetVariable("bMCMready");
+            if (elapsed && elapsed->IsInt() && delay && delay->IsInt() && limit && limit->IsInt() && ready && ready->IsBool()) {
+                // This is Kicker own condition.
+                return (ready->GetBool() && elapsed->GetSInt() == delay->GetSInt()) || elapsed->GetSInt() == limit->GetSInt();
+            }
+        }
+        return false;
+    }
+
+    RE::BSEventNotifyControl MCMKickerSupport::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
+    {
+        if (!a_event || a_event->eventName != "SKICP_configManagerReset" || a_event->sender != managerQuest) {
+            return RE::BSEventNotifyControl::kContinue;
+        }
+        std::lock_guard lock(kickerMutex);
+        if ((status != Status::Waiting && status != Status::Failed) || !IsKickDue()) {
+            return RE::BSEventNotifyControl::kContinue;
+        }
+        if (status == Status::Failed) {
+            // A late reset can recover support without restarting Skyrim.
+            registryWait.Reset();
+            status = Status::Waiting;
+            QueueCheck();
+        }
+        resetObserved = true;
+        registryWait.modIDs.clear();
+        registryWait.quietCheckCount = 0;
+        ++cacheGeneration;
+        // Redone cached scripts may still describe the registry from before the reset.
+        if (MCMRegistry::IsMCMMenuRedoneAvailable()) {
+            MCMMenuRedoneRegistry::GetSingleton()->Reset();
+        }
+        logger::info("MCM Kicker reset observed; waiting for the rebuilt registry to settle");
+        return RE::BSEventNotifyControl::kContinue;
+    }
+
+    void MCMKickerSupport::QueueCheck()
+    {
+        if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(CheckTask{ loadedGameSession }, registryCheckDelaySeconds)) {
+            status = Status::Failed;
+            ++cacheGeneration;
+            logger::error("MCM Kicker support could not schedule its registry check");
+        }
+    }
+
+    void MCMKickerSupport::Check(uint64_t a_loadedGameSession)
+    {
+        std::lock_guard lock(kickerMutex);
+        if (a_loadedGameSession != loadedGameSession || status != Status::Waiting || !IsGameLoaded()) {
+            return;
+        }
+        auto* ui = RE::UI::GetSingleton();
+        if (ui && (ui->GameIsPaused() || ui->IsMenuOpen(RE::RaceSexMenu::MENU_NAME))) {
+            // Papyrus update timers can pause with menus. Do not charge that time to registration.
+            QueueCheck();
+            return;
+        }
+        std::vector<MCMRegistryEntry> mcms;
+        if (resetObserved) {
+            mcms = MCMRegistry().ReadRegisteredMCMs();
+            if (MCMRegistry::IsRefreshing()) {
+                mcms.clear();
+            }
+        }
+        const auto result = registryWait.Update(mcms);
+        if (result == RegistryWaitResult::Ready) {
+            status = Status::Ready;
+            ++cacheGeneration;
+            logger::info("MCM Kicker registration settled with {} MCMs; scripted operations may start", mcms.size());
+            return;
+        }
+        if (result == RegistryWaitResult::Expired) {
+            status = Status::Failed;
+            ++cacheGeneration;
+            logger::error("MCM Kicker registration did not finish after {} checks (reset observed: {}); scripted operations will not use an unconfirmed registry", registryWait.checkCount, resetObserved);
+            return;
+        }
+        if (resetObserved && result == RegistryWaitResult::Changed) {
+            logger::info("MCM Kicker rebuilt registry contains {} MCMs; checking stability", mcms.size());
+        }
+        if (resetObserved) {
+            MCMRegistry::Refresh();
+        }
+        QueueCheck();
+    }
+
     std::optional<std::string> MCMHelperSupport::ReadConfigModName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript) const
     {
         if (!IsMCMHelperScript(a_mcmScript)) {
@@ -199,6 +476,7 @@ namespace MCMMemory
 
     void MCMRegistry::Install()
     {
+        MCMKickerSupport::GetSingleton()->Install();
         if (IsMCMMenuRedoneAvailable()) {
             logger::info("MCM Menu Redone detected; its registry will be used");
         }
@@ -303,6 +581,7 @@ namespace MCMMemory
 
     void MCMRegistry::Reset()
     {
+        MCMKickerSupport::GetSingleton()->Reset();
         if (IsMCMMenuRedoneAvailable()) {
             MCMMenuRedoneRegistry::GetSingleton()->Reset();
         }
@@ -322,7 +601,7 @@ namespace MCMMemory
 
     uint64_t MCMRegistry::CacheGeneration()
     {
-        return IsMCMMenuRedoneAvailable() ? MCMMenuRedoneRegistry::GetSingleton()->CacheGeneration() : 0;
+        return MCMKickerSupport::GetSingleton()->CacheGeneration() + (IsMCMMenuRedoneAvailable() ? MCMMenuRedoneRegistry::GetSingleton()->CacheGeneration() : 0);
     }
 
     std::vector<MCMRegistryEntry> MCMRegistry::ReadRegisteredMCMs() const

@@ -66,6 +66,8 @@ namespace MCMMemory
 
     private:
 
+        friend struct VioLensSupport;
+
         // Supports normal variables, properties, and their generated Papyrus backing names.
         const RE::BSScript::Variable* FindVariable(std::string_view a_name) const;
 

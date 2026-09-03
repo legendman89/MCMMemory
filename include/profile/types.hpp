@@ -28,7 +28,7 @@ namespace MCMMemory
 #undef DECLARE_EVENT_CONTROL_TYPE
     };
 
-    // Says whether this is a toggle, slider, menu, color, input or keymap.
+    // Returns the name stored in JSON for this control type.
     inline std::string_view ControlTypeName(ControlType a_type)
     {
         return controlTypeNames[ToIndex(a_type)];
@@ -112,7 +112,7 @@ namespace MCMMemory
 
         std::string optionLabel;
 
-        // MCM Helper setting name.
+        // MCM Helper setting name, or a known cycling control ID supplied by compatibility support.
         std::string settingID;
 
         // Stable Papyrus state used by state-based MCM options.
@@ -140,6 +140,9 @@ namespace MCMMemory
             }
             if ((pageScopedState || a_other.pageScopedState) && selection.pageName != a_other.selection.pageName) {
                 return false;
+            }
+            if (type == ControlType::Cycle && !settingID.empty() && !a_other.settingID.empty()) {
+                return settingID == a_other.settingID;
             }
             if (!stateName.empty() && !a_other.stateName.empty()) {
                 // A redraw can put a different control at the old row index.

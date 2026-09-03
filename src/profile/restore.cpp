@@ -83,6 +83,13 @@ namespace MCMMemory
         status = OperationStatus::Running;
         HUD::GetSingleton()->ShowRestoreStarted();
 
+        const auto kickerStatus = MCMKickerSupport::GetSingleton()->GetStatus();
+        if (kickerStatus == MCMKickerSupport::Status::Waiting || kickerStatus == MCMKickerSupport::Status::Failed) {
+            QueueRegistryCheck();
+            logger::info("Manual persistent profile restoration is checking MCM Kicker registration");
+            return status == OperationStatus::Running;
+        }
+
         const auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
         if (MCMRegistry::IsMCMMenuRedoneAvailable() && (registeredMCMs.empty() || MCMRegistry::IsRefreshing())) {
             MCMRegistry::Refresh();
@@ -164,7 +171,7 @@ namespace MCMMemory
         autoRestoreAllowed = a_autoRestoreAllowed;
         waitingForCharacterCreation = a_autoRestoreAllowed;
         HUD::GetSingleton()->HideMenuWarning();
-        logger::info("Persistent profile restore event reset; automatic restore allowed={}", autoRestoreAllowed);
+        logger::info("Persistent profile restore event reset; automatic restore allowed: {}", autoRestoreAllowed);
     }
 
     RE::BSEventNotifyControl Restore::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
@@ -293,6 +300,24 @@ namespace MCMMemory
             logger::info("Character creation has closed; restarting the MCM registry stability check");
         }
 
+        const auto kickerStatus = MCMKickerSupport::GetSingleton()->GetStatus();
+        if (kickerStatus == MCMKickerSupport::Status::Waiting) {
+            QueueRegistryCheck(registryCheckDelaySeconds);
+            return;
+        }
+        if (kickerStatus == MCMKickerSupport::Status::Failed) {
+            started = true;
+            status = OperationStatus::Idle;
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreFailed", "HUD.Failure.RegistrationIncomplete");
+            logger::error("Persistent profile restoration stopped because MCM Kicker registration was not confirmed");
+            return;
+        }
+        if (kickerStatus == MCMKickerSupport::Status::Ready && ui && ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
+            // A registration window belongs to the other mod, not to our operation.
+            QueueRegistryCheck(registryCheckDelaySeconds);
+            return;
+        }
+
         // The ready event can arrive before every MCM is registered, so wait for an unchanged list.
         auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
         if (MCMRegistry::IsRefreshing()) {
@@ -301,7 +326,7 @@ namespace MCMMemory
             return;
         }
 
-        if (operationMode == OperationMode::Manual) {
+        if (operationMode == OperationMode::Manual || kickerStatus == MCMKickerSupport::Status::Ready) {
             if (!registeredMCMs.empty()) {
                 MatchRegisteredMCMs(registeredMCMs);
                 StartRestore();
@@ -310,7 +335,7 @@ namespace MCMMemory
 
             const auto result = registryWait.Update(registeredMCMs);
             if (result == RegistryWaitResult::Expired) {
-                logger::error("Manual persistent profile restoration found no registered MCMs");
+                logger::error("Persistent profile restoration found no registered MCMs after waiting");
                 HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreFailed", "HUD.Failure.NoRegisteredMCMs");
                 status = OperationStatus::Idle;
                 return;
@@ -533,7 +558,10 @@ namespace MCMMemory
             }
             if (pendingActionIndex < actions.size()) {
                 auto& completedAction = actions[pendingActionIndex];
-                if (IsRestoreApplyAction(completedAction.type)) {
+                if (completedAction.type == RestoreActionType::ApplyCycle) {
+                    CompleteCycleAction(completedAction, status != OperationStatus::Stopping && !timedOut && !confirmationDeclined);
+                }
+                else if (IsRestoreApplyAction(completedAction.type)) {
                     if (confirmationDeclined) {
                         ++mcmStats.skippedSettingCount;
                         logger::warn("Restore of '{}' in '{}' needs user confirmation and was skipped", completedAction.optionLabel, restoreMCMs[completedAction.mcmIndex].identity.modID);

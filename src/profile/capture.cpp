@@ -102,7 +102,7 @@ namespace MCMMemory
         }
 
         SyncOpeningPage(*record);
-        if (record->type == EventType::OptionHighlighted || ControlTypeForEvent(record->type) == ControlType::Option) {
+        if (record->type == EventType::OptionHighlighted || record->type == EventType::MenuSelected || ControlTypeForEvent(record->type) == ControlType::Option) {
             RememberControl(*record);
         }
 
@@ -131,18 +131,22 @@ namespace MCMMemory
         if (record->selection.modIndex == selection.modIndex) {
             FindActiveMCMIdentity(record->type, record->stateAfter);
         }
+        if (record->type == EventType::MenuSelected) {
+            // The dropdown data request may still have been busy during the first read.
+            RememberControl(*record);
+        }
         if (IsValueChange(record->type)) {
             // Only accepted or selected values become profile settings.
             if (!pageReady || !ProcessCapturedEvent(*record)) {
                 if (!record->stateAfter.contains("error") && a_request.readAttempts < maximumCaptureReads) {
                     if (a_request.readAttempts == 0) {
-                        logger::debug("Waiting for MCM capture {}: mod='{}', page='{}', option={}", a_request.eventID, record->selection.identity.modName, record->selection.pageName, record->selection.optionIndex);
+                        logger::debug("Waiting for MCM capture {}: mod: '{}', page: '{}', option: {}", a_request.eventID, record->selection.identity.modName, record->selection.pageName, record->selection.optionIndex);
                     }
                     ++a_request.readAttempts;
                     QueueCaptureCompletion(a_request, captureReadDelayFrames);
                     return;
                 }
-                logger::warn("MCM capture {} could not finish: mod='{}', page='{}', option={}; saved profile left unchanged", a_request.eventID, record->selection.identity.modName, record->selection.pageName, record->selection.optionIndex);
+                logger::warn("MCM capture {} could not finish: mod: '{}', page: '{}', option: {}; saved profile left unchanged", a_request.eventID, record->selection.identity.modName, record->selection.pageName, record->selection.optionIndex);
             }
         }
         if (a_request.persist) {
@@ -229,7 +233,7 @@ namespace MCMMemory
         record.selection = selection;
         records.push_back(std::move(record));
 
-        logger::info("Captured {}: mod='{}', modID='{}', page='{}', option={}, str='{}', num={}", EventName(a_type), selection.identity.modName, selection.identity.modID, selection.pageName, selection.optionIndex, a_event.strArg.c_str(), a_event.numArg);
+        logger::info("Captured {} with mod: '{}', modID: '{}', page: '{}', option: {}, str: '{}', num: {}", EventName(a_type), selection.identity.modName, selection.identity.modID, selection.pageName, selection.optionIndex, a_event.strArg.c_str(), a_event.numArg);
 
         return eventCount;
     }

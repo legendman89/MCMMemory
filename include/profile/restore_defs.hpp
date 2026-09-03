@@ -4,6 +4,7 @@
     RESTORE_ACTION(OpenConfig, OpenConfig, None, false) \
     RESTORE_ACTION(SetPage, SetPage, Page, false) \
     RESTORE_ACTION(ApplyToggle, SelectOption, ToggleValue, true) \
+    RESTORE_ACTION(ApplyCycle, SelectOption, OptionIndex, true) \
     RESTORE_ACTION(RequestSliderDialogData, RequestSliderDialogData, OptionIndex, false) \
     RESTORE_ACTION(SetSliderValue, SetSliderValue, FloatValue, true) \
     RESTORE_ACTION(RequestMenuDialogData, RequestMenuDialogData, OptionIndex, false) \

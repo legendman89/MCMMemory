@@ -1,6 +1,5 @@
 #include "profile/capture.hpp"
-#include "mcm/mcm_support.hpp"
-#include "utils/json.hpp"
+#include "mcm/mcm_script.hpp"
 
 namespace MCMMemory
 {
@@ -48,9 +47,9 @@ namespace MCMMemory
         }
     }
 
-    void Capture::UpdateSelectionFromMenu(EventType a_type, const nlohmann::json& a_state)
+    void Capture::UpdateSelectionFromMenu(const nlohmann::json& a_state)
     {
-        // Menu fields give us readable mod and page names.
+        // Use the mod-list text, not the panel title: SkyUI replaces that title with the page heading.
         if (a_state.contains("fields") && a_state["fields"].is_object()) {
             const auto& fields = a_state["fields"];
             if (fields.contains("ModListSelectedText") && fields["ModListSelectedText"].is_string()) {
@@ -63,16 +62,6 @@ namespace MCMMemory
                 selection.pageName = fields["PageListSelectedText"].get<std::string>();
             }
         }
-
-        // Some MCMs only expose their name through the panel title.
-        if (selection.identity.modName.empty() && selection.modIndex >= 0 && a_type != EventType::ModSelected && a_state.contains("panelMembers")) {
-            auto title = JSON::ReadString(a_state["panelMembers"], "_titleText");
-            if (title && !title->empty() && *title != "MOD CONFIGURATION") {
-                selection.identity.modName = *title;
-            }
-        }
-
-        SyncMCMIdentity();
     }
 
     void Capture::FindActiveMCMIdentity(EventType a_type, const nlohmann::json& a_state)
@@ -83,12 +72,12 @@ namespace MCMMemory
 
         auto previousName = selection.identity.modName;
         auto previousID = selection.identity.modID;
-        UpdateSelectionFromMenu(a_type, a_state);
+        UpdateSelectionFromMenu(a_state);
 
-        // MCM Registry provides the stable ID that display text cannot give us.
-        if (selection.identity.modID.empty()) {
+        // The active script provides the stable ID and a name when the mod-list text is missing.
+        if (selection.identity.modID.empty() || selection.identity.modName.empty()) {
             auto activeMCM = MCMRegistry().ReadActiveMCM();
-            if (activeMCM) {
+            if (activeMCM && (selection.identity.modID.empty() || selection.identity.modID == activeMCM->identity.modID)) {
                 selection.identity.modID = activeMCM->identity.modID;
                 if (selection.identity.modName.empty()) {
                     selection.identity.modName = activeMCM->identity.modName;
@@ -124,9 +113,6 @@ namespace MCMMemory
             return true;
         }
         MCMScript script(activeMCM->mcmScript);
-        if (!NLMCMSupport::IsSupported(script)) {
-            return true;
-        }
         auto page = script.ReadCurrentPage();
         if (!page) {
             return false;
@@ -148,7 +134,7 @@ namespace MCMMemory
                 record->selection.pageIndex = page->index;
             }
         }
-        logger::debug("Capture resolved NL_MCM opening page '{}' (index {}) for '{}'", page->name, page->index, activeMCM->identity.modID);
+        logger::debug("Capture resolved opening page '{}' (index {}) for '{}'", page->name, page->index, activeMCM->identity.modID);
         return true;
     }
 

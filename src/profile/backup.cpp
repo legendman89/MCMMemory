@@ -37,17 +37,14 @@ namespace MCMMemory
         }
 
         Profile existingProfile;
-        std::error_code error;
-        const bool profileExists = std::filesystem::exists(ProfileStorage::Path(), error);
-        if (error || (profileExists && !ProfileStorage::Load(existingProfile))) {
-            logger::error("Full MCM backup refuses to replace an unreadable profile at {}", ToUTF8(ProfileStorage::Path()));
-            HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", "HUD.Failure.ExistingProfileUnreadable");
+        if (!ReadExistingProfile(existingProfile)) {
             return false;
         }
 
         Clear();
         ++loadedGameSession;
-        if (!callWatch.Acquire()) {
+        const auto kickerStatus = MCMKickerSupport::GetSingleton()->GetStatus();
+        if (kickerStatus == MCMKickerSupport::Status::Inactive && !callWatch.Acquire()) {
             HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupStopped", "HUD.Failure.ScriptBusy");
             return false;
         }
@@ -101,6 +98,21 @@ namespace MCMMemory
         logger::info("Full MCM backup reset");
     }
 
+    bool Backup::ReadExistingProfile(Profile& a_profile) const
+    {
+        std::error_code error;
+        const bool exists = std::filesystem::exists(ProfileStorage::Path(), error);
+        if (error || (exists && !ProfileStorage::Load(a_profile))) {
+            logger::error("Full MCM backup refuses to replace an unreadable profile at {}", ToUTF8(ProfileStorage::Path()));
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", "HUD.Failure.ExistingProfileUnreadable");
+            return false;
+        }
+        if (!exists) {
+            a_profile.clear();
+        }
+        return true;
+    }
+
     RE::BSEventNotifyControl Backup::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
     {
         if (!a_event || !a_event->opening || std::string_view(a_event->menuName.c_str()) != RE::JournalMenu::MENU_NAME) {
@@ -108,7 +120,7 @@ namespace MCMMemory
         }
 
         std::lock_guard lock(backupMutex);
-        if (status != OperationStatus::Idle) {
+        if (status != OperationStatus::Idle && (step != BackupStep::ReadRegistry || MCMKickerSupport::GetSingleton()->GetStatus() == MCMKickerSupport::Status::Inactive)) {
             CloseJournalMenu();
         }
         return RE::BSEventNotifyControl::kContinue;
@@ -256,6 +268,26 @@ namespace MCMMemory
 
     void Backup::ReadRegistry()
     {
+        const auto kickerStatus = MCMKickerSupport::GetSingleton()->GetStatus();
+        if (kickerStatus == MCMKickerSupport::Status::Waiting) {
+            QueueNext(registryCheckDelaySeconds);
+            return;
+        }
+        if (kickerStatus == MCMKickerSupport::Status::Failed) {
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", "HUD.Failure.RegistrationIncomplete");
+            logger::error("Full MCM backup stopped because MCM Kicker registration was not confirmed; the profile was not changed");
+            status = OperationStatus::Idle;
+            callWatch.Release();
+            return;
+        }
+        if (kickerStatus == MCMKickerSupport::Status::Ready) {
+            auto* ui = RE::UI::GetSingleton();
+            if (ui && ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
+                QueueNext(registryCheckDelaySeconds);
+                return;
+            }
+        }
+
         auto currentMCMs = MCMRegistry().ReadRegisteredMCMs();
         if (MCMRegistry::IsMCMMenuRedoneAvailable() && (currentMCMs.empty() || MCMRegistry::IsRefreshing())) {
             const auto result = registryWait.Update({});
@@ -292,6 +324,18 @@ namespace MCMMemory
             return;
         }
 
+        if (kickerStatus == MCMKickerSupport::Status::Ready) {
+            // Live capture stays enabled while Kicker registers, so reread any changes made while waiting.
+            if (!ReadExistingProfile(profile)) {
+                status = OperationStatus::Idle;
+                return;
+            }
+            if (!callWatch.Acquire()) {
+                status = OperationStatus::Idle;
+                HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupStopped", "HUD.Failure.ScriptBusy");
+                return;
+            }
+        }
         registeredMCMs = std::move(currentMCMs);
         firstPassCount = registeredMCMs.size();
         step = BackupStep::OpenMCM;
@@ -335,14 +379,7 @@ namespace MCMMemory
     void Backup::ReadPages()
     {
         MCMScript script(registeredMCMs[mcmIndex].mcmScript);
-        std::optional<MCMPage> openingPage;
-        if (NLMCMSupport::IsSupported(script)) {
-            openingPage = script.ReadCurrentPage();
-        }
-        else if (script.IsConfigOpen()) {
-            // Ordinary SkyUI MCMs keep their existing blank-first scan.
-            openingPage.emplace();
-        }
+        auto openingPage = script.ReadCurrentPage();
         if (!openingPage) {
             if (++scriptWaitCount < maximumScriptWaitChecks) {
                 QueueNext(GetSettings().actionTrialDelaySeconds);

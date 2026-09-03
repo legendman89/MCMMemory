@@ -157,7 +157,7 @@ namespace MCMMemory
             setting.selection.optionIndex = static_cast<int>(optionIndex);
             setting.optionLabel = std::move(*label);
             setting.type = skyUIControlTypes[static_cast<size_t>(skyUIType)];
-            if (setting.type == ControlType::Unknown) {
+            if (setting.type == ControlType::Unknown && skyUIType != 2) {
                 continue;
             }
             if (states && optionIndex < states->size()) {
@@ -166,8 +166,14 @@ namespace MCMMemory
                     setting.stateName = state.GetString();
                 }
             }
+            if (VioLensSupport::IsCommand(a_identity.modID, setting.stateName, a_pageIndex, setting.optionLabel)) {
+                continue;
+            }
 
             switch (skyUIType) {
+            case 2:
+                VioLensSupport::ReadCycleSetting(*this, setting);
+                break;
             case 3:
                 setting.type = ControlType::Option;
                 if (auto value = ReadNumber("_numValueBuf", optionIndex)) {
@@ -226,6 +232,13 @@ namespace MCMMemory
 
         const size_t index = static_cast<size_t>(a_optionIndex);
         switch (a_type) {
+        case ControlType::Cycle:
+            if (const auto* cycle = VioLensSupport::FindCycle(*this, a_optionIndex)) {
+                if (auto value = VioLensSupport::ReadCycleValue(*this, *cycle)) {
+                    return nlohmann::json(*value);
+                }
+            }
+            break;
         case ControlType::Option:
             if (auto value = ReadNumber("_numValueBuf", index)) {
                 return nlohmann::json(*value != 0.0F);
@@ -277,6 +290,9 @@ namespace MCMMemory
         }
 
         const int skyUIType = static_cast<int>(*flag) % 256;
+        if (skyUIType == 2 && VioLensSupport::FindCycle(*this, a_optionIndex)) {
+            return ControlType::Cycle;
+        }
         if (skyUIType < 0 || static_cast<size_t>(skyUIType) >= skyUIControlTypes.size()) {
             return std::nullopt;
         }

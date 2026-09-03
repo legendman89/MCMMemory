@@ -35,7 +35,7 @@ namespace MCMMemory
 
     bool Restore::AddSettingActions(const CapturedSetting& a_setting)
     {
-        if (!a_setting.identityComplete) {
+        if (!a_setting.identityComplete || VioLensSupport::IsCommand(a_setting.selection.identity.modID, a_setting.stateName, a_setting.selection.pageIndex, a_setting.optionLabel)) {
             return false;
         }
 
@@ -48,6 +48,16 @@ namespace MCMMemory
 
         // Check the saved value and build the calls needed by this control.
         switch (a_setting.type) {
+            case ControlType::Cycle: {
+                const auto* cycle = VioLensSupport::FindCycle(a_setting.settingID);
+                if (!VioLensSupport::IsSupported(a_setting.selection.identity.modID) || !cycle || a_setting.selection.pageIndex != 0 || !a_setting.value.is_number_integer() || a_setting.value < 0 || a_setting.value >= cycle->valueCount) {
+                    logger::warn("Skipping unknown or invalid cycling setting '{}'", a_setting.settingID);
+                    return false;
+                }
+                applyAction = MakeStringAction(RestoreActionType::ApplyCycle, 0, a_setting.settingID);
+                applyAction.integerValue = a_setting.value.get<int>();
+                break;
+            }
             case ControlType::Option: {
                 bool desiredValue{};
                 if (a_setting.value.is_boolean()) {
@@ -155,6 +165,11 @@ namespace MCMMemory
         if (hasSettingChangedAction) {
             restoreMCMs[mcmIndex].settingActions.push_back(std::move(settingChangedAction));
         }
+        if (VioLensSupport::IsSupported(a_setting.selection.identity.modID) && a_setting.type != ControlType::Cycle) {
+            // Its handlers can rebuild dependent rows; prepare fresh buffers for the next setting.
+            // Cycling actions already refresh their own page after each click.
+            restoreMCMs[mcmIndex].hasQueuedPage = false;
+        }
         return true;
     }
 
@@ -166,6 +181,7 @@ namespace MCMMemory
             return false;
         }
 
+        VioLensSupport::OrderSettings(profile);
         size_t supportedSettingCount{};
         size_t excludedSettingCount{};
         MCMFilter loggedExclusions;

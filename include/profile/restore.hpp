@@ -108,6 +108,14 @@ namespace MCMMemory
         // Number passed to a slider call.
         float floatValue{};
 
+        // A cycling setting gets at most one trip through its choices.
+        int cycleClicks{};
+
+        int previousCycleValue{-1};
+
+        // Refresh after a click, before inspecting the new value or using another row.
+        bool refreshingCycle{};
+
         // Desired state used when restoring a toggle.
         bool boolValue{};
 
@@ -309,7 +317,9 @@ namespace MCMMemory
         void BuildActionQueue();
 
         // Sends one queued action to its matching MCM script.
-        bool RunAction(const RestoreAction& a_action, SKSE::TaskInterface::TaskFn a_result);
+        bool RunAction(RestoreAction& a_action, SKSE::TaskInterface::TaskFn a_result);
+
+        void CompleteCycleAction(RestoreAction& a_action, bool a_continue);
 
         bool IsActionNeeded(const RestoreAction& a_action) const;
 

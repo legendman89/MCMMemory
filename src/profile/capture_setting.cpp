@@ -117,7 +117,7 @@ namespace MCMMemory
         }
     }
 
-    bool Capture::ReadToggleSetting(CaptureRecord& a_record, const MCMScript& a_script, CapturedSetting& a_setting) const
+    bool Capture::ReadSelectedSetting(CaptureRecord& a_record, const MCMScript& a_script, CapturedSetting& a_setting) const
     {
         if (!a_record.control || !a_record.stateAfter.contains("fields")) {
             return false;
@@ -142,6 +142,17 @@ namespace MCMMemory
             return false;
         }
 
+        a_setting.selection.optionIndex = *index;
+        a_setting.optionLabel = a_record.control->optionLabel;
+        a_setting.stateName = a_record.control->stateName;
+        if (a_record.control->type == ControlType::Cycle) {
+            if (!VioLensSupport::ReadCycleSetting(a_script, a_setting)) {
+                return false;
+            }
+            logger::info("Finished cycling setting capture {}: mod: '{}', setting: '{}', value: {}", a_record.eventID, a_setting.selection.identity.modName, a_setting.settingID, a_setting.value.get<int>());
+            return true;
+        }
+
         // SetToggleOptionValue updates the menu row, not the script's original page buffer.
         // Read the resolved row even if a redraw or mouse movement changed the cursor.
         auto& option = a_record.stateAfter["changedOptionMembers"];
@@ -154,13 +165,10 @@ namespace MCMMemory
             return false;
         }
 
-        a_setting.selection.optionIndex = *index;
-        a_setting.optionLabel = a_record.control->optionLabel;
-        a_setting.stateName = a_record.control->stateName;
         const bool enabled = *value != 0.0;
         a_setting.value = enabled;
         a_setting.valueSource = "menu.option.numValue";
-        logger::info("Finished toggle capture {}: mod='{}', option='{}', state='{}', value={}", a_record.eventID, a_setting.selection.identity.modName, a_setting.optionLabel, a_setting.stateName, enabled);
+        logger::info("Finished toggle capture {}: mod: '{}', option: '{}', state: '{}', value: {}", a_record.eventID, a_setting.selection.identity.modName, a_setting.optionLabel, a_setting.stateName, enabled);
         return true;
     }
 
@@ -182,6 +190,20 @@ namespace MCMMemory
             activeMCMScript = activeMCM->mcmScript;
         }
         MCMScript mcmScript(activeMCMScript);
+        const bool vioLensMenu = VioLensSupport::IsSupported(setting.selection.identity.modID) && setting.type == ControlType::Menu;
+        if (vioLensMenu) {
+            if (!activeMCMScript || !IsCapturePageCurrent(a_record)) {
+                // Do not mistake a command for a setting after leaving its page.
+                return true;
+            }
+            RememberControl(a_record);
+            if (!a_record.control || a_record.control->type != ControlType::Menu) {
+                // Page and file commands can clear the live buffers before this read.
+                // A translated dialog title alone cannot tell us which command ran.
+                logger::debug("Ignored VioLens menu capture {} without a confirmed control identity", a_record.eventID);
+                return true;
+            }
+        }
         setting.pageScopedState = NLMCMSupport::IsSupported(mcmScript);
         if (setting.pageScopedState && !IsCapturePageCurrent(a_record)) {
             logger::debug("Stopped NL_MCM capture {} after navigation or a newer change", a_record.eventID);
@@ -189,13 +211,17 @@ namespace MCMMemory
         }
         if (setting.type == ControlType::Option) {
             RememberControl(a_record);
-            // Text buttons send optionSelected too, but are not saved toggles.
-            if (a_record.control && a_record.control->type != ControlType::Option) {
+            // Only known cycling text settings may be saved; ordinary text buttons are commands.
+            if (a_record.control && a_record.control->type != ControlType::Option && a_record.control->type != ControlType::Cycle) {
                 return true;
             }
-            if (!activeMCMScript || !ReadToggleSetting(a_record, mcmScript, setting)) {
+            if (!activeMCMScript || !ReadSelectedSetting(a_record, mcmScript, setting)) {
                 return false;
             }
+        }
+        else if (vioLensMenu) {
+            setting.optionLabel = a_record.control->optionLabel;
+            setting.stateName = a_record.control->stateName;
         }
         else if (activeMCMScript) {
             auto optionLabel = mcmScript.ReadOptionLabel(setting.selection.optionIndex);
@@ -207,6 +233,10 @@ namespace MCMMemory
             if (stateName) {
                 setting.stateName = std::move(*stateName);
             }
+        }
+
+        if (VioLensSupport::IsCommand(setting.selection.identity.modID, setting.stateName, setting.selection.pageIndex, setting.optionLabel)) {
+            return true;
         }
 
         if (setting.optionLabel.empty()) {

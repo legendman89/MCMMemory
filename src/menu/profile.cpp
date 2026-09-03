@@ -200,7 +200,7 @@ namespace MCMMemory::Menu
         if (currentGameLoaded) {
             const auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
             const auto registryResult = registryWait.Update(registeredMCMs);
-            registrySettled = registryResult == RegistryWaitResult::Ready && !MCMRegistry::IsRefreshing();
+            registrySettled = registryResult == RegistryWaitResult::Ready && !MCMRegistry::IsRefreshing() && MCMKickerSupport::GetSingleton()->GetStatus() != MCMKickerSupport::Status::Waiting;
             if (registryResult == RegistryWaitResult::Expired) {
                 registryWait.Reset();
             }

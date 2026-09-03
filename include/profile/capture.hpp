@@ -144,14 +144,14 @@ namespace MCMMemory
         // Returns false when a toggle still needs another read before saving.
         bool ProcessCapturedEvent(CaptureRecord& a_record);
 
-        // Keeps the highlighted toggle label and state before its handler redraws the page.
+        // Keeps the highlighted control or opened dropdown label and state before a redraw.
         // Needed for mods that clear a page to hide disabled controls.
         void RememberControl(CaptureRecord& a_record);
 
         // Stops old reads after navigation or a newer setting change.
         bool IsCapturePageCurrent(const CaptureRecord& a_record) const;
 
-        bool ReadToggleSetting(CaptureRecord& a_record, const MCMScript& a_script, CapturedSetting& a_setting) const;
+        bool ReadSelectedSetting(CaptureRecord& a_record, const MCMScript& a_script, CapturedSetting& a_setting) const;
 
         // Reads the option label from the current menu state or an earlier read of the same row.
         std::string ReadOptionLabel(const CaptureRecord& a_record) const;
@@ -173,7 +173,7 @@ namespace MCMMemory
         void UpdateSelectionFromEvent(EventType a_type, const SKSE::ModCallbackEvent& a_event);
 
         // Fills missing selection names from the visible menu.
-        void UpdateSelectionFromMenu(EventType a_type, const nlohmann::json& a_state);
+        void UpdateSelectionFromMenu(const nlohmann::json& a_state);
 
         // Saves the callback as a raw record before its menu reads are queued.
         uint64_t RecordEvent(EventType a_type, const SKSE::ModCallbackEvent& a_event);

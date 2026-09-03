@@ -91,6 +91,8 @@ namespace MCMMemory
 
         bool Begin(MCMFilter a_filter);
 
+        bool ReadExistingProfile(Profile& a_profile) const;
+
         void RunNextStep(uint64_t a_loadedGameSession, uint64_t a_taskID);
 
         void ReadRegistry();

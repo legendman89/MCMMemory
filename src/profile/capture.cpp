@@ -37,7 +37,7 @@ namespace MCMMemory
 
         installed = true;
 
-        logger::info("MCM capture event installed; capture debugger is {}", GetSettings().captureRawRecords ? "enabled" : "disabled");
+        logger::info("MCM capture event is installed, capture debugger is {}", GetSettings().captureRawRecords ? "enabled" : "disabled");
 
         return true;
     }

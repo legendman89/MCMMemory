@@ -17,7 +17,7 @@ namespace MCMMemory
 
         events->AddEventSink<RE::TESCellFullyLoadedEvent>(this);
         installed = true;
-        logger::info("COC session detection installed for testing");
+        logger::info("COC session detection is successfully installed for testing");
         return true;
     }
 

@@ -31,7 +31,7 @@ namespace MCMMemory
 
             case SKSE::MessagingInterface::kDataLoaded:
                 if (!MCMRegistry::IsSkyUIAvailable()) {
-                    logger::critical("SkyUI is required, but its MCM manager quest is unavailable");
+                    logger::critical("SkyUI is required but its MCM manager quest is unavailable");
                     break;
                 }
                 if (!SettingsStorage::Load()) {
@@ -78,13 +78,15 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 
     SKSE::Init(a_skse, false);
 
+    logger::info("{} v{} by {} (Game v{})", BEAUTIFUL_NAME, CURR_VERSION, AUTHOR_NAME, REL::Module::get().version().string("."));
+    
     auto messaging = SKSE::GetMessagingInterface();
     if (!messaging || !messaging->RegisterListener(MCMMemory::HandleSKSEMessage)) {
         logger::critical("Failed to register SKSE message listener");
         return false;
     }
 
-    logger::info("{} plugin is loaded", BEAUTIFUL_NAME);
+    logger::info("SKSE message listener is registered successfully");
 
     return true;
 }

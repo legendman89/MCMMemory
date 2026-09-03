@@ -23,7 +23,7 @@ namespace MCMMemory
         modEvents->AddEventSink(static_cast<RE::BSTEventSink<SKSE::ModCallbackEvent>*>(this));
         ui->AddEventSink<RE::MenuOpenCloseEvent>(static_cast<RE::BSTEventSink<RE::MenuOpenCloseEvent>*>(this));
         installed = true;
-        logger::info("Persistent profile restore events installed");
+        logger::info("Persistent profile restore events are successfully installed");
         return true;
     }
 

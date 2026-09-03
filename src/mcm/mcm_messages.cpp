@@ -61,7 +61,7 @@ namespace MCMMemory
             }
             function = std::move(candidate);
             
-            logger::info("SkyUI message handling installed for watched backup/restore calls");
+            logger::info("SkyUI message handling is successfully installed for watched backup/restore calls");
 
             return true;
         }

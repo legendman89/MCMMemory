@@ -161,7 +161,7 @@ namespace MCMMemory
         }
         events->AddEventSink(this);
         installed = true;
-        logger::info("Jaxonz MCM Kicker detected; scripted operations will wait for its reset and registration");
+        logger::info("Jaxonz MCM Kicker detected, scripted operations will wait for its reset and registration");
     }
 
     void MCMKickerSupport::Reset()
@@ -478,10 +478,10 @@ namespace MCMMemory
     {
         MCMKickerSupport::GetSingleton()->Install();
         if (IsMCMMenuRedoneAvailable()) {
-            logger::info("MCM Menu Redone detected; its registry will be used");
+            logger::info("MCM Menu Redone detected, its registry will be used");
         }
         else if (IsMCMUnlockedAvailable()) {
-            logger::info("MCM Unlocked detected; its marker registry will be used");
+            logger::info("MCM Unlocked detected, its marker registry will be used");
         }
         else {
             logger::info("SkyUI registry will be used");

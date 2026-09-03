@@ -85,12 +85,14 @@ namespace MCMMemory
         logger::info(
             "Loaded Settings:\n"
             FOREACH_SETTING(LOG_FORMATTER)
+            " {:<30s} : {}\n"
+            " {:<30s} : {}\n"
             FOREACH_SETTING(LOG_SETTING)
+            , "Auto restore exclusions", settings.autoRestoreExcludedMCMs.size()
+            , "Active profile", settings.activeProfile
         );
 #undef LOG_SETTING
 #undef LOG_FORMATTER
-        logger::info(" {:<30s} : {}", "Auto restore exclusions", settings.autoRestoreExcludedMCMs.size());
-        logger::info(" {:<30s} : {}", "Active profile", settings.activeProfile);
 
         return true;
     }

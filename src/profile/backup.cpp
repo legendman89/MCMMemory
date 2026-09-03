@@ -24,7 +24,7 @@ namespace MCMMemory
 
         ui->AddEventSink<RE::MenuOpenCloseEvent>(this);
         installed = true;
-        logger::info("Full MCM backup menu protection installed");
+        logger::info("Full MCM backup menu protection is successfully installed");
         return true;
     }
 

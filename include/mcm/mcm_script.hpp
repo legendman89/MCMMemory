@@ -34,6 +34,8 @@ namespace MCMMemory
 
         std::optional<MCMPage> ReadCurrentPage() const;
 
+        std::optional<float> ReadGlobalValue(std::string_view a_name) const;
+
         // Reads the controls SkyUI prepared for the currently loaded page.
         bool ReadPage(const MCMIdentity& a_identity, std::string_view a_pageName, int a_pageIndex, std::vector<CapturedSetting>& a_settings) const;
 
@@ -44,6 +46,8 @@ namespace MCMMemory
         std::optional<std::string> ReadStateName(int a_optionIndex) const;
 
         std::optional<MCMControl> ReadControl(int a_optionIndex) const;
+
+        bool CanSelectOption(int a_optionIndex) const;
 
         // A state-based toggle can move to another row after a page reset.
         // Some mods clear the page to hide disabled controls.
@@ -64,9 +68,14 @@ namespace MCMMemory
             return a_optionIndex >= 0 ? ReadString("_textBuf", static_cast<size_t>(a_optionIndex)) : std::nullopt;
         }
 
+        inline std::optional<std::string> ReadOptionText(int a_optionIndex) const
+        {
+            return a_optionIndex >= 0 ? ReadString("_strValueBuf", static_cast<size_t>(a_optionIndex)) : std::nullopt;
+        }
+
     private:
 
-        friend struct VioLensSupport;
+        friend struct SkyUICycleSupport;
 
         // Supports normal variables, properties, and their generated Papyrus backing names.
         const RE::BSScript::Variable* FindVariable(std::string_view a_name) const;

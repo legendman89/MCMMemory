@@ -5,14 +5,14 @@
 
 namespace MCMMemory
 {
-    bool Restore::CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_result)
+    bool Restore::CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_result, bool a_acceptConfirmation)
     {
         if (a_mcmIndex >= restoreMCMs.size()) {
             delete a_arguments;
             return false;
         }
         const auto& mcm = restoreMCMs[a_mcmIndex];
-        return callWatch.Call(MCMScript(mcm.mcmScript), mcm.identity.modID, a_functionName, a_arguments, std::move(a_result));
+        return callWatch.Call(MCMScript(mcm.mcmScript), mcm.identity.modID, a_functionName, a_arguments, std::move(a_result), a_acceptConfirmation);
     }
 
     bool Restore::RestoreToggle(const RestoreAction& a_action, SKSE::TaskInterface::TaskFn a_result)
@@ -27,26 +27,28 @@ namespace MCMMemory
         }
         MCMScript script(restoreMCMs[a_action.mcmIndex].mcmScript);
         if (a_action.type == RestoreActionType::ApplyCycle) {
-            const auto* cycle = VioLensSupport::FindCycle(a_action.stringValue);
+            const auto& modID = restoreMCMs[a_action.mcmIndex].identity.modID;
+            const auto* cycle = SkyUICycleSupport::Find(modID, a_action.stringValue);
             auto page = script.ReadCurrentPage();
-            if (!cycle || !VioLensSupport::IsSupported(script) || !page || !page->Matches(a_action.pageName, a_action.pageIndex) || a_action.optionLabel != cycle->optionLabel || !a_action.stateName.empty()) {
+            if (!cycle || !page || !page->Matches(a_action.pageName, a_action.pageIndex) || a_action.optionLabel != cycle->profileLabel || !a_action.stateName.empty()) {
                 return false;
             }
-            if (a_action.refreshingCycle || VioLensSupport::FindCycleIndex(script, *cycle, true)) {
+            if (a_action.refreshingCycle || SkyUICycleSupport::FindOption(script, *cycle, true)) {
                 return true;
             }
             // A matching disabled value needs no click. A different one must still be skipped safely.
-            auto value = VioLensSupport::ReadCycleValue(script, *cycle);
-            return value && *value == a_action.integerValue && VioLensSupport::FindCycleIndex(script, *cycle).has_value();
+            auto value = SkyUICycleSupport::ReadValue(script, *cycle);
+            return value && *value == a_action.integerValue && SkyUICycleSupport::FindOption(script, *cycle).has_value();
         }
+
         if (VioLensSupport::IsSupported(script)) {
             auto liveState = script.ReadStateName(a_action.optionIndex);
             auto liveLabel = script.ReadOptionLabel(a_action.optionIndex);
             auto page = script.ReadCurrentPage();
             const auto& modID = restoreMCMs[a_action.mcmIndex].identity.modID;
             // Older profiles may not contain the state name. Check the live row as well.
-            const bool savedCommand = VioLensSupport::IsCommand(modID, a_action.stateName, a_action.pageIndex, a_action.optionLabel);
-            const bool liveCommand = VioLensSupport::IsCommand(modID, liveState.value_or(""), page ? page->index : -1, liveLabel.value_or(""));
+            const bool savedCommand = MCMCommandSupport::IsIgnored(modID, a_action.pageName, a_action.pageIndex, a_action.controlType, a_action.stateName, a_action.optionLabel);
+            const bool liveCommand = MCMCommandSupport::IsIgnored(modID, page ? page->name : "", page ? page->index : -1, a_action.controlType, liveState.value_or(""), liveLabel.value_or(""));
             if (savedCommand || liveCommand) {
                 return false;
             }
@@ -79,8 +81,9 @@ namespace MCMMemory
 
         MCMScript script(restoreMCMs[a_action.mcmIndex].mcmScript);
         if (a_action.type == RestoreActionType::ApplyCycle) {
-            const auto* cycle = VioLensSupport::FindCycle(a_action.stringValue);
-            auto value = cycle ? VioLensSupport::ReadCycleValue(script, *cycle) : std::nullopt;
+            const auto& modID = restoreMCMs[a_action.mcmIndex].identity.modID;
+            const auto* cycle = SkyUICycleSupport::Find(modID, a_action.stringValue);
+            auto value = cycle ? SkyUICycleSupport::ReadValue(script, *cycle) : std::nullopt;
             return a_action.refreshingCycle || !value || *value != a_action.integerValue;
         }
         if (a_action.type == RestoreActionType::SetMenuIndex) {
@@ -117,9 +120,10 @@ namespace MCMMemory
             return;
         }
         a_action.refreshingCycle = false;
-        const auto* cycle = VioLensSupport::FindCycle(a_action.stringValue);
         MCMScript script(restoreMCMs[a_action.mcmIndex].mcmScript);
-        auto value = cycle ? VioLensSupport::ReadCycleValue(script, *cycle) : std::nullopt;
+        const auto& modID = restoreMCMs[a_action.mcmIndex].identity.modID;
+        const auto* cycle = SkyUICycleSupport::Find(modID, a_action.stringValue);
+        auto value = cycle ? SkyUICycleSupport::ReadValue(script, *cycle) : std::nullopt;
         if (a_continue && value && *value == a_action.integerValue) {
             ++mcmStats.appliedSettingCount;
             logger::info("Restored cycling setting '{}' in {} clicks (value {})", a_action.stringValue, a_action.cycleClicks, *value);
@@ -146,15 +150,29 @@ namespace MCMMemory
                 return CallMCMFunction(a_action.mcmIndex, "SetPage", RE::MakeFunctionArguments(std::string{ a_action.pageName }, int{ a_action.pageIndex }), std::move(a_result));
             }
             MCMScript script(restoreMCMs[a_action.mcmIndex].mcmScript);
-            const auto* cycle = VioLensSupport::FindCycle(a_action.stringValue);
-            auto index = cycle ? VioLensSupport::FindCycleIndex(script, *cycle, true) : std::nullopt;
-            auto value = cycle ? VioLensSupport::ReadCycleValue(script, *cycle) : std::nullopt;
+            const auto& modID = restoreMCMs[a_action.mcmIndex].identity.modID;
+            const auto* cycle = SkyUICycleSupport::Find(modID, a_action.stringValue);
+            auto index = cycle ? SkyUICycleSupport::FindOption(script, *cycle, true) : std::nullopt;
+            auto value = cycle ? SkyUICycleSupport::ReadValue(script, *cycle) : std::nullopt;
             if (!cycle || !index || !value || a_action.cycleClicks >= cycle->valueCount - 1) {
                 return false;
             }
             a_action.previousCycleValue = *value;
             ++a_action.cycleClicks;
             return CallMCMFunction(a_action.mcmIndex, "SelectOption", RE::MakeFunctionArguments(int{ *index }), std::move(a_result));
+        }
+        // The MCM activation control is not a setting, so it is handled separately.
+        if (a_action.type == RestoreActionType::ActivateMCM) {
+            MCMScript script(restoreMCMs[a_action.mcmIndex].mcmScript);
+            const auto& activation = restoreMCMs[a_action.mcmIndex].activation;
+            auto optionIndex = activation ? MCMActivationSupport::FindOption(script, *activation) : std::nullopt;
+            if (!optionIndex) {
+                logger::error("Could not find the recorded MCM activation control in '{}'", restoreMCMs[a_action.mcmIndex].identity.modID);
+                return false;
+            }
+            a_action.optionIndex = *optionIndex;
+            logger::info("Activating MCM '{}' before restoring its settings", restoreMCMs[a_action.mcmIndex].identity.modID);
+            return CallMCMFunction(a_action.mcmIndex, "SelectOption", RE::MakeFunctionArguments(int{ *optionIndex }), std::move(a_result), true);
         }
 
         auto functionName = RestoreActionFunctionName(a_action.type);

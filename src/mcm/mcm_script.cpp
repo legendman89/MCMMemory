@@ -62,6 +62,17 @@ namespace MCMMemory
         return value;
     }
 
+    std::optional<float> MCMScript::ReadGlobalValue(std::string_view a_name) const
+    {
+        const auto* value = FindVariable(a_name);
+        auto globalObject = value && value->IsObject() ? value->GetObject() : RE::BSTSmartPointer<RE::BSScript::Object>();
+        auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+        auto* policy = vm ? vm->GetObjectHandlePolicy() : nullptr;
+        auto* form = policy && globalObject ? policy->GetObjectForHandle(RE::FormType::Global, globalObject->GetHandle()) : nullptr;
+        auto* global = form ? form->As<RE::TESGlobal>() : nullptr;
+        return global ? std::optional<float>(global->value) : std::nullopt;
+    }
+
     std::optional<float> MCMScript::ReadNumber(std::string_view a_name, size_t a_index) const
     {
         auto values = ReadArray(a_name);
@@ -120,6 +131,11 @@ namespace MCMMemory
 
     bool MCMScript::ReadPage(const MCMIdentity& a_identity, std::string_view a_pageName, int a_pageIndex, std::vector<CapturedSetting>& a_settings) const
     {
+        if (MCMCommandSupport::IsIgnoredPage(a_pageName)) {
+            logger::debug("Ignoring configuration-management page '{}' in '{}'", a_pageName, a_identity.modID);
+            return true;
+        }
+
         auto flags = ReadArray("_optionFlagsBuf");
         auto labels = ReadArray("_textBuf");
         auto numbers = ReadArray("_numValueBuf");
@@ -145,7 +161,10 @@ namespace MCMMemory
             }
 
             auto label = ReadString("_textBuf", optionIndex);
-            if (!label || label->empty()) {
+            if (!label) {
+                continue;
+            }
+            if (label->empty() && (skyUIType != 2 || !SkyUICycleSupport::Find(*this, static_cast<int>(optionIndex)))) {
                 continue;
             }
 
@@ -166,13 +185,13 @@ namespace MCMMemory
                     setting.stateName = state.GetString();
                 }
             }
-            if (VioLensSupport::IsCommand(a_identity.modID, setting.stateName, a_pageIndex, setting.optionLabel)) {
+            if (MCMCommandSupport::IsIgnored(a_identity.modID, a_pageName, a_pageIndex, setting.type, setting.stateName, setting.optionLabel)) {
                 continue;
             }
 
             switch (skyUIType) {
             case 2:
-                VioLensSupport::ReadCycleSetting(*this, setting);
+                SkyUICycleSupport::ReadSetting(*this, setting);
                 break;
             case 3:
                 setting.type = ControlType::Option;
@@ -233,8 +252,8 @@ namespace MCMMemory
         const size_t index = static_cast<size_t>(a_optionIndex);
         switch (a_type) {
         case ControlType::Cycle:
-            if (const auto* cycle = VioLensSupport::FindCycle(*this, a_optionIndex)) {
-                if (auto value = VioLensSupport::ReadCycleValue(*this, *cycle)) {
+            if (const auto* cycle = SkyUICycleSupport::Find(*this, a_optionIndex)) {
+                if (auto value = SkyUICycleSupport::ReadValue(*this, *cycle)) {
                     return nlohmann::json(*value);
                 }
             }
@@ -290,7 +309,7 @@ namespace MCMMemory
         }
 
         const int skyUIType = static_cast<int>(*flag) % 256;
-        if (skyUIType == 2 && VioLensSupport::FindCycle(*this, a_optionIndex)) {
+        if (skyUIType == 2 && SkyUICycleSupport::Find(*this, a_optionIndex)) {
             return ControlType::Cycle;
         }
         if (skyUIType < 0 || static_cast<size_t>(skyUIType) >= skyUIControlTypes.size()) {
@@ -316,7 +335,15 @@ namespace MCMMemory
     {
         auto type = ReadControlType(a_optionIndex);
         auto label = ReadOptionLabel(a_optionIndex);
-        if (!type || !label || label->empty()) {
+        if (!type || !label) {
+            return std::nullopt;
+        }
+
+        // Some text buttons leave their label empty and put the visible command in the value buffer.
+        if (label->empty() && *type == ControlType::Unknown) {
+            label = ReadOptionText(a_optionIndex);
+        }
+        if (!label || (label->empty() && *type != ControlType::Cycle)) {
             return std::nullopt;
         }
 
@@ -325,6 +352,16 @@ namespace MCMMemory
         control.stateName = ReadStateName(a_optionIndex).value_or("");
         control.type = *type;
         return control;
+    }
+
+    bool MCMScript::CanSelectOption(int a_optionIndex) const
+    {
+        auto flag = a_optionIndex >= 0 ? ReadNumber("_optionFlagsBuf", static_cast<size_t>(a_optionIndex)) : std::nullopt;
+        if (!flag) {
+            return false;
+        }
+        const int flagsOnly = static_cast<int>(*flag) / 256;
+        return (flagsOnly & 2) == 0;
     }
 
     std::optional<int> MCMScript::FindControlIndex(const MCMControl& a_control, int a_previousIndex) const

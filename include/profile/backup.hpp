@@ -3,6 +3,7 @@
 #include "mcm/mcm_registry.hpp"
 #include "mcm/mcm_script.hpp"
 #include "mcm/mcm_calls.hpp"
+#include "mcm/mcm_support.hpp"
 #include "profile/activity.hpp"
 #include "profile/profile.hpp"
 #include "profile/stats.hpp"
@@ -150,6 +151,9 @@ namespace MCMMemory
         RegistryWait registryWait;
 
         MCMCallWatch callWatch;
+
+        // For activation detection. I still working out a way to make this more generic.
+        std::optional<MCMActivationState> mcmActivation;
 
         size_t firstPassCount{};
 

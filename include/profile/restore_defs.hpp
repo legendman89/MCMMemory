@@ -3,6 +3,8 @@
 #define FOREACH_RESTORE_ACTION(RESTORE_ACTION) \
     RESTORE_ACTION(OpenConfig, OpenConfig, None, false) \
     RESTORE_ACTION(SetPage, SetPage, Page, false) \
+    RESTORE_ACTION(ActivateMCM, SelectOption, OptionIndex, false) \
+    RESTORE_ACTION(VerifyMCM, VerifyMCM, None, false) \
     RESTORE_ACTION(ApplyToggle, SelectOption, ToggleValue, true) \
     RESTORE_ACTION(ApplyCycle, SelectOption, OptionIndex, true) \
     RESTORE_ACTION(RequestSliderDialogData, RequestSliderDialogData, OptionIndex, false) \

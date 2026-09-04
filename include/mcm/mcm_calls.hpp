@@ -45,6 +45,9 @@ namespace MCMMemory
 
         std::atomic<bool> confirmationDeclined{};
 
+        // Known activation commands may accept their own confirmation prompt.
+        bool acceptConfirmation{};
+
         // Test mode keeps this call waiting even after its real callback arrives.
         bool simulateUnresponsive{};
     };
@@ -76,7 +79,7 @@ namespace MCMMemory
         void Release(bool a_abandonPending = false);
 
         // Calls an MCM function asynchronously through the Papyrus VM.
-        bool Call(const MCMScript& a_script, std::string_view a_modID, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_task);
+        bool Call(const MCMScript& a_script, std::string_view a_modID, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_task, bool a_acceptConfirmation = false);
 
         // Checks the status of the pending MCM call.
         MCMCallStatus Check();

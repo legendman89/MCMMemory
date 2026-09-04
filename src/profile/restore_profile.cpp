@@ -35,7 +35,7 @@ namespace MCMMemory
 
     bool Restore::AddSettingActions(const CapturedSetting& a_setting)
     {
-        if (!a_setting.identityComplete || VioLensSupport::IsCommand(a_setting.selection.identity.modID, a_setting.stateName, a_setting.selection.pageIndex, a_setting.optionLabel)) {
+        if (!a_setting.identityComplete || MCMCommandSupport::IsIgnored(a_setting.selection.identity.modID, a_setting.selection.pageName, a_setting.selection.pageIndex, a_setting.type, a_setting.stateName, a_setting.optionLabel)) {
             return false;
         }
 
@@ -49,8 +49,8 @@ namespace MCMMemory
         // Check the saved value and build the calls needed by this control.
         switch (a_setting.type) {
             case ControlType::Cycle: {
-                const auto* cycle = VioLensSupport::FindCycle(a_setting.settingID);
-                if (!VioLensSupport::IsSupported(a_setting.selection.identity.modID) || !cycle || a_setting.selection.pageIndex != 0 || !a_setting.value.is_number_integer() || a_setting.value < 0 || a_setting.value >= cycle->valueCount) {
+                const auto* cycle = SkyUICycleSupport::Find(a_setting.selection.identity.modID, a_setting.settingID);
+                if (!cycle || a_setting.selection.pageIndex != cycle->pageIndex || !a_setting.value.is_number_integer() || a_setting.value < 0 || a_setting.value >= cycle->valueCount) {
                     logger::warn("Skipping unknown or invalid cycling setting '{}'", a_setting.settingID);
                     return false;
                 }
@@ -181,11 +181,11 @@ namespace MCMMemory
             return false;
         }
 
-        VioLensSupport::OrderSettings(profile);
+        VioLensSupport::OrderSettings(profile.settings);
         size_t supportedSettingCount{};
         size_t excludedSettingCount{};
         MCMFilter loggedExclusions;
-        for (const auto& setting : profile) {
+        for (const auto& setting : profile.settings) {
             const auto& modID = setting.selection.identity.modID;
             const bool selected = AllowsMCM(mcmFilter, modID);
             const bool automaticEnabled = operationMode != OperationMode::Automatic || GetSettings().IsAutoRestoreEnabled(modID);
@@ -211,6 +211,12 @@ namespace MCMMemory
             }
             if (AddSettingActions(setting)) {
                 ++supportedSettingCount;
+            }
+        }
+
+        for (auto& mcm : restoreMCMs) {
+            if (const auto* activation = profile.FindActivation(mcm.identity.modID)) {
+                mcm.activation = *activation;
             }
         }
 

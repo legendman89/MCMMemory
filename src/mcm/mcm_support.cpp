@@ -6,6 +6,239 @@
 
 namespace MCMMemory
 {
+    bool MCMCommandSupport::IsIgnoredPage(std::string_view a_pageName)
+    {
+        for (const auto term : ignoredMCMPageTerms) {
+            if (ContainsCaseInsensitive(a_pageName, term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool MCMCommandSupport::IsIgnored(std::string_view a_modID, std::string_view a_pageName, int a_pageIndex, ControlType a_type, std::string_view a_stateName, std::string_view a_optionLabel)
+    {
+        if (IsIgnoredPage(a_pageName) || VioLensSupport::IsCommand(a_modID, a_stateName, a_pageIndex, a_optionLabel)) {
+            return true;
+        }
+        for (const auto& control : ignoredMCMControls) {
+            if (HasMCMScript(a_modID, control.scriptName) && a_pageIndex == control.pageIndex && a_type == control.type && EqualsCaseInsensitive(a_optionLabel, control.optionLabel)) {
+                return true;
+            }
+        }
+        if (a_type != ControlType::Unknown) {
+            return false;
+        }
+        for (const auto term : ignoredMCMCommandTerms) {
+            if (ContainsCaseInsensitive(a_optionLabel, term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::string MCMActivationSupport::MakeEnabledText(std::string_view a_text, const MCMActivationStatus& a_status)
+    {
+        for (size_t start = 0; start + a_status.disabledText.size() <= a_text.size(); ++start) {
+            bool matches = true;
+            for (size_t index = 0; index < a_status.disabledText.size(); ++index) {
+                if (ToLowerASCII(static_cast<unsigned char>(a_text[start + index])) != ToLowerASCII(static_cast<unsigned char>(a_status.disabledText[index]))) {
+                    matches = false;
+                    break;
+                }
+            }
+            if (matches) {
+                std::string enabledText(a_text);
+                enabledText.replace(start, a_status.disabledText.size(), a_status.enabledText);
+                return enabledText;
+            }
+        }
+        return {};
+    }
+
+    bool MCMActivationSupport::HasActivationName(const MCMControl& a_control)
+    {
+        for (const auto term : mcmActivationLabelTerms) {
+            if (ContainsCaseInsensitive(a_control.optionLabel, term) || ContainsCaseInsensitive(a_control.stateName, term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool MCMActivationSupport::HasActivationStatusName(const MCMControl& a_control)
+    {
+        for (const auto& status : mcmActivationStatuses) {
+            if (ContainsCaseInsensitive(a_control.optionLabel, status.enabledText) || ContainsCaseInsensitive(a_control.optionLabel, status.disabledText) || ContainsCaseInsensitive(a_control.stateName, status.enabledText) || ContainsCaseInsensitive(a_control.stateName, status.disabledText)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::optional<bool> MCMActivationSupport::ReadCommandState(const MCMControl& a_control, const MCMIdentity& a_identity)
+    {
+        const auto displayText = GetDisplayText(a_control.optionLabel);
+        const auto displayModName = GetDisplayModName(a_identity.modName);
+        if (a_control.type != ControlType::Unknown || displayModName.empty() || !ContainsCaseInsensitive(displayText, displayModName)) {
+            return std::nullopt;
+        }
+
+        for (const auto& command : mcmActivationCommands) {
+            if (ContainsCaseInsensitiveWordStart(a_control.optionLabel, command.enableText) || ContainsCaseInsensitiveWordStart(displayText, command.enableText)) {
+                return false;
+            }
+            if (ContainsCaseInsensitiveWordStart(a_control.optionLabel, command.disableText) || ContainsCaseInsensitiveWordStart(displayText, command.disableText)) {
+                return true;
+            }
+        }
+        return std::nullopt;
+    }
+
+    MCMActivation MCMActivationSupport::MakeActivation(const MCMIdentity& a_identity, std::string_view a_pageName, int a_pageIndex, int a_optionIndex, const MCMControl& a_control)
+    {
+        MCMActivation activation;
+        activation.selection.identity = a_identity;
+        activation.selection.pageName = a_pageName;
+        activation.selection.pageIndex = a_pageIndex;
+        activation.selection.optionIndex = a_optionIndex;
+        activation.optionLabel = a_control.optionLabel;
+        activation.stateName = a_control.stateName;
+        activation.type = a_control.type;
+        return activation;
+    }
+
+    std::optional<MCMActivationState> MCMActivationSupport::ReadSelectedState(const MCMScript& a_script, const MCMIdentity& a_identity, std::string_view a_pageName, int a_pageIndex, int a_optionIndex, const MCMControl& a_control)
+    {
+        if (!CanBeStaged(a_script)) {
+            return std::nullopt;
+        }
+
+        auto commandState = ReadCommandState(a_control, a_identity);
+        if (commandState) {
+            MCMActivationState result;
+            result.activation = MakeActivation(a_identity, a_pageName, a_pageIndex, a_optionIndex, a_control);
+            result.activation.startCommand = true;
+            result.enabled = *commandState;
+            return result;
+        }
+
+        auto result = ReadState(a_script, a_identity, a_pageName, a_pageIndex);
+        if (!result || !MatchesControl(a_control, result->activation)) {
+            return std::nullopt;
+        }
+        return result;
+    }
+
+    std::optional<MCMActivationState> MCMActivationSupport::ReadState(const MCMScript& a_script, const MCMIdentity& a_identity, std::string_view a_pageName, int a_pageIndex)
+    {
+        if (!CanBeStaged(a_script) || a_pageIndex < -1 || a_pageIndex > 0) {
+            return std::nullopt;
+        }
+
+        for (int index = 0; index < 128; ++index) {
+            auto control = a_script.ReadControl(index);
+            if (!control || (control->type != ControlType::Unknown && control->type != ControlType::Option)) {
+                continue;
+            }
+
+            auto commandState = ReadCommandState(*control, a_identity);
+            if (!commandState && !HasActivationName(*control)) {
+                continue;
+            }
+
+            if (control->type == ControlType::Option && !HasActivationStatusName(*control)) {
+                continue;
+            }
+
+            MCMActivationState result;
+            result.activation = MakeActivation(a_identity, a_pageName, a_pageIndex, index, *control);
+
+            if (commandState) {
+                result.activation.startCommand = true;
+                result.enabled = *commandState;
+                return result;
+            }
+
+            if (control->type == ControlType::Option) {
+                auto value = a_script.ReadCurrentValue(ControlType::Option, index);
+                if (value && value->is_boolean()) {
+                    result.enabled = value->get<bool>();
+                    return result;
+                }
+                continue;
+            }
+
+            auto text = a_script.ReadOptionText(index);
+            if (!text) {
+                continue;
+            }
+
+            for (const auto& status : mcmActivationStatuses) {
+                const bool disabled = ContainsCaseInsensitive(*text, status.disabledText);
+                const bool enabled = !disabled && ContainsCaseInsensitive(*text, status.enabledText);
+                if (!enabled && !disabled) {
+                    continue;
+                }
+
+                result.activation.enabledText = enabled ? std::move(*text) : MakeEnabledText(*text, status);
+                result.enabled = enabled;
+                if (!result.activation.enabledText.empty()) {
+                    return result;
+                }
+            }
+        }
+        return std::nullopt;
+    }
+
+    std::optional<int> MCMActivationSupport::FindOption(const MCMScript& a_script, const MCMActivation& a_activation)
+    {
+        if (a_activation.startCommand) {
+            for (int index = 0; index < 128; ++index) {
+                auto control = a_script.ReadControl(index);
+                if (control && ReadCommandState(*control, a_activation.selection.identity)) {
+                    return index;
+                }
+            }
+            return std::nullopt;
+        }
+
+        MCMControl control;
+        control.optionLabel = a_activation.optionLabel;
+        control.stateName = a_activation.stateName;
+        control.type = a_activation.type;
+        return a_script.FindControlIndex(control, a_activation.selection.optionIndex);
+    }
+
+    bool MCMActivationSupport::MatchesControl(const MCMControl& a_control, const MCMActivation& a_activation)
+    {
+        if (a_control.type != a_activation.type) {
+            return false;
+        }
+        if (a_activation.startCommand) {
+            return ReadCommandState(a_control, a_activation.selection.identity).has_value();
+        }
+        if (!a_control.stateName.empty() && !a_activation.stateName.empty()) {
+            return a_control.stateName == a_activation.stateName;
+        }
+        return a_control.optionLabel == a_activation.optionLabel || HasActivationName(a_control);
+    }
+
+    std::optional<bool> MCMActivationSupport::IsEnabled(const MCMScript& a_script, const MCMActivation& a_activation)
+    {
+        auto index = FindOption(a_script, a_activation);
+        if (a_activation.startCommand) {
+            auto control = index ? a_script.ReadControl(*index) : std::nullopt;
+            return control ? ReadCommandState(*control, a_activation.selection.identity) : std::nullopt;
+        }
+        if (a_activation.type == ControlType::Option) {
+            auto value = index ? a_script.ReadCurrentValue(ControlType::Option, *index) : std::nullopt;
+            return value && value->is_boolean() ? std::optional<bool>(value->get<bool>()) : std::nullopt;
+        }
+        auto text = index ? a_script.ReadOptionText(*index) : std::nullopt;
+        return text ? std::optional<bool>(EqualsCaseInsensitive(*text, a_activation.enabledText)) : std::nullopt;
+    }
+
     bool VioLensSupport::IsCommand(std::string_view a_modID, std::string_view a_stateName, int a_pageIndex, std::string_view a_optionLabel)
     {
         if (!IsSupported(a_modID)) {
@@ -35,28 +268,29 @@ namespace MCMMemory
         return false;
     }
 
-    const MCMCycleSetting* VioLensSupport::FindCycle(std::string_view a_settingID)
+    const MCMCycleSetting* SkyUICycleSupport::Find(std::string_view a_modID, std::string_view a_settingID)
     {
-        for (const auto& setting : cyclingSettings) {
-            if (setting.optionVariable == a_settingID) {
+        for (const auto& setting : mcmCycleSettings) {
+            if (HasMCMScript(a_modID, setting.scriptName) && setting.optionVariable == a_settingID) {
                 return &setting;
             }
         }
         return nullptr;
     }
 
-    std::optional<int> VioLensSupport::FindCycleIndex(const MCMScript& a_script, const MCMCycleSetting& a_setting, bool a_requireEnabled)
+    std::optional<int> SkyUICycleSupport::FindOption(const MCMScript& a_script, const MCMCycleSetting& a_setting, bool a_requireEnabled)
     {
         auto page = a_script.ReadCurrentPage();
-        if (!IsSupported(a_script) || !page || page->index != 0) {
+        if (!a_script.IsBasedOn(a_setting.scriptName) || !page || page->index != a_setting.pageIndex) {
             return std::nullopt;
         }
         auto option = a_script.ReadInteger(a_setting.optionVariable);
         // SkyUI IDs include the page number in their high byte; the buffer index does not.
-        if (!option || *option < 256 || *option >= 384) {
+        const int pageOffset = (a_setting.pageIndex + 1) * 256;
+        if (!option || *option < pageOffset || *option >= pageOffset + 128) {
             return std::nullopt;
         }
-        const int index = *option - 256;
+        const int index = *option - pageOffset;
         auto flags = a_script.ReadNumber("_optionFlagsBuf", static_cast<size_t>(index));
         auto label = a_script.ReadOptionLabel(index);
         if (!flags || !label || *label != a_setting.optionLabel) {
@@ -68,10 +302,10 @@ namespace MCMMemory
 
         // Only the real disabled camera row is readable. Reject the "$Disabled" placeholder,
         // which can occupy the same slot while the script still holds an old option ID.
-        if (!a_requireEnabled && static_cast<int>(*flags) == 258 && a_setting.optionVariable == "RangedPerspectiveOID") {
-            auto value = ReadCycleValue(a_script, a_setting);
+        if (!a_requireEnabled && a_setting.readableWhenDisabled && static_cast<int>(*flags) == 258) {
+            auto value = ReadValue(a_script, a_setting);
             auto text = a_script.ReadString("_strValueBuf", static_cast<size_t>(index));
-            auto expected = value ? a_script.ReadString("RangedPerspectiveList", static_cast<size_t>(*value)) : std::nullopt;
+            auto expected = value && !a_setting.valueTextArray.empty() ? a_script.ReadString(a_setting.valueTextArray, static_cast<size_t>(*value)) : std::nullopt;
             if (text && expected && *text == *expected) {
                 return index;
             }
@@ -79,43 +313,60 @@ namespace MCMMemory
         return std::nullopt;
     }
 
-    const MCMCycleSetting* VioLensSupport::FindCycle(const MCMScript& a_script, int a_optionIndex)
+    const MCMCycleSetting* SkyUICycleSupport::Find(const MCMScript& a_script, int a_optionIndex)
     {
-        if (a_optionIndex < 0 || !IsSupported(a_script)) {
+        if (a_optionIndex < 0) {
             return nullptr;
         }
-        for (const auto& setting : cyclingSettings) {
-            if (FindCycleIndex(a_script, setting) == a_optionIndex) {
+        for (const auto& setting : mcmCycleSettings) {
+            if (a_script.IsBasedOn(setting.scriptName) && FindOption(a_script, setting) == a_optionIndex) {
                 return &setting;
             }
         }
         return nullptr;
     }
 
-    std::optional<int> VioLensSupport::ReadCycleValue(const MCMScript& a_script, const MCMCycleSetting& a_setting)
+    std::optional<int> SkyUICycleSupport::ReadValue(const MCMScript& a_script, const MCMCycleSetting& a_setting)
     {
-        if (!IsSupported(a_script)) {
+        if (!a_script.IsBasedOn(a_setting.scriptName)) {
             return std::nullopt;
         }
-        auto value = a_script.ReadInteger(a_setting.valueVariable);
-        return value && *value >= 0 && *value < a_setting.valueCount ? value : std::nullopt;
+        std::optional<int> rawValue;
+        if (a_setting.valueSource == MCMCycleValueSource::GlobalVariable) {
+            auto value = a_script.ReadGlobalValue(a_setting.valueVariable);
+            if (value) {
+                rawValue = static_cast<int>(*value);
+            }
+        }
+        else {
+            rawValue = a_script.ReadInteger(a_setting.valueVariable);
+        }
+        if (!rawValue) {
+            return std::nullopt;
+        }
+        for (int index = 0; index < a_setting.valueCount; ++index) {
+            if (a_setting.values[static_cast<size_t>(index)] == *rawValue) {
+                return index;
+            }
+        }
+        return std::nullopt;
     }
 
-    bool VioLensSupport::ReadCycleSetting(const MCMScript& a_script, CapturedSetting& a_setting)
+    bool SkyUICycleSupport::ReadSetting(const MCMScript& a_script, CapturedSetting& a_setting)
     {
-        const auto* cycle = FindCycle(a_script, a_setting.selection.optionIndex);
+        const auto* cycle = Find(a_script, a_setting.selection.optionIndex);
         if (!cycle) {
             return false;
         }
-        auto value = ReadCycleValue(a_script, *cycle);
+        auto value = ReadValue(a_script, *cycle);
         if (!value) {
             return false;
         }
         a_setting.type = ControlType::Cycle;
         a_setting.settingID = cycle->optionVariable;
-        a_setting.optionLabel = cycle->optionLabel;
+        a_setting.optionLabel = cycle->profileLabel;
         a_setting.value = *value;
-        a_setting.valueSource = std::format("script.{}", cycle->valueVariable);
+        a_setting.valueSource = std::format("{}.{}", cycle->valueSource == MCMCycleValueSource::GlobalVariable ? "global" : "script", cycle->valueVariable);
         return true;
     }
 
@@ -170,7 +421,7 @@ namespace MCMMemory
         ++loadedGameSession;
         ++cacheGeneration;
         registryWait.Reset();
-        resetObserved = false;
+        resetDetected = false;
         status = !kickerQuest ? Status::Inactive : installed ? Status::Waiting : Status::Failed;
         if (status == Status::Waiting) {
             logger::info("Waiting for MCM Kicker to reset the registry in this game session");
@@ -221,15 +472,18 @@ namespace MCMMemory
             status = Status::Waiting;
             QueueCheck();
         }
-        resetObserved = true;
+        resetDetected = true;
         registryWait.modIDs.clear();
         registryWait.quietCheckCount = 0;
         ++cacheGeneration;
-        // Redone cached scripts may still describe the registry from before the reset.
+        // A cached registry may still describe the menus from before the reset.
         if (MCMRegistry::IsMCMMenuRedoneAvailable()) {
             MCMMenuRedoneRegistry::GetSingleton()->Reset();
         }
-        logger::info("MCM Kicker reset observed; waiting for the rebuilt registry to settle");
+        else if (MCMRegistry::IsMCMMenuMaidAvailable()) {
+            MCMMenuMaidRegistry::GetSingleton()->Reset();
+        }
+        logger::info("MCM Kicker reset detected; waiting for the rebuilt registry to settle");
         return RE::BSEventNotifyControl::kContinue;
     }
 
@@ -255,7 +509,7 @@ namespace MCMMemory
             return;
         }
         std::vector<MCMRegistryEntry> mcms;
-        if (resetObserved) {
+        if (resetDetected) {
             mcms = MCMRegistry().ReadRegisteredMCMs();
             if (MCMRegistry::IsRefreshing()) {
                 mcms.clear();
@@ -271,13 +525,13 @@ namespace MCMMemory
         if (result == RegistryWaitResult::Expired) {
             status = Status::Failed;
             ++cacheGeneration;
-            logger::error("MCM Kicker registration did not finish after {} checks (reset observed: {}); scripted operations will not use an unconfirmed registry", registryWait.checkCount, resetObserved);
+            logger::error("MCM Kicker registration did not finish after {} checks (reset detected: {}); scripted operations will not use an unconfirmed registry", registryWait.checkCount, resetDetected);
             return;
         }
-        if (resetObserved && result == RegistryWaitResult::Changed) {
+        if (resetDetected && result == RegistryWaitResult::Changed) {
             logger::info("MCM Kicker rebuilt registry contains {} MCMs; checking stability", mcms.size());
         }
-        if (resetObserved) {
+        if (resetDetected) {
             MCMRegistry::Refresh();
         }
         QueueCheck();
@@ -480,6 +734,9 @@ namespace MCMMemory
         if (IsMCMMenuRedoneAvailable()) {
             logger::info("MCM Menu Redone detected, its registry will be used");
         }
+        else if (IsMCMMenuMaidAvailable()) {
+            logger::info("Menu Maid 2 detected, its SkyUI-compatible registry will be used");
+        }
         else if (IsMCMUnlockedAvailable()) {
             logger::info("MCM Unlocked detected, its marker registry will be used");
         }
@@ -491,6 +748,16 @@ namespace MCMMemory
     bool MCMRegistry::IsMCMMenuRedoneAvailable()
     {
         return GetModuleHandleW(L"MCMMenuRedone.dll") != nullptr;
+    }
+
+    bool MCMRegistry::IsMCMMenuMaidAvailable()
+    {
+        return GetModuleHandleW(L"MenuMaid2.dll") != nullptr;
+    }
+
+    bool MCMRegistry::UsesCachedRegistry()
+    {
+        return IsMCMMenuRedoneAvailable() || IsMCMMenuMaidAvailable();
     }
 
     bool MCMRegistry::IsMCMUnlockedAvailable()
@@ -585,6 +852,9 @@ namespace MCMMemory
         if (IsMCMMenuRedoneAvailable()) {
             MCMMenuRedoneRegistry::GetSingleton()->Reset();
         }
+        else if (IsMCMMenuMaidAvailable()) {
+            MCMMenuMaidRegistry::GetSingleton()->Reset();
+        }
     }
 
     void MCMRegistry::Refresh()
@@ -592,16 +862,29 @@ namespace MCMMemory
         if (IsMCMMenuRedoneAvailable()) {
             MCMMenuRedoneRegistry::GetSingleton()->Refresh();
         }
+        else if (IsMCMMenuMaidAvailable()) {
+            MCMMenuMaidRegistry::GetSingleton()->Refresh();
+        }
     }
 
     bool MCMRegistry::IsRefreshing()
     {
-        return IsMCMMenuRedoneAvailable() && MCMMenuRedoneRegistry::GetSingleton()->IsRefreshing();
+        if (IsMCMMenuRedoneAvailable()) {
+            return MCMMenuRedoneRegistry::GetSingleton()->IsRefreshing();
+        }
+        return IsMCMMenuMaidAvailable() && MCMMenuMaidRegistry::GetSingleton()->IsRefreshing();
     }
 
     uint64_t MCMRegistry::CacheGeneration()
     {
-        return MCMKickerSupport::GetSingleton()->CacheGeneration() + (IsMCMMenuRedoneAvailable() ? MCMMenuRedoneRegistry::GetSingleton()->CacheGeneration() : 0);
+        uint64_t generation = MCMKickerSupport::GetSingleton()->CacheGeneration();
+        if (IsMCMMenuRedoneAvailable()) {
+            generation += MCMMenuRedoneRegistry::GetSingleton()->CacheGeneration();
+        }
+        else if (IsMCMMenuMaidAvailable()) {
+            generation += MCMMenuMaidRegistry::GetSingleton()->CacheGeneration();
+        }
+        return generation;
     }
 
     std::vector<MCMRegistryEntry> MCMRegistry::ReadRegisteredMCMs() const
@@ -609,12 +892,16 @@ namespace MCMMemory
         if (IsMCMMenuRedoneAvailable()) {
             return MCMMenuRedoneRegistry::GetSingleton()->ReadRegisteredMCMs();
         }
+        if (IsMCMMenuMaidAvailable()) {
+            return MCMMenuMaidRegistry::GetSingleton()->ReadRegisteredMCMs();
+        }
         if (IsMCMUnlockedAvailable()) {
             return ReadMCMUnlockedRegistry();
         }
         return ReadSkyUIRegistry();
     }
 
+    // Menu Redone patch.
     void MCMMenuRedoneRegistry::CountResult::operator()(RE::BSScript::Variable a_result)
     {
         const int menuCount = a_result.IsInt() ? a_result.GetSInt() : -1;
@@ -649,7 +936,7 @@ namespace MCMMemory
 
     void MCMMenuRedoneRegistry::Refresh()
     {
-        RegistryRequest request;
+        MCMRegistryRequest request;
         {
             std::lock_guard lock(registryMutex);
             if (refreshing) {
@@ -657,7 +944,7 @@ namespace MCMMemory
             }
 
             refreshing = true;
-            request = RegistryRequest{ currentRequest.loadedGameSession, ++currentRequest.requestID };
+            request = MCMRegistryRequest{ currentRequest.loadedGameSession, ++currentRequest.requestID };
         }
 
         if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RefreshTask{ request }, 0.0F)) {
@@ -680,7 +967,7 @@ namespace MCMMemory
         return result;
     }
 
-    void MCMMenuRedoneRegistry::DispatchCount(RegistryRequest a_request)
+    void MCMMenuRedoneRegistry::DispatchCount(MCMRegistryRequest a_request)
     {
         {
             std::lock_guard lock(registryMutex);
@@ -695,7 +982,7 @@ namespace MCMMemory
         }
     }
 
-    void MCMMenuRedoneRegistry::ReceiveCount(RegistryRequest a_request, int a_menuCount)
+    void MCMMenuRedoneRegistry::ReceiveCount(MCMRegistryRequest a_request, int a_menuCount)
     {
         if (a_menuCount < 0) {
             FailRequest(a_request, "GetMenuCount returned no number");
@@ -727,7 +1014,7 @@ namespace MCMMemory
         }
     }
 
-    void MCMMenuRedoneRegistry::ReceiveMenu(RegistryRequest a_request, size_t a_registryIndex, RE::BSTSmartPointer<RE::BSScript::Object> a_menuQuest)
+    void MCMMenuRedoneRegistry::ReceiveMenu(MCMRegistryRequest a_request, size_t a_registryIndex, RE::BSTSmartPointer<RE::BSScript::Object> a_menuQuest)
     {
         RE::BSTSmartPointer<RE::BSScript::Object> mcmScript;
         auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
@@ -770,7 +1057,7 @@ namespace MCMMemory
         CompleteRequest(nativeMenuCount);
     }
 
-    void MCMMenuRedoneRegistry::FailRequest(RegistryRequest a_request, std::string_view a_reason)
+    void MCMMenuRedoneRegistry::FailRequest(MCMRegistryRequest a_request, std::string_view a_reason)
     {
         std::lock_guard lock(registryMutex);
         if (!IsCurrentRequest(a_request)) {
@@ -797,5 +1084,234 @@ namespace MCMMemory
         refreshing = false;
         ++cacheGeneration;
         logger::info("MCM Menu Redone registry read {} MCM scripts from {} entries", registeredMCMs.size(), a_nativeMenuCount);
+    }
+
+    // Menu Maid patch.
+    void MCMMenuMaidRegistry::Result::operator()(RE::BSScript::Variable a_result)
+    {
+        if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(ResultTask{ std::move(a_result), request, type }, 0.0F)) {
+            logger::error("Menu Maid 2 registry result could not reach the game task queue");
+            MCMMenuMaidRegistry::GetSingleton()->FailRequest(request, "a result could not reach the game task queue");
+        }
+    }
+
+    void MCMMenuMaidRegistry::Reset()
+    {
+        std::lock_guard lock(registryMutex);
+        ++currentRequest.loadedGameSession;
+        ++currentRequest.requestID;
+        ++cacheGeneration;
+        registeredMCMs.clear();
+        reportedMenuCount = -1;
+        refreshing = false;
+        cacheReady = false;
+        logger::info("Menu Maid 2 registry cache reset");
+    }
+
+    void MCMMenuMaidRegistry::Refresh()
+    {
+        MCMRegistryRequest request;
+        {
+            std::lock_guard lock(registryMutex);
+            if (refreshing) {
+                return;
+            }
+
+            refreshing = true;
+            reportedMenuCount = -1;
+            request = MCMRegistryRequest{ currentRequest.loadedGameSession, ++currentRequest.requestID };
+        }
+
+        if (!Scheduler::GetSingleton()->ScheduleAfterSeconds(RefreshTask{ request }, 0.0F)) {
+            UseFallbackRegistry(request, "the game task queue is unavailable");
+        }
+    }
+
+    std::vector<MCMRegistryEntry> MCMMenuMaidRegistry::ReadRegisteredMCMs()
+    {
+        bool needsRefresh{};
+        std::vector<MCMRegistryEntry> result;
+        {
+            std::lock_guard lock(registryMutex);
+            result = registeredMCMs;
+            needsRefresh = !cacheReady && !refreshing;
+        }
+        if (needsRefresh) {
+            Refresh();
+        }
+        return result;
+    }
+
+    void MCMMenuMaidRegistry::Dispatch(MCMRegistryRequest a_request, ResultType a_type, std::string_view a_functionName)
+    {
+        {
+            std::lock_guard lock(registryMutex);
+            if (!IsCurrentRequest(a_request)) {
+                return;
+            }
+        }
+
+        auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+        RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> result(new Result(a_request, a_type));
+        if (!vm || !vm->DispatchStaticCall(RE::BSFixedString(mcmMenuMaidScriptName), RE::BSFixedString(a_functionName), RE::MakeFunctionArguments(), result)) {
+            UseFallbackRegistry(a_request, std::format("{} could not be called", a_functionName));
+        }
+    }
+
+    void MCMMenuMaidRegistry::Receive(MCMRegistryRequest a_request, ResultType a_type, const RE::BSScript::Variable& a_result)
+    {
+        {
+            std::lock_guard lock(registryMutex);
+            if (!IsCurrentRequest(a_request)) {
+                return;
+            }
+        }
+
+        if (a_type == ResultType::Hired) {
+            if (!a_result.IsBool() || !a_result.GetBool()) {
+                UseFallbackRegistry(a_request, "Menu Maid 2 is dismissed");
+                return;
+            }
+            Dispatch(a_request, ResultType::Count, "PluginsAmount");
+            return;
+        }
+
+        if (a_type == ResultType::Count) {
+            {
+                std::lock_guard lock(registryMutex);
+                if (!IsCurrentRequest(a_request)) {
+                    return;
+                }
+                reportedMenuCount = a_result.IsInt() ? a_result.GetSInt() : -1;
+            }
+            Dispatch(a_request, ResultType::Menus, "GetConfigsForSkyUI");
+            return;
+        }
+
+        ReceiveMenus(a_request, a_result);
+    }
+
+    void MCMMenuMaidRegistry::ReceiveMenus(MCMRegistryRequest a_request, const RE::BSScript::Variable& a_result)
+    {
+        auto forms = a_result.IsObjectArray() ? a_result.GetArray() : RE::BSTSmartPointer<RE::BSScript::Array>();
+        auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
+        RE::BSTSmartPointer<RE::BSScript::ObjectTypeInfo> configType;
+        if (!forms || !vm || !vm->GetScriptObjectType(RE::BSFixedString("SKI_ConfigBase"), configType)) {
+            UseFallbackRegistry(a_request, "GetConfigsForSkyUI returned no usable Form array");
+            return;
+        }
+
+        std::vector<MCMRegistryEntry> entries;
+        std::vector<uint64_t> handles;
+        entries.reserve(forms->size());
+        handles.reserve(forms->size());
+        size_t occupiedSlots{};
+        size_t unresolved{};
+        size_t duplicates{};
+        size_t registryIndex{};
+        for (const auto& value : *forms) {
+            auto menuQuest = value.IsObject() ? value.GetObject() : RE::BSTSmartPointer<RE::BSScript::Object>();
+            if (!menuQuest) {
+                ++registryIndex;
+                continue;
+            }
+            ++occupiedSlots;
+
+            RE::BSTSmartPointer<RE::BSScript::Object> mcmScript;
+            vm->CastObject(menuQuest, configType, mcmScript);
+            std::string failureReason;
+            auto entry = MCMRegistry::CreateRegistryEntry(mcmScript, std::addressof(failureReason));
+            if (!entry) {
+                ++unresolved;
+                logger::debug("Menu Maid 2 registry skipped entry {}: {}", registryIndex, failureReason.empty() ? "no config script was returned" : failureReason);
+                ++registryIndex;
+                continue;
+            }
+
+            const uint64_t handle = mcmScript->GetHandle();
+            if (std::find(handles.begin(), handles.end(), handle) != handles.end()) {
+                ++duplicates;
+                logger::debug("Menu Maid 2 registry skipped duplicate entry {} for '{}'", registryIndex, entry->identity.modID);
+                ++registryIndex;
+                continue;
+            }
+
+            handles.push_back(handle);
+            entries.push_back(std::move(*entry));
+            ++registryIndex;
+        }
+
+        CompleteRequest(a_request, std::move(entries), forms->size(), occupiedSlots, unresolved, duplicates);
+    }
+
+    void MCMMenuMaidRegistry::CompleteRequest(MCMRegistryRequest a_request, std::vector<MCMRegistryEntry> a_registeredMCMs, size_t a_arraySlots, size_t a_occupiedSlots, size_t a_unresolved, size_t a_duplicates)
+    {
+        int menuCount{};
+        size_t usableCount{};
+        {
+            std::lock_guard lock(registryMutex);
+            if (!IsCurrentRequest(a_request)) {
+                return;
+            }
+
+            registeredMCMs = std::move(a_registeredMCMs);
+            usableCount = registeredMCMs.size();
+            menuCount = reportedMenuCount;
+            refreshing = false;
+            cacheReady = true;
+            ++cacheGeneration;
+        }
+
+        logger::info("Menu Maid 2 registry read {} MCM scripts from {} occupied slots in its {}-slot SkyUI-compatible array ({} unresolved, {} duplicates, {} total reported)",
+            usableCount, a_occupiedSlots, a_arraySlots, a_unresolved, a_duplicates, menuCount);
+        if (menuCount > 0 && usableCount < static_cast<size_t>(menuCount)) {
+            logger::warn("Menu Maid 2 reports {} MCMs, but its current public form API exposes only {}; menus outside that list cannot be backed up or restored yet", menuCount, usableCount);
+        }
+    }
+
+    void MCMMenuMaidRegistry::UseFallbackRegistry(MCMRegistryRequest a_request, std::string_view a_reason)
+    {
+        {
+            std::lock_guard lock(registryMutex);
+            if (!IsCurrentRequest(a_request)) {
+                return;
+            }
+        }
+
+        std::vector<MCMRegistryEntry> fallbackMCMs;
+        std::string_view fallbackName{ "SkyUI" };
+        if (MCMRegistry::IsMCMUnlockedAvailable()) {
+            fallbackMCMs = MCMRegistry::ReadMCMUnlockedRegistry();
+            fallbackName = "MCM Unlocked";
+        }
+        else {
+            fallbackMCMs = MCMRegistry::ReadSkyUIRegistry();
+        }
+
+        size_t fallbackCount{};
+        {
+            std::lock_guard lock(registryMutex);
+            if (!IsCurrentRequest(a_request)) {
+                return;
+            }
+
+            registeredMCMs = std::move(fallbackMCMs);
+            fallbackCount = registeredMCMs.size();
+            refreshing = false;
+            cacheReady = true;
+            ++cacheGeneration;
+        }
+        logger::info("Menu Maid 2 registry was not used because {}; {} supplied {} MCMs instead", a_reason, fallbackName, fallbackCount);
+    }
+
+    void MCMMenuMaidRegistry::FailRequest(MCMRegistryRequest a_request, std::string_view a_reason)
+    {
+        std::lock_guard lock(registryMutex);
+        if (!IsCurrentRequest(a_request)) {
+            return;
+        }
+
+        refreshing = false;
+        logger::error("Menu Maid 2 registry refresh failed because {}", a_reason);
     }
 }

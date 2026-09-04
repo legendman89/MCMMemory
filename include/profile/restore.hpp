@@ -17,6 +17,10 @@
 
 namespace MCMMemory
 {
+    // Gives a newly enabled MCM time to finish starting before it is opened again.
+    // Givies enough time for the MCM to build.
+    inline constexpr float mcmActivationDelaySeconds{ 2.0F };
+
     // Says which type of argument a restore script function expects.
     enum class RestoreArgumentType
     {
@@ -121,6 +125,9 @@ namespace MCMMemory
 
         // A final retry must not repeat a setting or follow-up that already finished.
         bool completed{};
+
+        // Activation actions enable an inactive MCM before its settings are restored.
+        bool activationStep{};
     };
 
     // Creates an action that does not need a value.
@@ -212,7 +219,11 @@ namespace MCMMemory
         // MCM Registry gives us this live MCM script after registration.
         RE::BSTSmartPointer<RE::BSScript::Object> mcmScript;
 
+        std::optional<MCMActivation> activation;
+
         RestoreStats previousStats;
+
+        std::chrono::steady_clock::time_point activationDeadline{};
 
         int queuedPageIndex{-1};
 
@@ -222,6 +233,8 @@ namespace MCMMemory
 
         // A skipped confirmation stays incomplete even if the other settings retry successfully.
         bool confirmationRequired{};
+
+        bool activationPending{};
     };
 
     struct RegistryCheckTask
@@ -326,7 +339,7 @@ namespace MCMMemory
         bool IsActionValid(const RestoreAction& a_action) const;
 
         // Calls one function on a live MCM script.
-        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_result);
+        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_result, bool a_acceptConfirmation = false);
 
         // Flips a toggle only when its current state differs from the profile.
         bool RestoreToggle(const RestoreAction& a_action, SKSE::TaskInterface::TaskFn a_result);

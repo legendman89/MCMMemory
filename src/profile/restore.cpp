@@ -91,10 +91,10 @@ namespace MCMMemory
         }
 
         const auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
-        if (MCMRegistry::IsMCMMenuRedoneAvailable() && (registeredMCMs.empty() || MCMRegistry::IsRefreshing())) {
+        if (MCMRegistry::UsesCachedRegistry() && (registeredMCMs.empty() || MCMRegistry::IsRefreshing())) {
             MCMRegistry::Refresh();
             QueueRegistryCheck(GetSettings().actionTrialDelaySeconds);
-            logger::info("Manual persistent profile restoration is waiting for the MCM Menu Redone registry");
+            logger::info("Manual persistent profile restoration is waiting for the external MCM registry");
             return status == OperationStatus::Running;
         }
 
@@ -321,7 +321,7 @@ namespace MCMMemory
         // The ready event can arrive before every MCM is registered, so wait for an unchanged list.
         auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
         if (MCMRegistry::IsRefreshing()) {
-            logger::debug("Persistent profile restore is waiting for the MCM Menu Redone registry query");
+            logger::debug("Persistent profile restore is waiting for the external MCM registry query");
             QueueRegistryCheck(operationMode == OperationMode::Manual ? GetSettings().actionTrialDelaySeconds : registryCheckDelaySeconds);
             return;
         }
@@ -552,12 +552,17 @@ namespace MCMMemory
             const bool closing = callWatch.IsClosing();
             const bool timedOut = callWatch.TimedOut();
             const bool confirmationDeclined = callWatch.ConfirmationDeclined();
+            bool activationClose{};
             callWatch.Consume();
             if (confirmationDeclined && activeMCMIndex < restoreMCMs.size()) {
                 restoreMCMs[activeMCMIndex].confirmationRequired = true;
             }
             if (pendingActionIndex < actions.size()) {
                 auto& completedAction = actions[pendingActionIndex];
+                activationClose = completedAction.activationStep && completedAction.type == RestoreActionType::CloseConfig;
+                if (completedAction.type == RestoreActionType::ActivateMCM && completedAction.mcmIndex < restoreMCMs.size()) {
+                    restoreMCMs[completedAction.mcmIndex].activationPending = true;
+                }
                 if (completedAction.type == RestoreActionType::ApplyCycle) {
                     CompleteCycleAction(completedAction, status != OperationStatus::Stopping && !timedOut && !confirmationDeclined);
                 }
@@ -584,7 +589,18 @@ namespace MCMMemory
                     mcmFailed = true;
                 }
                 if (closing) {
-                    CompleteMCM();
+                    if (activationClose && !mcmFailed) {
+                        auto& mcm = restoreMCMs[activeMCMIndex];
+                        mcm.activationDeadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(GetSettings().scriptCallTimeoutSeconds + mcmActivationDelaySeconds));
+                        if (mcm.activationPending) {
+                            logger::info("MCM '{}' is starting; its settings will continue after a {} second delay", mcm.identity.modID, mcmActivationDelaySeconds);
+                            QueueNextAction(mcmActivationDelaySeconds);
+                            return;
+                        }
+                    }
+                    else {
+                        CompleteMCM();
+                    }
                 }
                 else if (timedOut || confirmationDeclined) {
                     FailMCM();
@@ -615,13 +631,70 @@ namespace MCMMemory
 
         auto& action = actions[currentActionIndex];
         if (action.type == RestoreActionType::OpenConfig) {
+            auto& mcm = restoreMCMs[action.mcmIndex];
             // Each MCM gets its own applied, unchanged and skipped counts.
-            mcmStats = restoreMCMs[action.mcmIndex].previousStats;
+            mcmStats = mcm.previousStats;
             firstActionIndex = currentActionIndex;
-            mcmFailed = restoreMCMs[action.mcmIndex].confirmationRequired;
+            mcmFailed = mcm.confirmationRequired;
             activeMCMIndex = action.mcmIndex;
             mcmStarted = true;
             mcmStatsRecorded = false;
+            if (action.activationStep) {
+                mcm.activationPending = true;
+                mcm.activationDeadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(GetSettings().scriptCallTimeoutSeconds));
+            }
+        }
+
+        auto& activeMCM = restoreMCMs[action.mcmIndex];
+        if (action.type == RestoreActionType::ActivateMCM && activeMCM.activation) {
+            const auto enabled = MCMActivationSupport::IsEnabled(MCMScript(activeMCM.mcmScript), *activeMCM.activation);
+            // Already enabled.
+            if (enabled && *enabled) {
+                action.completed = true;
+                activeMCM.activationPending = false;
+                logger::info("MCM '{}' is already enabled", activeMCM.identity.modID);
+            }
+            // Not yet, wo we retry again after a delay.
+            else if (!enabled && std::chrono::steady_clock::now() < activeMCM.activationDeadline && currentActionIndex > 0) {
+                if (activeMCM.activation->selection.pageIndex >= 0) {
+                    --currentActionIndex;
+                }
+                QueueNextAction(GetSettings().actionTrialDelaySeconds);
+                return;
+            }
+        }
+        // Check if MCM is safely enabled before restoring its saved settings.
+        if (action.type == RestoreActionType::VerifyMCM && activeMCM.activation) {
+            const auto enabled = MCMActivationSupport::IsEnabled(MCMScript(activeMCM.mcmScript), *activeMCM.activation);
+            if (enabled && *enabled) {
+                action.completed = true;
+                activeMCM.activationPending = false;
+                ++currentActionIndex;
+                logger::info("MCM '{}' is enabled; restoring its saved settings", activeMCM.identity.modID);
+                QueueNextAction(0.0F);
+                return;
+            }
+            if (activeMCM.activationPending) {
+                action.completed = true;
+                activeMCM.activationPending = false;
+                ++currentActionIndex;
+                logger::info("MCM '{}' completed its activation request; restoring its saved settings", activeMCM.identity.modID);
+                QueueNextAction(0.0F);
+                return;
+            }
+            if (std::chrono::steady_clock::now() < activeMCM.activationDeadline && currentActionIndex > 0) {
+                if (activeMCM.activation->selection.pageIndex >= 0) {
+                    --currentActionIndex;
+                }
+                QueueNextAction(GetSettings().actionTrialDelaySeconds);
+                return;
+            }
+
+            mcmFailed = true;
+            logger::error("MCM '{}' did not expose its enabled state before the restore deadline", activeMCM.identity.modID);
+            FailMCM();
+            QueueNextAction(0.0F);
+            return;
         }
 
         // Some settings need one call to prepare their data and another call to apply the value.

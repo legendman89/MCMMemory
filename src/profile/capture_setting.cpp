@@ -146,7 +146,7 @@ namespace MCMMemory
         a_setting.optionLabel = a_record.control->optionLabel;
         a_setting.stateName = a_record.control->stateName;
         if (a_record.control->type == ControlType::Cycle) {
-            if (!VioLensSupport::ReadCycleSetting(a_script, a_setting)) {
+            if (!SkyUICycleSupport::ReadSetting(a_script, a_setting)) {
                 return false;
             }
             logger::info("Finished cycling setting capture {}: mod: '{}', setting: '{}', value: {}", a_record.eventID, a_setting.selection.identity.modName, a_setting.settingID, a_setting.value.get<int>());
@@ -172,6 +172,48 @@ namespace MCMMemory
         return true;
     }
 
+    bool Capture::CaptureMCMActivation(CaptureRecord& a_record, const MCMScript& a_script)
+    {
+        if (a_record.activationEvent || a_record.type != EventType::OptionSelected || !a_record.control) {
+            return false;
+        }
+
+        auto page = a_script.ReadCurrentPage();
+        if (!page) {
+            return false;
+        }
+        auto activation = MCMActivationSupport::ReadSelectedState(a_script, a_record.selection.identity, page->name, page->index, a_record.selection.optionIndex, *a_record.control);
+        if (!activation) {
+            return false;
+        }
+
+        // Instead of waiting to read the new state of the control, clicking on disabled means enabled,
+        // so we remember that now because some activation controls close the MCM immediately.
+        activation->enabled = !activation->enabled;
+        a_record.activationEvent = true;
+        RememberActivation(*activation);
+        logger::info("Remembered MCM '{}' as {} for the next manual backup", a_record.selection.identity.modID, activation->enabled ? "enabled" : "disabled");
+        if (GetSettings().autoBackup) {
+            if (!ProfileStorage::UpdateActivation(activation->activation, activation->enabled)) {
+                logger::error("Failed to update the activation state for '{}' in the persistent profile", a_record.selection.identity.modID);
+                return true;
+            }
+            logger::info("Automatic backup recorded MCM '{}' as {}", a_record.selection.identity.modID, activation->enabled ? "enabled" : "disabled");
+        }
+        return true;
+    }
+
+    void Capture::RememberActivation(const MCMActivationState& a_activation)
+    {
+        for (auto& detected : detectedActivations) {
+            if (detected.activation.selection.identity.modID == a_activation.activation.selection.identity.modID) {
+                detected = a_activation;
+                return;
+            }
+        }
+        detectedActivations.push_back(a_activation);
+    }
+
     bool Capture::ProcessCapturedEvent(CaptureRecord& a_record)
     {
         if (const auto reason = GetMCMExclusionReason(a_record.selection.identity.modID); !reason.empty()) {
@@ -190,6 +232,9 @@ namespace MCMMemory
             activeMCMScript = activeMCM->mcmScript;
         }
         MCMScript mcmScript(activeMCMScript);
+        if (a_record.activationEvent) {
+            return true;
+        }
         const bool vioLensMenu = VioLensSupport::IsSupported(setting.selection.identity.modID) && setting.type == ControlType::Menu;
         if (vioLensMenu) {
             if (!activeMCMScript || !IsCapturePageCurrent(a_record)) {
@@ -235,12 +280,16 @@ namespace MCMMemory
             }
         }
 
-        if (VioLensSupport::IsCommand(setting.selection.identity.modID, setting.stateName, setting.selection.pageIndex, setting.optionLabel)) {
+        if (MCMCommandSupport::IsIgnored(setting.selection.identity.modID, setting.selection.pageName, setting.selection.pageIndex, setting.type, setting.stateName, setting.optionLabel)) {
             return true;
         }
 
         if (setting.optionLabel.empty()) {
             setting.optionLabel = ReadOptionLabel(a_record);
+        }
+
+        if (activeMCMScript && setting.type == ControlType::Keymap) {
+            MCMHelperSupport::GetSingleton()->ReadKeymapSetting(activeMCMScript, setting);
         }
 
         // Each control reports its accepted value in a different place.
@@ -258,23 +307,31 @@ namespace MCMMemory
                 setting.value = a_record.stringArgument;
                 setting.valueSource = "event.stringArgument";
                 break;
-            case EventType::KeymapChanged:
-                // numArg is the option index here. Read the key after SkyUI updates the script buffer.
-                if (activeMCMScript) {
-                    auto keyCode = mcmScript.ReadCurrentValue(ControlType::Keymap, setting.selection.optionIndex);
-                    if (keyCode && keyCode->is_number_integer()) {
-                        setting.value = std::move(*keyCode);
+            case EventType::KeymapChanged: {
+                // SkyUI keeps the newly selected key here while the script handles the change.
+                std::optional<double> keyCode;
+                if (a_record.state.contains("fields")) {
+                    keyCode = JSON::ReadNumber(a_record.state["fields"], "SelectedKeyCode");
+                }
+                if (!keyCode && a_record.stateAfter.contains("fields")) {
+                    keyCode = JSON::ReadNumber(a_record.stateAfter["fields"], "SelectedKeyCode");
+                }
+                if (keyCode) {
+                    setting.value = static_cast<int>(*keyCode);
+                    setting.valueSource = "menu.selectedKeyCode";
+                }
+                else if (setting.valueSource.empty() && activeMCMScript) {
+                    auto bufferedKeyCode = mcmScript.ReadCurrentValue(ControlType::Keymap, setting.selection.optionIndex);
+                    if (bufferedKeyCode && bufferedKeyCode->is_number_integer()) {
+                        setting.value = std::move(*bufferedKeyCode);
                         setting.valueSource = "script._numValueBuf";
                     }
                 }
                 break;
+            }
             default:
                 break;
 
-        }
-
-        if (activeMCMScript && setting.type == ControlType::Keymap) {
-            MCMHelperSupport::GetSingleton()->ReadKeymapSetting(activeMCMScript, setting);
         }
 
         // Incomplete settings stay in Capture.json but not in the selected profile.

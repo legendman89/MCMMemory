@@ -105,6 +105,22 @@ namespace MCMMemory
         int optionIndex{-1};
     };
 
+    // Remembers the control that enables an MCM before its normal settings appear.
+    struct MCMActivation
+    {
+        MCMSelection selection;
+
+        std::string optionLabel;
+
+        std::string stateName;
+
+        std::string enabledText;
+
+        ControlType type{ ControlType::Unknown };
+
+        bool startCommand{};
+    };
+
     // One setting stored in a profile.
     struct CapturedSetting
     {
@@ -184,6 +200,8 @@ namespace MCMMemory
         float numberArgument{};
 
         RE::FormID senderFormID{};
+
+        bool activationEvent{};
     };
 
     // Adds a setting; callers can keep an existing value when it came from a fresher read.

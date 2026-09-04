@@ -4,6 +4,7 @@
 #define FOREACH_MENU_FIELD(MENU_FIELD) \
     MENU_FIELD(PanelState, "_root.ConfigPanelFader.configPanel._state") \
     MENU_FIELD(PageResetRequested, "_root.ConfigPanelFader.configPanel._bRequestPageReset") \
+    MENU_FIELD(SelectedKeyCode, "_root.ConfigPanelFader.configPanel.selectedKeyCode") \
     MENU_FIELD(ModListSelectedIndex, "_root.ConfigPanelFader.configPanel.modList.selectedIndex") \
     MENU_FIELD(ModListSelectedText, "_root.ConfigPanelFader.configPanel.modList.selectedEntry.text") \
     MENU_FIELD(ModListSelectedLabel, "_root.ConfigPanelFader.configPanel.modList.selectedEntry.label") \

@@ -120,11 +120,15 @@ namespace MCMMemory
         // This is the same result SkyUI sets after a click. ShowMessage then unregisters
         // its listener and returns normally, without opening an invisible dialog.
         const bool confirmation = withCancel.GetBool();
-        result->SetBool(!confirmation);
+        const bool accepted = !confirmation || call->acceptConfirmation;
+        result->SetBool(accepted);
         waiting->SetBool(false);
-        if (confirmation) {
+        if (confirmation && !accepted) {
             call->confirmationDeclined.store(true, std::memory_order_release);
             logger::warn("Declined MCM confirmation '{}' during '{}' on '{}'; this call is incomplete", (*parameters)[0].GetString(), call->functionName, call->modID);
+        }
+        else if (confirmation) {
+            logger::info("Accepted MCM activation confirmation '{}' during '{}' on '{}'", (*parameters)[0].GetString(), call->functionName, call->modID);
         }
         else {
             logger::info("Acknowledged MCM message '{}' during '{}' on '{}'", (*parameters)[0].GetString(), call->functionName, call->modID);

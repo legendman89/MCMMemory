@@ -192,7 +192,7 @@ namespace MCMMemory::Menu
         profileAvailable = std::filesystem::exists(ProfileStorage::Path(), error) && !error;
         Profile profile;
         if (profileAvailable && ProfileStorage::Load(profile)) {
-            for (const auto& setting : profile) {
+            for (const auto& setting : profile.settings) {
                 ++FindOrAddMCM(setting.selection.identity, selectedMCMs).settingCount;
             }
         }

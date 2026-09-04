@@ -2,6 +2,7 @@
 
 #include "mcm/mcm_menu.hpp"
 #include "mcm/mcm_registry.hpp"
+#include "mcm/mcm_support.hpp"
 #include "profile/profile.hpp"
 #include "profile/stats.hpp"
 #include "profile/storage.hpp"
@@ -73,7 +74,10 @@ namespace MCMMemory
         void Reset();
 
         // Keeps captured settings hidden from this MCM's scan, without replacing fresh reads.
-        void MergeSettings(Profile& a_profile, std::string_view a_modID);
+        void MergeSettings(std::vector<CapturedSetting>& a_settings, std::string_view a_modID);
+
+        // Returns an activation choice detected during this loaded game.
+        std::optional<MCMActivationState> FindDetectedActivation(std::string_view a_modID);
 
         // Receives MCM callbacks such as sliderAccepted and optionSelected.
         RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;
@@ -144,6 +148,11 @@ namespace MCMMemory
         // Returns false when a toggle still needs another read before saving.
         bool ProcessCapturedEvent(CaptureRecord& a_record);
 
+        // Saves a staged MCM enable choice separately from its normal settings.
+        bool CaptureMCMActivation(CaptureRecord& a_record, const MCMScript& a_script);
+
+        void RememberActivation(const MCMActivationState& a_activation);
+
         // Keeps the highlighted control or opened dropdown label and state before a redraw.
         // Needed for mods that clear a page to hide disabled controls.
         void RememberControl(CaptureRecord& a_record);
@@ -192,6 +201,9 @@ namespace MCMMemory
 
         // Holds the latest cleaned settings captured in this game session.
         std::vector<CapturedSetting> settings;
+
+        // Remembers staged MCM choices until a manual backup, even when automatic backup is off.
+        std::vector<MCMActivationState> detectedActivations;
 
         // Holds settings automatically saved during the current Journal Menu visit.
         std::vector<CapturedSetting> pendingAutoBackupSettings;

@@ -54,18 +54,30 @@ namespace MCMMemory
         mcmIdentities.clear();
         records.clear();
         settings.clear();
+        detectedActivations.clear();
         pendingAutoBackupSettings.clear();
         logger::info("Capture session reset");
     }
 
-    void Capture::MergeSettings(Profile& a_profile, std::string_view a_modID)
+    void Capture::MergeSettings(std::vector<CapturedSetting>& a_settings, std::string_view a_modID)
     {
         std::scoped_lock lock(captureMutex);
         for (const auto& setting : settings) {
             if (setting.identityComplete && setting.selection.identity.modID == a_modID) {
-                Deduplicate(a_profile, setting, false);
+                Deduplicate(a_settings, setting, false);
             }
         }
+    }
+
+    std::optional<MCMActivationState> Capture::FindDetectedActivation(std::string_view a_modID)
+    {
+        std::scoped_lock lock(captureMutex);
+        for (const auto& activation : detectedActivations) {
+            if (activation.activation.selection.identity.modID == a_modID) {
+                return activation;
+            }
+        }
+        return std::nullopt;
     }
 
     RE::BSEventNotifyControl Capture::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
@@ -104,6 +116,12 @@ namespace MCMMemory
         SyncOpeningPage(*record);
         if (record->type == EventType::OptionHighlighted || record->type == EventType::MenuSelected || ControlTypeForEvent(record->type) == ControlType::Option) {
             RememberControl(*record);
+        }
+        if (record->type == EventType::OptionSelected && record->control) {
+            auto activeMCM = MCMRegistry().ReadActiveMCM();
+            if (activeMCM && activeMCM->identity.modID == record->selection.identity.modID) {
+                CaptureMCMActivation(*record, MCMScript(activeMCM->mcmScript));
+            }
         }
 
         QueueCaptureCompletion(a_request, QueueDelayFrames);

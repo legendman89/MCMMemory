@@ -21,6 +21,19 @@ namespace MCMMemory
         return a_character;
     }
 
+    inline bool EqualsCaseInsensitive(std::string_view a_left, std::string_view a_right)
+    {
+        if (a_left.size() != a_right.size()) {
+            return false;
+        }
+        for (size_t index = 0; index < a_left.size(); ++index) {
+            if (ToLowerASCII(static_cast<unsigned char>(a_left[index])) != ToLowerASCII(static_cast<unsigned char>(a_right[index]))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     inline bool ContainsCaseInsensitive(std::string_view a_text, std::string_view a_search)
     {
         if (a_search.empty()) {
@@ -45,6 +58,22 @@ namespace MCMMemory
         return false;
     }
 
+    inline bool ContainsCaseInsensitiveWordStart(std::string_view a_text, std::string_view a_search)
+    {
+        for (size_t start = 0; start + a_search.size() <= a_text.size(); ++start) {
+            if (start > 0) {
+                const auto previous = static_cast<unsigned char>(a_text[start - 1]);
+                if ((previous >= 'A' && previous <= 'Z') || (previous >= 'a' && previous <= 'z') || (previous >= '0' && previous <= '9')) {
+                    continue;
+                }
+            }
+            if (EqualsCaseInsensitive(a_text.substr(start, a_search.size()), a_search)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     inline std::string ToUTF8(const std::filesystem::path& a_path)
     {
         auto utf8 = a_path.u8string();
@@ -57,21 +86,26 @@ namespace MCMMemory
         return std::filesystem::path(std::u8string(first, first + a_text.size()));
     }
 
-    inline std::string GetDisplayModName(std::string_view a_modName)
+    inline std::string GetDisplayText(std::string_view a_text)
     {
-        std::string modName{ a_modName };
-        if (!modName.starts_with('$')) {
-            return modName;
+        std::string text{ a_text };
+        if (!text.starts_with('$')) {
+            return text;
         }
 
-        std::string translatedName;
-        if (SKSE::Translation::Translate(modName, translatedName) && !translatedName.empty()) {
-            modName = std::move(translatedName);
+        std::string translatedText;
+        if (SKSE::Translation::Translate(text, translatedText) && !translatedText.empty()) {
+            text = std::move(translatedText);
         }
-        if (modName.starts_with('$')) {
-            modName.erase(0, 1);
+        if (text.starts_with('$')) {
+            text.erase(0, 1);
         }
-        return modName;
+        return text;
+    }
+
+    inline std::string GetDisplayModName(std::string_view a_modName)
+    {
+        return GetDisplayText(a_modName);
     }
 
     inline bool IsJournalMenuOpen()

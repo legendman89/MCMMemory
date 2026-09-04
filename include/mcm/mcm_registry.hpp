@@ -57,6 +57,7 @@ namespace MCMMemory
 
     // Forward it to keep it private to the implementation.
     class MCMMenuRedoneRegistry;
+    class MCMMenuMaidRegistry;
 
     class MCMRegistry
     {
@@ -79,7 +80,11 @@ namespace MCMMemory
 
         static bool IsMCMMenuRedoneAvailable();
 
-        // Uses the registry supplied by MCM Menu Redone, MCM Unlocked, or SkyUI.
+        static bool IsMCMMenuMaidAvailable();
+
+        static bool UsesCachedRegistry();
+
+        // Uses the registry provided by MCM Menu Redone, Menu Maid 2, MCM Unlocked, or SkyUI.
         std::vector<MCMRegistryEntry> ReadRegisteredMCMs() const;
 
         std::optional<MCMRegistryEntry> ReadActiveMCM() const;
@@ -88,6 +93,9 @@ namespace MCMMemory
 
         // Allows the MCM Menu Redone registry to use the private CreateRegistryEntry helper.
         friend class MCMMenuRedoneRegistry;
+
+        // Allows the Menu Maid 2 registry to turn its returned forms into normal registry we can use.
+        friend class MCMMenuMaidRegistry;
 
 
         static const char* ReadScriptName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript)

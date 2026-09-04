@@ -53,7 +53,7 @@ namespace MCMMemory
         }
     }
 
-    bool MCMCallWatch::Call(const MCMScript& a_script, std::string_view a_modID, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_task)
+    bool MCMCallWatch::Call(const MCMScript& a_script, std::string_view a_modID, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_task, bool a_acceptConfirmation)
     {
         if (owner.load() != this || pending || IsUnavailable(a_modID)) {
             delete a_arguments;
@@ -63,6 +63,7 @@ namespace MCMMemory
         pending->modID = a_modID;
         pending->functionName = a_functionName;
         pending->started = std::chrono::steady_clock::now();
+        pending->acceptConfirmation = a_acceptConfirmation;
         // Check for a test mode that simulates an unresponsive MCM call.
         const auto& testMCM = GetSettings().testUnresponsiveMCM;
         if (!testMCM.empty() && testMCM.size() == a_modID.size() && ContainsCaseInsensitive(testMCM, a_modID) && !simulatedUnresponsive.exchange(true)) {

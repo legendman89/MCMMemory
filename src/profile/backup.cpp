@@ -73,7 +73,7 @@ namespace MCMMemory
         menuSettings.clear();
         activityMods.clear();
         mcmFilter.clear();
-        profile.clear();
+        profile.Clear();
         mcmIndex = 0;
         pageIndex = 0;
         menuIndex = 0;
@@ -81,6 +81,7 @@ namespace MCMMemory
         mcmStats.Reset();
         registryWait.Reset();
         scriptWaitCount = 0;
+        mcmActivation.reset();
         scheduledTaskID = 0;
         step = BackupStep::ReadRegistry;
         status = OperationStatus::Idle;
@@ -108,7 +109,7 @@ namespace MCMMemory
             return false;
         }
         if (!exists) {
-            a_profile.clear();
+            a_profile.Clear();
         }
         return true;
     }
@@ -289,11 +290,11 @@ namespace MCMMemory
         }
 
         auto currentMCMs = MCMRegistry().ReadRegisteredMCMs();
-        if (MCMRegistry::IsMCMMenuRedoneAvailable() && (currentMCMs.empty() || MCMRegistry::IsRefreshing())) {
+        if (MCMRegistry::UsesCachedRegistry() && (currentMCMs.empty() || MCMRegistry::IsRefreshing())) {
             const auto result = registryWait.Update({});
             if (result != RegistryWaitResult::Expired) {
                 MCMRegistry::Refresh();
-                logger::debug("Full MCM backup is waiting for the MCM Menu Redone registry (check {})", registryWait.checkCount);
+                logger::debug("Full MCM backup is waiting for the external MCM registry (check {})", registryWait.checkCount);
                 QueueNext(GetSettings().actionTrialDelaySeconds);
                 return;
             }
@@ -359,6 +360,7 @@ namespace MCMMemory
         pageIndex = 0;
         menuIndex = 0;
         scriptWaitCount = 0;
+        mcmActivation.reset();
         mcmFailed = false;
         mcmStarted = true;
 
@@ -461,6 +463,13 @@ namespace MCMMemory
             return;
         }
 
+        if (!MCMCommandSupport::IsIgnoredPage(page.name)) {
+            if (auto activation = MCMActivationSupport::ReadState(script, registeredMCMs[mcmIndex].identity, page.name, page.index)) {
+                mcmActivation = std::move(activation);
+                logger::info("Full MCM backup found an activation control for '{}' on page '{}' ({})", registeredMCMs[mcmIndex].identity.modID, page.name, mcmActivation->enabled ? "enabled" : "disabled");
+            }
+        }
+
         for (size_t index = 0; index < pageSettings.size(); ++index) {
             MCMHelperSupport::GetSingleton()->ReadKeymapSetting(registeredMCMs[mcmIndex].mcmScript, pageSettings[index]);
             if (pageSettings[index].type == ControlType::Menu) {
@@ -544,7 +553,7 @@ namespace MCMMemory
 
     void Backup::AdvancePage()
     {
-        ++pageIndex;
+        pageIndex = mcmActivation && !mcmActivation->enabled ? pages.size() : pageIndex + 1;
         scriptWaitCount = 0;
         step = pageIndex < pages.size() ? BackupStep::SetPage : BackupStep::CloseMCM;
         QueueNext(0.0F);
@@ -563,23 +572,42 @@ namespace MCMMemory
     {
         const auto& modID = registeredMCMs[mcmIndex].identity.modID;
         if (!mcmFailed) {
-            // Fresh scan values win. Older captures only fill controls hidden from this scan.
-            Capture::GetSingleton()->MergeSettings(mcmSettings, modID);
-            auto setting = profile.begin();
-            while (setting != profile.end()) {
-                if (setting->selection.identity.modID == modID) {
-                    setting = profile.erase(setting);
-                }
-                else {
-                    ++setting;
+            if (!mcmActivation) {
+                mcmActivation = Capture::GetSingleton()->FindDetectedActivation(modID);
+                if (mcmActivation) {
+                    logger::info("Full MCM backup reused the detected activation state for '{}' ({})", modID, mcmActivation->enabled ? "enabled" : "disabled");
                 }
             }
-            for (auto& backedUpSetting : mcmSettings) {
-                profile.push_back(std::move(backedUpSetting));
+            if (!mcmActivation || mcmActivation->enabled) {
+                // Fresh scan values win. Older captures only fill controls hidden from this scan.
+                Capture::GetSingleton()->MergeSettings(mcmSettings, modID);
+                auto setting = profile.settings.begin();
+                while (setting != profile.settings.end()) {
+                    if (setting->selection.identity.modID == modID) {
+                        setting = profile.settings.erase(setting);
+                    }
+                    else {
+                        ++setting;
+                    }
+                }
+                for (auto& backedUpSetting : mcmSettings) {
+                    profile.settings.push_back(std::move(backedUpSetting));
+                }
+            }
+            if (mcmActivation && mcmActivation->enabled) {
+                profile.SetActivation(mcmActivation->activation);
+            }
+            else if (mcmActivation) {
+                profile.RemoveActivation(modID);
             }
             mcmStats.MCMCount = 1;
-            mcmStats.settingCount = static_cast<uint32_t>(mcmSettings.size());
-            logger::info("Full MCM backup captured {} settings from '{}' ({} skipped)", mcmStats.settingCount, modID, mcmStats.skippedSettingCount);
+            mcmStats.settingCount = mcmActivation && !mcmActivation->enabled ? 0 : static_cast<uint32_t>(mcmSettings.size());
+            if (mcmActivation && !mcmActivation->enabled) {
+                logger::info("Full MCM backup recorded '{}' as disabled and preserved its hidden settings", modID);
+            }
+            else {
+                logger::info("Full MCM backup captured {} settings from '{}' ({} skipped)", mcmStats.settingCount, modID, mcmStats.skippedSettingCount);
+            }
         }
         else {
             mcmStats.failedMCMCount = 1;

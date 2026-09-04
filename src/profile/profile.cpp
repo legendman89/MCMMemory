@@ -13,7 +13,7 @@ namespace MCMMemory
 
     bool ProfileStorage::Load(std::string_view a_name, Profile& a_profile)
     {
-        a_profile.clear();
+        a_profile.Clear();
         const auto path = Path(a_name);
         std::ifstream stream(path);
         if (!stream) {
@@ -34,7 +34,32 @@ namespace MCMMemory
             for (const auto& settingDocument : *settings) {
                 CapturedSetting setting;
                 if (FromJson(settingDocument, setting) && setting.identityComplete) {
-                    a_profile.push_back(std::move(setting));
+                    a_profile.settings.push_back(std::move(setting));
+                }
+            }
+            auto activations = document.find("activations");
+            if (activations != document.end() && activations->is_array()) {
+                for (const auto& activationDocument : *activations) {
+                    if (!activationDocument.is_object()) {
+                        continue;
+                    }
+                    MCMActivation activation;
+                    JSON::ReadValue(activationDocument, "modName", activation.selection.identity.modName);
+                    JSON::ReadValue(activationDocument, "modID", activation.selection.identity.modID);
+                    JSON::ReadValue(activationDocument, "pageName", activation.selection.pageName);
+                    JSON::ReadValue(activationDocument, "pageIndex", activation.selection.pageIndex);
+                    JSON::ReadValue(activationDocument, "optionIndex", activation.selection.optionIndex);
+                    JSON::ReadValue(activationDocument, "optionLabel", activation.optionLabel);
+                    JSON::ReadValue(activationDocument, "stateName", activation.stateName);
+                    JSON::ReadValue(activationDocument, "enabledText", activation.enabledText);
+                    JSON::ReadValue(activationDocument, "startCommand", activation.startCommand);
+                    std::string controlType;
+                    JSON::ReadValue(activationDocument, "controlType", controlType);
+                    activation.type = controlType.empty() ? ControlType::Unknown : ParseControlType(controlType);
+                    const bool validValue = activation.type == ControlType::Option || activation.startCommand || !activation.enabledText.empty();
+                    if (!activation.selection.identity.modID.empty() && activation.selection.pageIndex >= -1 && activation.selection.optionIndex >= 0 && !activation.optionLabel.empty() && validValue) {
+                        a_profile.SetActivation(activation);
+                    }
                 }
             }
         } catch (const std::exception& error) {
@@ -58,8 +83,27 @@ namespace MCMMemory
             return false;
         }
 
-        Deduplicate(profile, a_setting);
+        Deduplicate(profile.settings, a_setting);
 
+        return Save(profile);
+    }
+
+    bool ProfileStorage::UpdateActivation(const MCMActivation& a_activation, bool a_enabled)
+    {
+        Profile profile;
+        std::error_code error;
+        const bool profileExists = std::filesystem::exists(Path(), error);
+        if (error || (profileExists && !Load(profile))) {
+            logger::error("Refusing to overwrite an unreadable persistent profile at {}", ToUTF8(Path()));
+            return false;
+        }
+
+        if (a_enabled) {
+            profile.SetActivation(a_activation);
+        }
+        else {
+            profile.RemoveActivation(a_activation.selection.identity.modID);
+        }
         return Save(profile);
     }
 
@@ -74,7 +118,7 @@ namespace MCMMemory
         if (!JSON::WriteFile(path, ToJson(a_profile))) {
             return false;
         }
-        logger::info("Saved {} persistent profile settings to {}", a_profile.size(), ToUTF8(path));
+        logger::info("Saved {} persistent profile settings to {}", a_profile.settings.size(), ToUTF8(path));
         return true;
     }
 
@@ -123,8 +167,27 @@ namespace MCMMemory
         nlohmann::json document;
         document["formatVersion"] = 1;
         document["purpose"] = "Persistent MCM settings profile";
+        if (!a_profile.activations.empty()) {
+            document["activations"] = nlohmann::json::array();
+            for (const auto& activation : a_profile.activations) {
+                nlohmann::json activationDocument;
+                activationDocument["modName"] = activation.selection.identity.modName;
+                activationDocument["modID"] = activation.selection.identity.modID;
+                activationDocument["pageName"] = activation.selection.pageName;
+                activationDocument["pageIndex"] = activation.selection.pageIndex;
+                activationDocument["optionIndex"] = activation.selection.optionIndex;
+                activationDocument["optionLabel"] = activation.optionLabel;
+                activationDocument["stateName"] = activation.stateName;
+                activationDocument["enabledText"] = activation.enabledText;
+                if (activation.startCommand) {
+                    activationDocument["startCommand"] = true;
+                }
+                activationDocument["controlType"] = std::string(ControlTypeName(activation.type));
+                document["activations"].push_back(std::move(activationDocument));
+            }
+        }
         document["settings"] = nlohmann::json::array();
-        for (const auto& setting : a_profile) {
+        for (const auto& setting : a_profile.settings) {
             document["settings"].push_back(JSON::ToJson(setting, false));
         }
         return document;

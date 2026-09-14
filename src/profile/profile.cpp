@@ -1,8 +1,11 @@
+#include "profile/action.hpp"
 #include "profile/profile.hpp"
+#include "mcm/mcm_support.hpp"
 #include "profile/profiles.hpp"
-#include "settings.hpp"
 #include "utils/helper.hpp"
 #include "utils/json.hpp"
+
+#include "settings.hpp"
 
 namespace MCMMemory
 {
@@ -26,6 +29,22 @@ namespace MCMMemory
                 logger::error("Profile root is not an object in {}", ToUTF8(path));
                 return false;
             }
+            auto mods = document.find("mods");
+            if (mods != document.end() && mods->is_object()) {
+                for (const auto& item : mods->items()) {
+                    if (item.key().empty() || !item.value().is_object()) {
+                        continue;
+                    }
+                    // ReadValue would throw on a non-string mode and make the whole profile unreadable.
+                    const auto mode = JSON::ReadString(item.value(), "mode").value_or(std::string{});
+                    const auto parsed = ParseProfileMode(mode);
+                    if (parsed == ProfileMode::Value && mode != ProfileModeName(ProfileMode::Value)) {
+                        logger::warn("Profile mod '{}' has an unknown mode '{}' and is read as '{}'", item.key(), mode, ProfileModeName(ProfileMode::Value));
+                    }
+                    a_profile.SetMode(item.key(), parsed);
+                }
+            }
+
             auto settings = document.find("settings");
             if (settings == document.end() || !settings->is_array()) {
                 logger::error("Profile settings are missing or invalid in {}", ToUTF8(path));
@@ -57,9 +76,14 @@ namespace MCMMemory
                     JSON::ReadValue(activationDocument, "controlType", controlType);
                     activation.type = controlType.empty() ? ControlType::Unknown : ParseControlType(controlType);
                     const bool validValue = activation.type == ControlType::Option || activation.startCommand || !activation.enabledText.empty();
-                    if (!activation.selection.identity.modID.empty() && activation.selection.pageIndex >= -1 && activation.selection.optionIndex >= 0 && !activation.optionLabel.empty() && validValue) {
-                        a_profile.SetActivation(activation);
+                    if (activation.selection.identity.modID.empty() || activation.selection.pageIndex < -1 || activation.selection.optionIndex < 0 || activation.optionLabel.empty() || !validValue) {
+                        continue;
                     }
+                    if (activation.startCommand && !MCMActivationSupport::IsStoredCommandValid(activation)) {
+                        logger::warn("Skipped activation control '{}' from '{}': it no longer reads as an enable command", activation.optionLabel, activation.selection.identity.modID);
+                        continue;
+                    }
+                    a_profile.SetActivation(activation);
                 }
             }
         } catch (const std::exception& error) {
@@ -67,6 +91,49 @@ namespace MCMMemory
             return false;
         }
         return true;
+    }
+
+    bool ProfileStorage::ForgetMCMs(std::string_view a_name, const MCMFilter& a_modIDs, size_t& a_settingCount)
+    {
+        a_settingCount = 0;
+        if (a_modIDs.empty() || !Profiles::IsValidName(a_name)) {
+            return false;
+        }
+
+        Profile profile;
+        std::error_code error;
+        if (!std::filesystem::exists(Path(a_name), error) || error || !Load(a_name, profile)) {
+            logger::error("Refusing to edit an unreadable persistent profile at {}", ToUTF8(Path(a_name)));
+            return false;
+        }
+
+        auto setting = profile.settings.begin();
+        while (setting != profile.settings.end()) {
+            if (ContainsMCMID(a_modIDs, setting->selection.identity.modID)) {
+                setting = profile.settings.erase(setting);
+                ++a_settingCount;
+            }
+            else {
+                ++setting;
+            }
+        }
+
+        auto activation = profile.activations.begin();
+        while (activation != profile.activations.end()) {
+            if (ContainsMCMID(a_modIDs, activation->selection.identity.modID)) {
+                activation = profile.activations.erase(activation);
+            }
+            else {
+                ++activation;
+            }
+        }
+
+        // A forgotten MCM goes back to the default mode, so recording starts over if it is used again.
+        for (const auto& modID : a_modIDs) {
+            profile.mods.erase(modID);
+        }
+
+        return Save(a_name, profile);
     }
 
     bool ProfileStorage::UpdateSetting(const CapturedSetting& a_setting)
@@ -83,7 +150,19 @@ namespace MCMMemory
             return false;
         }
 
-        Deduplicate(profile.settings, a_setting);
+        const auto& modID = a_setting.selection.identity.modID;
+        if (GetSettings().recordActions && !profile.IsActionMode(modID)) {
+            profile.SetMode(modID, ProfileMode::Action);
+            // Scanned settings stay unordered until the player changes their controls.
+            logger::info("Automatic backup started recording actions for '{}'", modID);
+        }
+
+        if (profile.IsActionMode(modID)) {
+            AppendAction(profile.settings, a_setting);
+        }
+        else {
+            Deduplicate(profile.settings, a_setting);
+        }
 
         return Save(profile);
     }
@@ -152,21 +231,45 @@ namespace MCMMemory
         JSON::ReadValue(a_document, "settingID", a_setting.settingID);
         JSON::ReadValue(a_document, "stateName", a_setting.stateName);
         JSON::ReadValue(a_document, "pageScopedState", a_setting.pageScopedState);
+        JSON::ReadValue(a_document, "textControl", a_setting.textControl);
+        JSON::ReadValue(a_document, "command", a_setting.command);
+        JSON::ReadValue(a_document, "confirmedCommand", a_setting.confirmedCommand);
+        JSON::ReadValue(a_document, "recorded", a_setting.recorded);
+        JSON::ReadValue(a_document, "sequence", a_setting.sequence);
+        JSON::ReadValue(a_document, "rebuildsPage", a_setting.rebuildsPage);
+        JSON::ReadValue(a_document, "reopensConfig", a_setting.reopensConfig);
+        // ReadString ignores a wrongly typed field instead of throwing the whole profile away.
+        if (auto valueText = JSON::ReadString(a_document, "valueText")) {
+            a_setting.valueText = std::move(*valueText);
+        }
         JSON::ReadValue(a_document, "valueSource", a_setting.valueSource);
         JSON::ReadValue(a_document, "identityComplete", a_setting.identityComplete);
         JSON::ReadValue(a_document, "value", a_setting.value);
         
         a_setting.type = ParseControlType(controlType);
 
-        return a_setting.type != ControlType::Unknown && !a_setting.selection.identity.modID.empty() && a_setting.selection.optionIndex >= 0 && !a_setting.value.is_null();
+        return (a_setting.type != ControlType::Unknown || (a_setting.command && a_setting.recorded)) && !a_setting.selection.identity.modID.empty() && a_setting.selection.optionIndex >= 0 && !a_setting.value.is_null();
     }
 
     nlohmann::json ProfileStorage::ToJson(const Profile& a_profile)
     {
         // Keep selection fields flat and omit the temporary MCM list index.
         nlohmann::json document;
-        document["formatVersion"] = 1;
+        document["formatVersion"] = 2;
         document["purpose"] = "Persistent MCM settings profile";
+        // Value is the default, so only mods that record actions are written here.
+        nlohmann::json mods = nlohmann::json::object();
+        for (const auto& [modID, mode] : a_profile.mods) {
+            if (mode == ProfileMode::Value) {
+                continue;
+            }
+            nlohmann::json modDocument;
+            modDocument["mode"] = std::string(ProfileModeName(mode));
+            mods[modID] = std::move(modDocument);
+        }
+        if (!mods.empty()) {
+            document["mods"] = std::move(mods);
+        }
         if (!a_profile.activations.empty()) {
             document["activations"] = nlohmann::json::array();
             for (const auto& activation : a_profile.activations) {

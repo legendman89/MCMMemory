@@ -305,6 +305,11 @@ namespace MCMMemory
             if (!AllowsMCM(mcmFilter, mcm->identity.modID)) {
                 mcm = currentMCMs.erase(mcm);
             }
+            else if (profile.IsActionMode(mcm->identity.modID)) {
+                // Recorded actions have priority over a scan, so there is no reason to read this MCM at all.
+                logger::info("Full MCM backup skipped '{}' because it is in action mode", mcm->identity.modID);
+                mcm = currentMCMs.erase(mcm);
+            }
             else if (const auto reason = GetMCMExclusionReason(mcm->identity.modID); !reason.empty()) {
                 logger::info("Full MCM backup skipped '{}': {}", mcm->identity.modID, reason);
                 mcm = currentMCMs.erase(mcm);
@@ -395,7 +400,8 @@ namespace MCMMemory
             return;
         }
 
-        auto pageNames = script.ReadPages();
+        std::vector<std::string> pageNames;
+        script.ReadPages(pageNames);
         pages.reserve(pageNames.size() + 1);
         // OpenConfig may redirect to a named page. Read it once, under its real name.
         pages.push_back(*openingPage);
@@ -528,6 +534,9 @@ namespace MCMMemory
         if (selectedIndex && *selectedIndex >= 0) {
             setting.value = *selectedIndex;
             setting.valueSource = "script._menuParams";
+            // IsMenuReady already proved this row owns the dialog data, so the text beside it is the
+            // text for the index just read. Restore compares it instead of asking for the data again.
+            setting.valueText = script.ReadOptionText(setting.selection.optionIndex).value_or("");
         }
         else {
             setting.identityComplete = false;
@@ -571,7 +580,13 @@ namespace MCMMemory
     void Backup::CommitMCM()
     {
         const auto& modID = registeredMCMs[mcmIndex].identity.modID;
-        if (!mcmFailed) {
+        // The registry filter already removed these, 
+        // so this only guards a mode set while the backup ran.
+        const bool actionMode = profile.IsActionMode(modID);
+        if (actionMode) {
+            logger::info("Full MCM backup left '{}' unchanged because it is in action mode", modID);
+        }
+        if (!mcmFailed && !actionMode) {
             if (!mcmActivation) {
                 mcmActivation = Capture::GetSingleton()->FindDetectedActivation(modID);
                 if (mcmActivation) {
@@ -609,7 +624,7 @@ namespace MCMMemory
                 logger::info("Full MCM backup captured {} settings from '{}' ({} skipped)", mcmStats.settingCount, modID, mcmStats.skippedSettingCount);
             }
         }
-        else {
+        else if (mcmFailed) {
             mcmStats.failedMCMCount = 1;
             logger::warn("Full MCM backup kept the previous settings for '{}' after the MCM failed", modID);
         }

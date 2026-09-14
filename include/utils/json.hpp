@@ -222,7 +222,29 @@ namespace MCMMemory
             if (a_setting.pageScopedState) {
                 document["pageScopedState"] = true;
             }
+            if (a_setting.textControl) {
+                document["textControl"] = true;
+            }
+            if (a_setting.command) {
+                document["command"] = true;
+                document["confirmedCommand"] = a_setting.confirmedCommand;
+            }
+            if (a_setting.recorded) {
+                document["recorded"] = true;
+            }
+            if (a_setting.sequence != 0) {
+                document["sequence"] = a_setting.sequence;
+            }
+            if (a_setting.reopensConfig) {
+                document["reopensConfig"] = true;
+            }
+            if (a_setting.rebuildsPage) {
+                document["rebuildsPage"] = true;
+            }
             document["value"] = a_setting.value;
+            if (!a_setting.valueText.empty()) {
+                document["valueText"] = a_setting.valueText;
+            }
             document["valueSource"] = a_setting.valueSource;
             document["identityComplete"] = a_setting.identityComplete;
             return document;

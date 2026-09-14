@@ -3,17 +3,22 @@
 // Add stable page keys here when an MCM page only manages external configurations.
 #define FOREACH_IGNORED_MCM_PAGE(IGNORED_PAGE) \
     IGNORED_PAGE("SaveLoad") \
-    IGNORED_PAGE("ImportExport")
+    IGNORED_PAGE("ImportExport") \
+    IGNORED_PAGE("Presets")
 
-// These words only ignore text buttons. Normal toggles, sliders and menus are unaffected.
-#define FOREACH_IGNORED_MCM_COMMAND(IGNORED_COMMAND) \
+// Profile managing commands are excluded from both value capture and recorded commands.
+#define FOREACH_MCM_PROFILE_WRITE_COMMAND(IGNORED_COMMAND) \
     IGNORED_COMMAND("Save") \
-    IGNORED_COMMAND("Load") \
     IGNORED_COMMAND("Delete") \
-    IGNORED_COMMAND("Import") \
-    IGNORED_COMMAND("Export") \
     IGNORED_COMMAND("Rename") \
-    IGNORED_COMMAND("Duplicate") \
+    IGNORED_COMMAND("Export") \
+    IGNORED_COMMAND("Duplicate")
+
+// Value capture excludes these text commands; recording can replay Load/Import/Reset.
+#define FOREACH_IGNORED_MCM_COMMAND(IGNORED_COMMAND) \
+    FOREACH_MCM_PROFILE_WRITE_COMMAND(IGNORED_COMMAND) \
+    IGNORED_COMMAND("Load") \
+    IGNORED_COMMAND("Import") \
     IGNORED_COMMAND("Reset")
 
 // Ignore commands in NFF from backup/restore.

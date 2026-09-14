@@ -75,12 +75,6 @@ namespace MCMMemory
 
         friend struct MCMWatchTask<Backup>;
 
-        void CheckCalls(uint64_t a_loadedGameSession);
-
-        void HandleExpiredCall();
-
-        bool QueueWatch();
-
         inline void QueueNext(float a_delaySeconds)
         {
             const uint64_t taskID = ++scheduledTaskID;
@@ -89,6 +83,12 @@ namespace MCMMemory
                 FinishCancellation(OperationResult::Failed, callWatch.HasCall() || mcmOpen);
             }
         }
+
+        bool QueueWatch();
+
+        void CheckCalls(uint64_t a_loadedGameSession);
+
+        void HandleExpiredCall();
 
         bool Begin(MCMFilter a_filter);
 

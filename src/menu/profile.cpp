@@ -3,6 +3,7 @@
 #include "menu/icons.hpp"
 #include "menu/translate.hpp"
 #include "profile/backup.hpp"
+#include "profile/capture.hpp"
 #include "profile/profile.hpp"
 #include "profile/profiles.hpp"
 #include "profile/restore.hpp"
@@ -83,7 +84,7 @@ namespace MCMMemory::Menu
         const auto backupStatus = Backup::GetSingleton()->GetStatus();
         const auto restoreStatus = Restore::GetSingleton()->GetStatus();
         const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
-        const bool profileEditing = createProfileWindow.open || deleteProfileWindow.open;
+        const bool profileEditing = createProfileWindow.open || deleteProfileWindow.open || forgetMCMsWindow.open;
         const auto backupLabel = Trans::Tr("Profile.Action.BackUpNow");
         const auto restoreLabel = Trans::Tr("Profile.Action.RestoreNow");
         const auto cancelLabel = Trans::Tr("Profile.Action.CancelNow");
@@ -153,11 +154,19 @@ namespace MCMMemory::Menu
     {
         SelectedMCMFilters selectedMCMs;
         for (const auto& mcm : mcms) {
-            if (mcm.selected && mcm.CanSelect()) {
-                selectedMCMs.backup.push_back(mcm.identity.modID);
-                if (mcm.settingCount > 0) {
-                    selectedMCMs.restore.push_back(mcm.identity.modID);
-                }
+            if (!mcm.selected) {
+                continue;
+            }
+            selectedMCMs.selected.push_back(mcm.identity.modID);
+            if (mcm.CanForget()) {
+                selectedMCMs.forget.push_back(mcm.identity.modID);
+            }
+            if (!mcm.CanSelect()) {
+                continue;
+            }
+            selectedMCMs.backup.push_back(mcm.identity.modID);
+            if (mcm.settingCount > 0) {
+                selectedMCMs.restore.push_back(mcm.identity.modID);
             }
         }
         return selectedMCMs;
@@ -180,7 +189,7 @@ namespace MCMMemory::Menu
 
     void ProfileMenu::Refresh()
     {
-        const auto selectedMCMs = ReadSelectedMCMs().backup;
+        const auto selectedMCMs = ReadSelectedMCMs().selected;
         const bool currentGameLoaded = IsGameLoaded();
         if (currentGameLoaded != gameLoaded) {
             registryWait.Reset();
@@ -216,7 +225,7 @@ namespace MCMMemory::Menu
         gameLoaded = currentGameLoaded;
         for (auto& mcm : mcms) {
             mcm.unresponsive = MCMCallWatch::IsUnavailable(mcm.identity.modID);
-            if (!mcm.CanSelect()) {
+            if (!mcm.CanSelect() && !mcm.CanForget()) {
                 mcm.selected = false;
             }
         }
@@ -244,7 +253,7 @@ namespace MCMMemory::Menu
                 mcm.selected = false;
                 continue;
             }
-            if (mcm.CanSelect() && IsVisible(mcm)) {
+            if ((mcm.CanSelect() || mcm.CanForget()) && IsVisible(mcm)) {
                 mcm.selected = true;
             }
         }
@@ -259,7 +268,7 @@ namespace MCMMemory::Menu
         const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
         const bool journalMenuOpen = IsJournalMenuOpen();
         const bool journalBlocksOperation = !operationRunning && journalMenuOpen;
-        const bool operationAvailable = IsGameLoaded() && !operationRunning && !journalMenuOpen && !createProfileWindow.open && !deleteProfileWindow.open;
+        const bool operationAvailable = IsGameLoaded() && !operationRunning && !journalMenuOpen && !createProfileWindow.open && !deleteProfileWindow.open && !forgetMCMsWindow.open;
         std::string backupLabel = Trans::Tr("Profile.Action.BackUpNow");
         std::string restoreLabel = Trans::Tr("Profile.Action.RestoreNow");
         unsigned backupIcon = Icons::kSave;
@@ -423,20 +432,19 @@ namespace MCMMemory::Menu
         GUI::End();
     }
 
-    void ProfileMenu::RenderDeleteProfileWindow()
+    bool ProfileMenu::RenderConfirmWindow(ConfirmWindow& a_window, std::string_view a_id, std::string_view a_titleKey, const std::string& a_message)
     {
-        auto& window = deleteProfileWindow;
-        if (!window.open) {
-            return;
+        if (!a_window.open) {
+            return false;
         }
 
-        GUI::SetNextWindowSize(GUI::ImVec2{ 420.0F, 160.0F }, GUI::ImGuiCond_FirstUseEver);
+        bool confirmed{};
+        GUI::SetNextWindowSize(GUI::ImVec2{ 520.0F, 170.0F }, GUI::ImGuiCond_FirstUseEver);
         CenterNextWindow();
-        const auto title = std::format("{}###Delete MCM Memory Profile", Trans::Tr("Profile.Delete.Title"));
-        if (GUI::Begin(title.c_str(), std::addressof(window.open), GUI::ImGuiWindowFlags_NoCollapse)) {
-            const auto message = Trans::Format("Profile.Delete.Prompt", window.profile);
-            CenterNextItem(GUI::CalcTextSize(message.c_str()).x);
-            GUI::TextUnformatted(message.c_str());
+        const auto title = std::format("{}###{}", Trans::Tr(a_titleKey), a_id);
+        if (GUI::Begin(title.c_str(), std::addressof(a_window.open), GUI::ImGuiWindowFlags_NoCollapse)) {
+            CenterNextItem(GUI::CalcTextSize(a_message.c_str()).x);
+            GUI::TextUnformatted(a_message.c_str());
             GUI::Spacing();
 
             const bool operationRunning = Backup::GetSingleton()->GetStatus() != OperationStatus::Idle || Restore::GetSingleton()->GetStatus() != OperationStatus::Idle;
@@ -448,28 +456,72 @@ namespace MCMMemory::Menu
             const float buttonHeight = std::max(yesSize.y, cancelSize.y);
             constexpr float buttonSpacing{ 14.0F };
             CenterNextItem(buttonWidth * 2.0F + buttonSpacing);
-            if (CTAButton(yesLabel.c_str(), !operationRunning, Color::kCancelButtonColors, GUI::ImVec2{ buttonWidth, buttonHeight })) {
-                if (Profiles::Delete(window.profile, window.error)) {
-                    RefreshProfileNames();
-                    loaded = false;
-                    window.open = false;
-                }
-            }
+            confirmed = CTAButton(yesLabel.c_str(), !operationRunning, Color::kCancelButtonColors, GUI::ImVec2{ buttonWidth, buttonHeight });
 
             GUI::SameLine(0.0F, buttonSpacing);
 
             if (CTAButton(cancelLabel.c_str(), true, Color::kNeutralButtonColors, GUI::ImVec2{ buttonWidth, buttonHeight })) {
-                window.open = false;
+                a_window.open = false;
             }
 
-            if (!window.error.empty()) {
+            // The caller sets this after the prompt is drawn, so a failure shows on the next frame.
+            if (!a_window.error.empty()) {
                 GUI::Spacing();
-                GUI::TextWrapped("%s", Trans::Tr(window.error).c_str());
+                GUI::TextWrapped("%s", Trans::Tr(a_window.error).c_str());
             }
 
             GUI::Spacing();
         }
         GUI::End();
+        return confirmed;
+    }
+
+    void ProfileMenu::RenderForgetMCMsWindow()
+    {
+        auto& window = forgetMCMsWindow;
+        if (!window.open) {
+            return;
+        }
+
+        if (window.profile != GetSettings().activeProfile) {
+            window.open = false;
+            return;
+        }
+
+        const auto message = Trans::Format("Profile.Forget.Prompt", window.modIDs.size(), window.profile);
+        if (!RenderConfirmWindow(window, "Forget MCM Memory Settings", "Profile.Forget.Title", message)) {
+            return;
+        }
+
+        size_t settingCount{};
+        if (ProfileStorage::ForgetMCMs(window.profile, window.modIDs, settingCount)) {
+            Capture::GetSingleton()->ForgetMCMs(window.modIDs);
+            logger::info("Removed {} settings from {} MCMs in profile '{}'", settingCount, window.modIDs.size(), window.profile);
+            loaded = false;
+            window.open = false;
+        }
+        else {
+            window.error = "Profile.Forget.Failed";
+        }
+    }
+
+    void ProfileMenu::RenderDeleteProfileWindow()
+    {
+        auto& window = deleteProfileWindow;
+        if (!window.open) {
+            return;
+        }
+
+        const auto message = Trans::Format("Profile.Delete.Prompt", window.profile);
+        if (!RenderConfirmWindow(window, "Delete MCM Memory Profile", "Profile.Delete.Title", message)) {
+            return;
+        }
+
+        if (Profiles::Delete(window.profile, window.error)) {
+            RefreshProfileNames();
+            loaded = false;
+            window.open = false;
+        }
     }
 
     void ProfileMenu::RenderAutomation()
@@ -487,6 +539,17 @@ namespace MCMMemory::Menu
             changed = true;
         }
         HelpMarker(Trans::Tr("Profile.Automation.Restore.Tooltip").c_str());
+
+        GUI::Spacing();
+
+        // Recording needs automatic backup running; there is no interaction order to monitor without it.
+        GUI::BeginDisabled(!settings.autoBackup);
+        if (GUI::Checkbox(Trans::Tr("Profile.Automation.Record").c_str(), std::addressof(settings.recordActions))) {
+            changed = true;
+        }
+        GUI::EndDisabled();
+        HelpMarker(Trans::Tr("Profile.Automation.Record.Tooltip").c_str());
+
         if (changed && !SettingsStorage::Save()) {
             logger::error("MCM Memory menu could not save its automation settings");
         }
@@ -544,7 +607,7 @@ namespace MCMMemory::Menu
             GUI::TableNextRow();
 
             GUI::TableSetColumnIndex(0);
-            GUI::BeginDisabled(!mcm.CanSelect() || !a_operationAvailable);
+            GUI::BeginDisabled((!mcm.CanSelect() && !mcm.CanForget()) || !a_operationAvailable);
 
             CenterNextItem(GUI::GetFrameHeight());
             GUI::Checkbox("##Selected", std::addressof(mcm.selected));
@@ -652,10 +715,12 @@ namespace MCMMemory::Menu
         const auto backupStatus = Backup::GetSingleton()->GetStatus();
         const auto restoreStatus = Restore::GetSingleton()->GetStatus();
         const bool journalMenuOpen = IsJournalMenuOpen();
-        const bool operationAvailable = IsGameLoaded() && backupStatus == OperationStatus::Idle && restoreStatus == OperationStatus::Idle;
+        const bool operationAvailable = IsGameLoaded() && backupStatus == OperationStatus::Idle && restoreStatus == OperationStatus::Idle && !createProfileWindow.open && !deleteProfileWindow.open && !forgetMCMsWindow.open;
         const bool journalBlocksOperation = operationAvailable && journalMenuOpen;
         const auto backupLabel = Trans::Tr("Profile.MCM.BackUpSelected");
         const auto restoreLabel = Trans::Tr("Profile.MCM.RestoreSelected");
+        const auto forgetLabel = Trans::Tr("Profile.MCM.ForgetSelected");
+        const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
 
         GUI::Spacing();
 
@@ -686,7 +751,7 @@ namespace MCMMemory::Menu
 
         GUI::SameLine(0.0F, 18.0F);
 
-        RenderMCMCounts(registeredMCMCount, selectedMCMs.backup.size());
+        RenderMCMCounts(registeredMCMCount, selectedMCMs.selected.size());
 
         GUI::SameLine(0.0F, 28.0F);
 
@@ -702,6 +767,17 @@ namespace MCMMemory::Menu
         }
         WrappedTooltip(Trans::Tr(journalBlocksOperation ? "Profile.Action.JournalMenuOpen.Tooltip" : "Profile.MCM.RestoreSelected.Tooltip").c_str());
 
+        GUI::SameLine(0.0F, 14.0F);
+
+        // Only the profile file is touched, so this does not wait for the Journal Menu to close.
+        if (IconCTAButton(forgetLabel.c_str(), !operationRunning && !createProfileWindow.open && !deleteProfileWindow.open && !forgetMCMsWindow.open && !selectedMCMs.forget.empty(), Icons::kDelete, Color::kCancelButtonColors)) {
+            forgetMCMsWindow = {};
+            forgetMCMsWindow.open = true;
+            forgetMCMsWindow.profile = GetSettings().activeProfile;
+            forgetMCMsWindow.modIDs = selectedMCMs.forget;
+        }
+        WrappedTooltip(Trans::Tr("Profile.MCM.ForgetSelected.Tooltip").c_str());
+
         GUI::Spacing();
 
         RenderMCMTable(operationAvailable);
@@ -716,6 +792,8 @@ namespace MCMMemory::Menu
         RenderCreateProfileWindow();
 
         RenderDeleteProfileWindow();
+
+        RenderForgetMCMsWindow();
 
         GUI::Spacing();
         GUI::Spacing();

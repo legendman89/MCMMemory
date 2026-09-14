@@ -18,6 +18,8 @@
     FOREACH_HUD_SETTING(SETTING) \
     /* Keeps the profile updated when an MCM setting changes. */ \
     SETTING(bool, autoBackup, true) \
+    /* Records the order of automatic backup changes so modified controls can be replayed in that order. */ \
+    SETTING(bool, recordActions, true) \
     /* Restores the profile after a new game's MCM registration finishes. */ \
     SETTING(bool, autoRestore, true) \
     FOREACH_NOTIFICATION_TOGGLE_SETTING(SETTING) \

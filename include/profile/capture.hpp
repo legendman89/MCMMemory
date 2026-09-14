@@ -1,13 +1,15 @@
 #pragma once
 
 #include "mcm/mcm_menu.hpp"
-#include "mcm/mcm_registry.hpp"
 #include "mcm/mcm_support.hpp"
-#include "profile/profile.hpp"
+#include "mcm/mcm_registry.hpp"
+#include "profile/types.hpp"
 #include "profile/stats.hpp"
+#include "profile/profile.hpp"
 #include "profile/storage.hpp"
-#include "settings.hpp"
 #include "utils/scheduler.hpp"
+
+#include "settings.hpp"
 
 namespace MCMMemory
 {
@@ -78,6 +80,12 @@ namespace MCMMemory
 
         // Returns an activation choice detected during this loaded game.
         std::optional<MCMActivationState> FindDetectedActivation(std::string_view a_modID);
+
+        // True when a config close separates this change from the last one written for the MCM.
+        bool IsConfigReopened(const std::string& a_modID, uint32_t a_configSession) const;
+
+        // Forget what this game still remembers about MCMs whose saved settings were removed.
+        void ForgetMCMs(const MCMFilter& a_modIDs);
 
         // Receives MCM callbacks such as sliderAccepted and optionSelected.
         RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>* a_source) override;
@@ -208,6 +216,10 @@ namespace MCMMemory
         // Holds settings automatically saved during the current Journal Menu visit.
         std::vector<CapturedSetting> pendingAutoBackupSettings;
 
+        // Config session each MCM was last written under, so the next change can tell whether the
+        // player left and came back. Covers this game only, which is the scope we want.
+        std::unordered_map<std::string, uint32_t> recordedConfigSessions;
+
         // Gives each new callback its eventID.
         uint64_t eventCount{};
 
@@ -216,6 +228,10 @@ namespace MCMMemory
 
         // Old reads must not run against a newly opened Journal Menu.
         uint64_t menuOpenedEventID{};
+
+        // Counts how many times an MCM config was opened. Settings recorded under different
+        // counts are separated by an OnConfigClose that the restore has to replay.
+        uint32_t configSession{ 1 };
 
         // Prevents the event listeners from being installed twice.
         bool installed{};
@@ -234,5 +250,18 @@ namespace MCMMemory
     {
         // Read the menu again after SkyUI has finished updating it.
         Capture::GetSingleton()->CompleteCaptureIfCurrentSession(request);
+    }
+
+    // A text row that shows its own value can be replayed by clicking it, but a command button
+    // like Save or Reset must never become a setting. Accepting the row rewrites its type to Cycle,
+    // which hides it from the command check later.
+    inline bool IsRecordableTextSetting(const CaptureRecord& a_record)
+    {
+        if (!GetSettings().recordActions || !a_record.control || !IsRecordableTextControl(*a_record.control)) {
+            return false;
+        }
+        const auto& selection = a_record.selection;
+        const auto& control = *a_record.control;
+        return !MCMCommandSupport::IsIgnored(selection.identity.modID, selection.pageName, selection.pageIndex, control.type, control.stateName, control.optionLabel);
     }
 }

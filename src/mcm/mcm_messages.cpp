@@ -128,7 +128,7 @@ namespace MCMMemory
             logger::warn("Declined MCM confirmation '{}' during '{}' on '{}'; this call is incomplete", (*parameters)[0].GetString(), call->functionName, call->modID);
         }
         else if (confirmation) {
-            logger::info("Accepted MCM activation confirmation '{}' during '{}' on '{}'", (*parameters)[0].GetString(), call->functionName, call->modID);
+            logger::info("Accepted MCM confirmation '{}' during '{}' on '{}'", (*parameters)[0].GetString(), call->functionName, call->modID);
         }
         else {
             logger::info("Acknowledged MCM message '{}' during '{}' on '{}'", (*parameters)[0].GetString(), call->functionName, call->modID);

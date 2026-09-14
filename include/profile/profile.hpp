@@ -1,6 +1,7 @@
 #pragma once
 
 #include "profile/types.hpp"
+#include "profile/mode.hpp"
 
 namespace MCMMemory
 {
@@ -11,10 +12,41 @@ namespace MCMMemory
 
         std::vector<MCMActivation> activations;
 
+        // Only holds mods that differ from the default,
+        // a missing mod implies ProfileMode::Value.
+        ProfileModeMap mods;
+
         inline void Clear()
         {
             settings.clear();
             activations.clear();
+            mods.clear();
+        }
+
+        // Value or Action per mod?
+        inline ProfileMode ModeFor(std::string_view a_modID) const
+        {
+            const auto found = mods.find(a_modID);
+            return found != mods.end() ? found->second : ProfileMode::Value;
+        }
+
+        inline bool IsActionMode(std::string_view a_modID) const
+        {
+            return ModeFor(a_modID) == ProfileMode::Action;
+        }
+
+        inline void SetMode(std::string_view a_modID, ProfileMode a_mode)
+        {
+            const auto found = mods.find(a_modID);
+            if (found != mods.end()) {
+                found->second = a_mode;
+                return;
+            }
+
+            // A mod only tracked iff it stops using the default mode (Value).
+            if (a_mode != ProfileMode::Value) {
+                mods.emplace(std::string(a_modID), a_mode);
+            }
         }
 
         inline const MCMActivation* FindActivation(std::string_view a_modID) const
@@ -67,6 +99,9 @@ namespace MCMMemory
 
         // Remembers whether the player allowed a staged MCM to start automatically.
         static bool UpdateActivation(const MCMActivation& a_activation, bool a_enabled);
+
+        // Removes every saved setting, activation and mode for these MCMs from the named profile.
+        static bool ForgetMCMs(std::string_view a_name, const MCMFilter& a_modIDs, size_t& a_settingCount);
 
         // Writes the complete profile to disk.
         static bool Save(const Profile& a_profile);

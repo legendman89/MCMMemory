@@ -21,6 +21,15 @@ namespace MCMMemory
     // Givies enough time for the MCM to build.
     inline constexpr float mcmActivationDelaySeconds{ 2.0F };
 
+    // A cycle normally ends when the value stops changing or returns to where it
+    // started; this just bounds a control whose text never repeats.
+    // Largest cycle I found so far when making patches is 6.
+    inline constexpr int maximumRecordedClicks{ 16 };
+
+    // A page can still be rebuilding when the next setting is checked, so give it a few tries
+    // before deciding the control is gone.
+    inline constexpr int maximumSettleChecks{ 5 };
+
     // Says which type of argument a restore script function expects.
     enum class RestoreArgumentType
     {
@@ -91,6 +100,15 @@ namespace MCMMemory
         // Stable Papyrus state used to verify state-based controls.
         std::string stateName;
 
+        // Text the menu row showed when this index was saved, compared instead of its dialog data.
+        std::string valueText;
+
+        // Value shown by a text control before its last click.
+        std::string previousCycleText;
+
+        // Value shown before its first click, so one full cycle ends the attempt.
+        std::string startText;
+
         // Index of the RestoreMCM that should receive this call.
         size_t mcmIndex{};
 
@@ -115,13 +133,24 @@ namespace MCMMemory
         // A cycling setting gets at most one trip through its choices.
         int cycleClicks{};
 
+        // Counts how often this action waited for its page to finish rebuilding.
+        int settleChecks{};
+
         int previousCycleValue{-1};
+
+        // Closes and opens the MCM again through its settings, so this step is not
+        // the start or the end of the MCM.
+        bool reopenStep{};
 
         // Refresh after a click, before inspecting the new value or using another row.
         bool refreshingCycle{};
 
         // Desired state used when restoring a toggle.
         bool boolValue{};
+
+        bool command{};
+
+        bool confirmedCommand{};
 
         // A final retry must not repeat a setting or follow-up that already finished.
         bool completed{};
@@ -180,11 +209,11 @@ namespace MCMMemory
         return action;
     }
 
-    // Calls normal keymaps directly while state-based controls keep SkyUI's state.
-    inline RestoreAction MakeKeymapAction(size_t a_mcmIndex, int a_optionIndex, int a_keyCode, bool a_stateControl)
+    // SkyUI turns the buffer index into its option ID and runs the right callback, so
+    // the remap goes through it instead of calling the mod back directly.
+    inline RestoreAction MakeKeymapAction(size_t a_mcmIndex, int a_optionIndex, int a_keyCode)
     {
-        auto type = a_stateControl ? RestoreActionType::ChangeStateKeymap : RestoreActionType::ChangeKeymap;
-        auto action = MakeOptionAction(type, a_mcmIndex, a_optionIndex);
+        auto action = MakeOptionAction(RestoreActionType::ChangeKeymap, a_mcmIndex, a_optionIndex);
         action.integerValue = a_keyCode;
         return action;
     }
@@ -314,7 +343,7 @@ namespace MCMMemory
         size_t FindMCMClose() const;
 
         // Finds the RestoreMCM for a setting or creates it.
-        size_t GetOrAddMCM(const CapturedSetting& a_setting);
+        size_t GetOrAddMCM(const MCMIdentity& a_identity);
 
         bool Begin(MCMFilter a_filter);
 
@@ -330,19 +359,31 @@ namespace MCMMemory
         void BuildActionQueue();
 
         // Sends one queued action to its matching MCM script.
-        bool RunAction(RestoreAction& a_action, SKSE::TaskInterface::TaskFn a_result);
+        bool RunAction(RestoreAction& a_action, std::function<void()> a_result);
 
         void CompleteCycleAction(RestoreAction& a_action, bool a_continue);
+
+        // Checks the displayed value after clicking a control that has no typed value to read.
+        void CompleteClicksAction(RestoreAction& a_action, bool a_continue);
+
+        // Reports a remapped key that the MCM row does not show, since nothing else would notice this.
+        void VerifyKeymapAction(const RestoreAction& a_action) const;
+
+        // Closes and opens an MCM between two of its settings.
+        void AddReopenActions(size_t a_mcmIndex);
 
         bool IsActionNeeded(const RestoreAction& a_action) const;
 
         bool IsActionValid(const RestoreAction& a_action) const;
 
+        // True when SkyUI has finished building the page this action belongs to.
+        bool IsActionPageReady(const RestoreAction& a_action) const;
+
         // Calls one function on a live MCM script.
-        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_result, bool a_acceptConfirmation = false);
+        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_result, bool a_acceptConfirmation = false);
 
         // Flips a toggle only when its current state differs from the profile.
-        bool RestoreToggle(const RestoreAction& a_action, SKSE::TaskInterface::TaskFn a_result);
+        bool RestoreToggle(const RestoreAction& a_action, std::function<void()> a_result);
 
         // Schedules the next action after the requested delay.
         inline void QueueNextAction(float a_delaySeconds)

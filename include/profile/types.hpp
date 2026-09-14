@@ -136,6 +136,10 @@ namespace MCMMemory
 
         nlohmann::json value;
 
+        // Text a menu row shows for the stored index. A menu is the only control whose live value
+        // costs a script call to read, so this lets restore compare it for free.
+        std::string valueText;
+
         std::string valueSource;
 
         uint64_t sourceEventID{};
@@ -147,8 +151,36 @@ namespace MCMMemory
         // NL_MCM pages have separate scripts and can reuse the same state names.
         bool pageScopedState{};
 
+        // A SkyUI text row used as a setting. It has no typed value, so the shown text is the value.
+        bool textControl{};
+
+        // Replay this captured click once; it has no persistent value to compare.
+        bool command{};
+
+        bool confirmedCommand{};
+
+        // Flag if player was seen doing recording.
+        // Scanned settings (captured values) have no position and can be restored at once afterwards.
+        bool recorded{};
+
+        // Orders a mod recorded settings (e.g. next = sequence + 1). 
+        // Scanned ones ignore it.
+        int sequence{};
+
+        // This change rebuilt its page, so the controls recorded after it depend on it.
+        bool rebuildsPage{};
+
+        // The MCM was closed and opened again before this change, so its handler had
+        // everything recorded earlier. Capture decides this, since a profile is reloaded from
+        // disk on every update and cannot remember the change before this one.
+        bool reopensConfig{};
+
+        // A dropdown can select dependent controls before its delayed redraw is captured.
+        // Keep its recorded position even when the page hash did not catch that redraw.
+        bool RequiresOrderedReplay() const { return command || type == ControlType::Menu || rebuildsPage || reopensConfig; }
+
         // Checks whether another captured setting refers to the same MCM option.
-        // This avoids duplicate profile entries.
+        // This avoids duplicate profile settings.
         bool IsSameSetting(const CapturedSetting& a_other) const
         {
             if (type != a_other.type || selection.identity.modID != a_other.selection.identity.modID) {
@@ -175,8 +207,20 @@ namespace MCMMemory
 
         std::string stateName;
 
+        // The value SkyUI displayed on this row, used by controls that have no typed value.
+        std::string valueText;
+
         ControlType type{ ControlType::Unknown };
+
+        std::optional<bool> toggleValue;
     };
+
+    // A cycling setting shows a value beside its label. A command button shows no value, or has no
+    // label and puts the command in the value instead.
+    inline bool IsRecordableTextControl(const MCMControl& a_control)
+    {
+        return a_control.type == ControlType::Unknown && !a_control.valueText.empty() && !a_control.optionLabel.empty() && a_control.optionLabel != a_control.valueText;
+    }
 
     // Keeps the raw event and menu state for Capture.json debugging.
     struct CaptureRecord
@@ -193,7 +237,14 @@ namespace MCMMemory
         // Read before a redraw; not part of the saved profile format.
         std::optional<MCMControl> control;
 
+        // Instead of checking every control per page just to know if the page changed (cleared, had new controls, etc.), 
+        // we can just check the page hash. If it changed, the page was rebuilt.
+        std::optional<uint64_t> pageHash;
+
         uint64_t eventID{};
+
+        // Taken when the event arrived, since the menu can close before the capture finishes.
+        uint32_t configSession{};
 
         EventType type{ EventType::Unknown };
 
@@ -202,9 +253,13 @@ namespace MCMMemory
         RE::FormID senderFormID{};
 
         bool activationEvent{};
+
+        bool confirmationAccepted{};
+
+        bool confirmationCancelled{};
     };
 
-    // Adds a setting; callers can keep an existing value when it came from a fresher read.
+    // Adds a setting to the vector, replacing an existing one if it matches and a_replaceExisting is true.
     inline void Deduplicate(std::vector<CapturedSetting>& a_settings, CapturedSetting a_setting, bool a_replaceExisting = true)
     {
         auto existing = a_settings.begin();

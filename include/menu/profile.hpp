@@ -9,14 +9,17 @@ namespace MCMMemory::Menu
 {
     struct ProfileMCMRow
     {
-        bool CanSelect() const
+        inline bool CanSelect() const
         {
             return available && !IsExcluded() && !IsUnresponsive();
         }
 
-        bool IsExcluded() const { return !GetMCMExclusionReason(identity.modID).empty(); }
+        // Saved settings can be removed from profiles even for a mod that is no longer installed.
+        inline bool CanForget() const { return settingCount > 0; }
 
-        bool IsUnresponsive() const { return unresponsive; }
+        inline bool IsExcluded() const { return !GetMCMExclusionReason(identity.modID).empty(); }
+
+        inline bool IsUnresponsive() const { return unresponsive; }
 
         MCMIdentity identity;
 
@@ -31,9 +34,15 @@ namespace MCMMemory::Menu
 
     struct SelectedMCMFilters
     {
+        // Every checked row.
+        MCMFilter selected;
+
         MCMFilter backup;
 
         MCMFilter restore;
+
+        // Rows holding saved settings, including MCMs that are no longer installed.
+        MCMFilter forget;
     };
 
     struct CreateProfileWindow
@@ -49,13 +58,25 @@ namespace MCMMemory::Menu
         bool duplicate{};
     };
 
-    struct DeleteProfileWindow
+    // Shared state for the yes or cancel prompts.
+    struct ConfirmWindow
     {
-        std::string profile;
-
+        // Holds a translation key, not the finished text.
         std::string error;
 
         bool open{};
+    };
+
+    struct DeleteProfileWindow : ConfirmWindow
+    {
+        std::string profile;
+    };
+
+    struct ForgetMCMsWindow : ConfirmWindow
+    {
+        std::string profile;
+
+        MCMFilter modIDs;
     };
 
     class ProfileMenu
@@ -86,7 +107,13 @@ namespace MCMMemory::Menu
 
         void RenderCreateProfileWindow();
 
+        // Draws the prompt and reports whether the player accepted. The caller runs the action
+        // and puts any failure key in the window error.
+        bool RenderConfirmWindow(ConfirmWindow& a_window, std::string_view a_id, std::string_view a_titleKey, const std::string& a_message);
+
         void RenderDeleteProfileWindow();
+
+        void RenderForgetMCMsWindow();
 
         void RenderAutomation();
 
@@ -116,6 +143,8 @@ namespace MCMMemory::Menu
         CreateProfileWindow createProfileWindow;
 
         DeleteProfileWindow deleteProfileWindow;
+
+        ForgetMCMsWindow forgetMCMsWindow;
 
         RegistryWait registryWait;
 

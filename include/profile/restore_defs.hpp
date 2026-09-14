@@ -7,6 +7,8 @@
     RESTORE_ACTION(VerifyMCM, VerifyMCM, None, false) \
     RESTORE_ACTION(ApplyToggle, SelectOption, ToggleValue, true) \
     RESTORE_ACTION(ApplyCycle, SelectOption, OptionIndex, true) \
+    RESTORE_ACTION(ApplyClicks, SelectOption, OptionIndex, true) \
+    RESTORE_ACTION(ApplyCommand, SelectOption, OptionIndex, true) \
     RESTORE_ACTION(RequestSliderDialogData, RequestSliderDialogData, OptionIndex, false) \
     RESTORE_ACTION(SetSliderValue, SetSliderValue, FloatValue, true) \
     RESTORE_ACTION(RequestMenuDialogData, RequestMenuDialogData, OptionIndex, false) \
@@ -17,6 +19,5 @@
     RESTORE_ACTION(SetInputText, SetInputText, StringValue, true) \
     RESTORE_ACTION(SetIntegerSetting, SetModSettingInt, SettingIntegerValue, true) \
     RESTORE_ACTION(NotifySettingChanged, OnSettingChange, StringValue, false) \
-    RESTORE_ACTION(ChangeKeymap, OnOptionKeyMapChange, KeymapValue, true) \
-    RESTORE_ACTION(ChangeStateKeymap, RemapKey, KeymapValue, true) \
+    RESTORE_ACTION(ChangeKeymap, RemapKey, KeymapValue, true) \
     RESTORE_ACTION(CloseConfig, CloseConfig, None, false)

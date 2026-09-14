@@ -22,7 +22,8 @@
     MCM_EVENT(ColorAccepted, "SKICP_colorAccepted", ValueChange, Color) \
     MCM_EVENT(InputSelected, "SKICP_inputSelected", OptionSelection, Unknown) \
     MCM_EVENT(InputAccepted, "SKICP_inputAccepted", ValueChange, Input) \
-    MCM_EVENT(DialogCanceled, "SKICP_dialogCanceled", Cancel, Unknown)
+    MCM_EVENT(DialogCanceled, "SKICP_dialogCanceled", Cancel, Unknown) \
+    MCM_EVENT(MessageDialogClosed, "SKICP_messageDialogClosed", Cancel, Unknown)
 
 
     #define DECLARE_EVENT_TYPE(name, eventName, role, controlType) name,

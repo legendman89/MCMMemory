@@ -18,7 +18,7 @@ namespace MCMMemory
         }
     }
 
-    bool Scheduler::Schedule(SKSE::TaskInterface::TaskFn a_task, float a_delaySeconds, bool a_uiTask) const
+    bool Scheduler::Schedule(std::function<void()> a_task, float a_delaySeconds, bool a_uiTask) const
     {
         if (!a_task) {
             return false;

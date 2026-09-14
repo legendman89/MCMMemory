@@ -40,8 +40,12 @@ namespace MCMMemory
             return page.name.empty() ? std::optional<MCMPage>(std::move(page)) : std::nullopt;
         }
 
-        auto registeredName = ReadString("Pages", static_cast<size_t>(page.index));
-        return registeredName && *registeredName == page.name ? std::optional<MCMPage>(std::move(page)) : std::nullopt;
+        auto pages = ReadPageArray();
+        if (!pages || static_cast<size_t>(page.index) >= pages->size()) {
+            return std::nullopt;
+        }
+        const auto& registeredName = (*pages)[static_cast<uint32_t>(page.index)];
+        return registeredName.IsString() && page.name == registeredName.GetString() ? std::optional<MCMPage>(std::move(page)) : std::nullopt;
     }
 
     const RE::BSScript::Variable* MCMScript::FindVariable(std::string_view a_name) const
@@ -104,35 +108,39 @@ namespace MCMMemory
         return value.IsString() ? std::optional<std::string>(std::string(value.GetString())) : std::nullopt;
     }
 
-    std::vector<std::string> MCMScript::ReadPages() const
+    RE::BSTSmartPointer<RE::BSScript::Array> MCMScript::ReadPageArray() const
     {
-        std::vector<std::string> pages;
         if (!script) {
-            return pages;
+            return {};
         }
 
         const auto* value = script->GetProperty("Pages");
         if (!value || !value->IsArray()) {
             value = script->GetVariable("::Pages_var");
         }
-        auto pageArray = value && value->IsArray() ? value->GetArray() : RE::BSTSmartPointer<RE::BSScript::Array>();
+        return value && value->IsArray() ? value->GetArray() : RE::BSTSmartPointer<RE::BSScript::Array>();
+    }
+
+    void MCMScript::ReadPages(std::vector<std::string>& a_pages) const
+    {
+        a_pages.clear();
+        auto pageArray = ReadPageArray();
         if (!pageArray) {
-            return pages;
+            return;
         }
 
-        pages.reserve(pageArray->size());
+        a_pages.reserve(pageArray->size());
         for (const auto& page : *pageArray) {
             if (page.IsString()) {
-                pages.emplace_back(page.GetString());
+                a_pages.emplace_back(page.GetString());
             }
         }
-        return pages;
     }
 
     bool MCMScript::ReadPage(const MCMIdentity& a_identity, std::string_view a_pageName, int a_pageIndex, std::vector<CapturedSetting>& a_settings) const
     {
-        if (MCMCommandSupport::IsIgnoredPage(a_pageName)) {
-            logger::debug("Ignoring configuration-management page '{}' in '{}'", a_pageName, a_identity.modID);
+        if (MCMCommandSupport::IsExcludedPage(a_identity.modID, a_pageName, a_pageIndex) || MCMCommandSupport::IsIgnoredPage(a_pageName)) {
+            logger::debug("Ignoring configuration management page '{}' in '{}'", a_pageName, a_identity.modID);
             return true;
         }
 
@@ -191,6 +199,7 @@ namespace MCMMemory
 
             switch (skyUIType) {
             case 2:
+                // Only known cycling controls are safe to discover without a recorded click.
                 SkyUICycleSupport::ReadSetting(*this, setting);
                 break;
             case 3:
@@ -285,6 +294,40 @@ namespace MCMMemory
         return std::nullopt;
     }
 
+    bool MCMScript::IsTextControl(int a_optionIndex) const
+    {
+        if (a_optionIndex < 0) {
+            return false;
+        }
+        auto flag = ReadNumber("_optionFlagsBuf", static_cast<size_t>(a_optionIndex));
+        return flag && static_cast<int>(*flag) % 256 == 2;
+    }
+
+    std::optional<uint64_t> MCMScript::ReadPageHash() const
+    {
+        auto flags = ReadArray("_optionFlagsBuf");
+        auto labels = ReadArray("_textBuf");
+        if (!flags || !labels) {
+            return std::nullopt;
+        }
+
+        const size_t optionCount = std::min<size_t>(flags->size(), labels->size());
+        uint64_t hash{ hashBasis };
+        // We hash the flags and labels, so a changed value leaves 
+        // the hash untouched and only a rebuilt page mutates it.
+        for (uint32_t optionIndex = 0; optionIndex < optionCount; ++optionIndex) {
+            const auto& flagValue = (*flags)[optionIndex];
+            AddToHash(hash, flagValue.IsInt() ? static_cast<uint32_t>(flagValue.GetSInt()) : 0);
+            const auto& labelValue = (*labels)[optionIndex];
+            if (labelValue.IsString()) {
+                AddTextToHash(hash, labelValue.GetString());
+            }
+            // Row separator, so neighbouring labels can't merge.
+            AddToHash(hash, 0);
+        }
+        return hash;
+    }
+
     std::optional<int> MCMScript::ReadMenuIndex() const
     {
         auto value = ReadNumber("_menuParams", 0);
@@ -350,6 +393,7 @@ namespace MCMMemory
         MCMControl control;
         control.optionLabel = std::move(*label);
         control.stateName = ReadStateName(a_optionIndex).value_or("");
+        control.valueText = ReadOptionText(a_optionIndex).value_or("");
         control.type = *type;
         return control;
     }

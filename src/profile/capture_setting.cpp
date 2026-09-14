@@ -90,7 +90,27 @@ namespace MCMMemory
             if (previous->eventID >= a_record.eventID) {
                 continue;
             }
-            if (previous->eventID <= menuOpenedEventID || Role(previous->type) == EventRole::Navigation || IsValueChange(previous->type)) {
+            if (previous->eventID <= menuOpenedEventID || Role(previous->type) == EventRole::Navigation) {
+                break;
+            }
+            if (IsValueChange(previous->type)) {
+                // Repeated clicks need the last captured value.
+                if (previous->selection.modIndex == a_record.selection.modIndex && previous->selection.pageIndex == a_record.selection.pageIndex && previous->selection.optionIndex == a_record.selection.optionIndex && previous->control && previous->stateAfter.contains("changedOptionMembers")) {
+                    const auto& option = previous->stateAfter["changedOptionMembers"];
+                    auto type = JSON::ReadNumber(option, "optionType");
+                    auto text = JSON::ReadString(option, "strValue");
+                    auto number = JSON::ReadNumber(option, "numValue");
+                    if (type && *type == 3.0 && number) {
+                        a_record.control = previous->control;
+                        a_record.control->toggleValue = *number != 0.0;
+                        return;
+                    }
+                    if (type && *type == 2.0 && text && !text->empty()) {
+                        a_record.control = previous->control;
+                        a_record.control->valueText = std::move(*text);
+                        return;
+                    }
+                }
                 break;
             }
             if (previous->selection.modIndex == a_record.selection.modIndex && previous->selection.pageIndex == a_record.selection.pageIndex && previous->selection.optionIndex == a_record.selection.optionIndex && previous->control) {
@@ -113,6 +133,18 @@ namespace MCMMemory
             MCMScript script(activeMCM->mcmScript);
             if (script.IsPageReady(a_record.selection.pageIndex)) {
                 a_record.control = script.ReadControl(a_record.selection.optionIndex);
+                if (a_record.control && a_record.control->type == ControlType::Option && !IsValueChange(a_record.type)) {
+                    const auto option = MCMMenu::ReadOption(a_record.selection.optionIndex);
+                    auto value = JSON::ReadNumber(option, "numValue");
+                    if (value) {
+                        a_record.control->toggleValue = *value != 0.0;
+                    }
+                }
+                if (a_record.control && script.IsTextControl(a_record.selection.optionIndex)) {
+                    const auto option = MCMMenu::ReadOption(a_record.selection.optionIndex);
+                    auto text = JSON::ReadString(option, "strValue");
+                    a_record.control->valueText = text.value_or("");
+                }
             }
         }
     }
@@ -145,6 +177,7 @@ namespace MCMMemory
         a_setting.selection.optionIndex = *index;
         a_setting.optionLabel = a_record.control->optionLabel;
         a_setting.stateName = a_record.control->stateName;
+        const bool recordCommand = GetSettings().recordActions && a_record.type == EventType::OptionSelected && !IsProfileWriteCommand(a_setting.optionLabel, a_setting.stateName);
         if (a_record.control->type == ControlType::Cycle) {
             if (!SkyUICycleSupport::ReadSetting(a_script, a_setting)) {
                 return false;
@@ -153,15 +186,48 @@ namespace MCMMemory
             return true;
         }
 
-        // SetToggleOptionValue updates the menu row, not the script's original page buffer.
-        // Read the resolved row even if a redraw or mouse movement changed the cursor.
+        // SkyUI updates the visible row without changing its original script value buffer.
         auto& option = a_record.stateAfter["changedOptionMembers"];
         option = MCMMenu::ReadOption(*index);
         auto type = JSON::ReadNumber(option, "optionType");
-        auto value = JSON::ReadNumber(option, "numValue");
         auto label = JSON::ReadString(option, "text");
+        if (!type || !label) {
+            return false;
+        }
+
+        if (IsRecordableTextSetting(a_record) && a_script.IsTextControl(*index) && *type == 2.0) {
+            auto text = JSON::ReadString(option, "strValue");
+            if ((!text || text->empty() || *text == a_record.control->valueText) && !recordCommand) {
+                // A cycling setting advances its value when clicked. Unchanged means the handler is
+                // still running, or this row is a command.
+                return false;
+            }
+            if (text && !text->empty() && *text != a_record.control->valueText) {
+                a_setting.type = ControlType::Cycle;
+                a_setting.textControl = true;
+                a_setting.value = *text;
+                a_setting.valueSource = "menu.option.strValue";
+                logger::info("Finished text setting capture {}: mod: '{}', option: '{}', value: '{}'", a_record.eventID, a_setting.selection.identity.modName, a_setting.optionLabel, *text);
+                return true;
+            }
+        }
+
+        // SetToggleOptionValue updates the menu row, not the script's original page buffer.
+        // Read the row even if a redraw or mouse movement changed the cursor.
+        auto value = JSON::ReadNumber(option, "numValue");
+        const bool unchangedToggle = *type == 3.0 && value && a_record.control->toggleValue && (*value != 0.0) == *a_record.control->toggleValue;
+        if (recordCommand && (*type == 2.0 || unchangedToggle)) {
+            a_setting.type = a_record.control->type;
+            a_setting.command = true;
+            a_setting.confirmedCommand = a_record.confirmationAccepted;
+            a_setting.recorded = true;
+            a_setting.value = true;
+            a_setting.valueSource = "event.optionSelected";
+            logger::info("Finished command capture {}: mod: '{}', option: '{}'", a_record.eventID, a_setting.selection.identity.modName, a_setting.optionLabel);
+            return true;
+        }
         // SkyUI translates this text. FindControlIndex already checked the script's control identity.
-        if (!type || *type != 3.0 || !value || !label) {
+        if (*type != 3.0 || !value) {
             return false;
         }
 
@@ -216,6 +282,10 @@ namespace MCMMemory
 
     bool Capture::ProcessCapturedEvent(CaptureRecord& a_record)
     {
+        if (MCMCommandSupport::IsExcludedPage(a_record.selection.identity.modID, a_record.selection.pageName, a_record.selection.pageIndex)) {
+            return true;
+        }
+
         if (const auto reason = GetMCMExclusionReason(a_record.selection.identity.modID); !reason.empty()) {
             logger::debug("Skipped capture {}: {}", a_record.eventID, reason);
             return true;
@@ -231,12 +301,14 @@ namespace MCMMemory
         if (activeMCM && activeMCM->identity.modID == setting.selection.identity.modID) {
             activeMCMScript = activeMCM->mcmScript;
         }
+
         MCMScript mcmScript(activeMCMScript);
-        if (a_record.activationEvent) {
+        if (a_record.activationEvent || a_record.confirmationCancelled) {
             return true;
         }
-        const bool vioLensMenu = VioLensSupport::IsSupported(setting.selection.identity.modID) && setting.type == ControlType::Menu;
-        if (vioLensMenu) {
+
+        const bool menuSetting = setting.type == ControlType::Menu;
+        if (menuSetting) {
             if (!activeMCMScript || !IsCapturePageCurrent(a_record)) {
                 // Do not mistake a command for a setting after leaving its page.
                 return true;
@@ -245,10 +317,22 @@ namespace MCMMemory
             if (!a_record.control || a_record.control->type != ControlType::Menu) {
                 // Page and file commands can clear the live buffers before this read.
                 // A translated dialog title alone cannot tell us which command ran.
-                logger::debug("Ignored VioLens menu capture {} without a confirmed control identity", a_record.eventID);
+                logger::debug("Ignored menu capture {} in '{}' without a confirmed control identity", a_record.eventID, setting.selection.identity.modID);
                 return true;
             }
+            // Preset dialogs can outlive the initial read. Save only after the handler finishes.
+            if (!a_record.stateAfter.contains("fields")) {
+                return false;
+            }
+            const auto& fields = a_record.stateAfter["fields"];
+            auto panelState = JSON::ReadNumber(fields, "PanelState");
+            bool pageResetRequested{};
+            JSON::ReadValue(fields, "PageResetRequested", pageResetRequested);
+            if (!panelState || *panelState != 0.0 || pageResetRequested || !mcmScript.IsPageReady(setting.selection.pageIndex)) {
+                return false;
+            }
         }
+
         setting.pageScopedState = NLMCMSupport::IsSupported(mcmScript);
         if (setting.pageScopedState && !IsCapturePageCurrent(a_record)) {
             logger::debug("Stopped NL_MCM capture {} after navigation or a newer change", a_record.eventID);
@@ -257,14 +341,17 @@ namespace MCMMemory
         if (setting.type == ControlType::Option) {
             RememberControl(a_record);
             // Only known cycling text settings may be saved; ordinary text buttons are commands.
-            if (a_record.control && a_record.control->type != ControlType::Option && a_record.control->type != ControlType::Cycle) {
+            // While recording, a text row that shows its own value can be replayed by clicking it.
+            const bool recordableText = IsRecordableTextSetting(a_record);
+            const bool commandCandidate = GetSettings().recordActions && a_record.type == EventType::OptionSelected && a_record.control && !IsProfileWriteCommand(a_record.control->optionLabel, a_record.control->stateName);
+            if (a_record.control && a_record.control->type != ControlType::Option && a_record.control->type != ControlType::Cycle && !recordableText && !commandCandidate) {
                 return true;
             }
             if (!activeMCMScript || !ReadSelectedSetting(a_record, mcmScript, setting)) {
                 return false;
             }
         }
-        else if (vioLensMenu) {
+        else if (menuSetting) {
             setting.optionLabel = a_record.control->optionLabel;
             setting.stateName = a_record.control->stateName;
         }
@@ -280,7 +367,13 @@ namespace MCMMemory
             }
         }
 
-        if (MCMCommandSupport::IsIgnored(setting.selection.identity.modID, setting.selection.pageName, setting.selection.pageIndex, setting.type, setting.stateName, setting.optionLabel)) {
+        if (menuSetting && GetSettings().recordActions && !IsProfileWriteCommand(setting.optionLabel, setting.stateName)) {
+            // Menus on configuration pages can apply presets or batch changes.
+            setting.command = MCMCommandSupport::IsIgnored(setting.selection.identity.modID, setting.selection.pageName, setting.selection.pageIndex, setting.type, setting.stateName, setting.optionLabel) || ContainsCaseInsensitive(setting.optionLabel, "Load") || ContainsCaseInsensitive(setting.stateName, "Load") || ContainsCaseInsensitive(setting.optionLabel, "Apply") || ContainsCaseInsensitive(setting.stateName, "Import");
+            setting.confirmedCommand = setting.command && a_record.confirmationAccepted;
+            setting.recorded = setting.command;
+        }
+        if (((setting.command || menuSetting) && IsProfileWriteCommand(setting.optionLabel, setting.stateName)) || (!setting.command && MCMCommandSupport::IsIgnored(setting.selection.identity.modID, setting.selection.pageName, setting.selection.pageIndex, setting.type, setting.stateName, setting.optionLabel))) {
             return true;
         }
 
@@ -292,16 +385,39 @@ namespace MCMMemory
             MCMHelperSupport::GetSingleton()->ReadKeymapSetting(activeMCMScript, setting);
         }
 
+        if (a_record.pageHash) {
+            // A changed hash means the handler rebuilt the page.
+            auto currentHash = mcmScript.ReadPageHash();
+            setting.rebuildsPage = currentHash && *currentHash != *a_record.pageHash;
+        }
+
         // Each control reports its accepted value in a different place.
         switch (a_record.type) {
 
             case EventType::SliderAccepted:
-            case EventType::MenuAccepted:
             case EventType::ColorAccepted:
-                // numArg is the accepted slider value, menu index or RGB color.
+                // numArg is the accepted slider value or RGB color.
                 setting.value = a_record.numberArgument;
                 setting.valueSource = "event.numberArgument";
                 break;
+            case EventType::MenuAccepted: {
+                setting.value = a_record.numberArgument;
+                setting.valueSource = "event.numberArgument";
+                // Save the text this row now shows, so restore can decide the menu is already correct
+                // without asking SkyUI for its dialog data. Only a row that actually changed is
+                // trusted. A mod that never calls SetMenuOptionValue still shows the value chosen
+                // before this one, and storing that would let restore skip a menu it never set.
+                RememberControl(a_record);
+                if (activeMCMScript && a_record.control && !a_record.control->valueText.empty()) {
+                    // A dropdown can move or replace its own row during a rebuild.
+                    auto index = mcmScript.FindControlIndex(*a_record.control, setting.selection.optionIndex);
+                    auto text = index ? mcmScript.ReadOptionText(*index) : std::nullopt;
+                    if (text && !text->empty() && *text != a_record.control->valueText) {
+                        setting.valueText = std::move(*text);
+                    }
+                }
+                break;
+            }
             case EventType::InputAccepted:
                 // strArg is the text accepted in the input dialog.
                 setting.value = a_record.stringArgument;
@@ -320,12 +436,11 @@ namespace MCMMemory
                     setting.value = static_cast<int>(*keyCode);
                     setting.valueSource = "menu.selectedKeyCode";
                 }
-                else if (setting.valueSource.empty() && activeMCMScript) {
-                    auto bufferedKeyCode = mcmScript.ReadCurrentValue(ControlType::Keymap, setting.selection.optionIndex);
-                    if (bufferedKeyCode && bufferedKeyCode->is_number_integer()) {
-                        setting.value = std::move(*bufferedKeyCode);
-                        setting.valueSource = "script._numValueBuf";
-                    }
+                else if (setting.valueSource.empty()) {
+                    // SkyUI does not put the new key in its value buffer; the MCM has to do that from
+                    // its own handler and many mods never do. Reading the buffer here would save the key
+                    // before this change, so the old binding is kept instead of a wrong one.
+                    logger::warn("Could not read the new key for '{}' in '{}'; its saved binding is left unchanged", setting.optionLabel, setting.selection.identity.modID);
                 }
                 break;
             }
@@ -335,9 +450,15 @@ namespace MCMMemory
         }
 
         // Incomplete settings stay in Capture.json but not in the selected profile.
-        setting.identityComplete = !setting.selection.identity.modName.empty() && !setting.selection.identity.modID.empty() && setting.selection.optionIndex >= 0 && !setting.optionLabel.empty() && setting.type != ControlType::Unknown && !setting.valueSource.empty();
+        setting.identityComplete = !setting.selection.identity.modName.empty() && 
+                                   !setting.selection.identity.modID.empty() && setting.selection.optionIndex >= 0 && 
+                                   !setting.optionLabel.empty() && (setting.type != ControlType::Unknown || setting.command) &&
+                                   !setting.valueSource.empty();
         if (setting.identityComplete && GetSettings().autoBackup) {
+            const auto& modID = setting.selection.identity.modID;
+            setting.reopensConfig = IsConfigReopened(modID, a_record.configSession);
             if (ProfileStorage::UpdateSetting(setting)) {
+                recordedConfigSessions[modID] = a_record.configSession;
                 Deduplicate(pendingAutoBackupSettings, setting);
             }
             else {

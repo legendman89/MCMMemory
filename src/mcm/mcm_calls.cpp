@@ -53,7 +53,7 @@ namespace MCMMemory
         }
     }
 
-    bool MCMCallWatch::Call(const MCMScript& a_script, std::string_view a_modID, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, SKSE::TaskInterface::TaskFn a_task, bool a_acceptConfirmation)
+    bool MCMCallWatch::Call(const MCMScript& a_script, std::string_view a_modID, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_task, bool a_acceptConfirmation)
     {
         if (owner.load() != this || pending || IsUnavailable(a_modID)) {
             delete a_arguments;

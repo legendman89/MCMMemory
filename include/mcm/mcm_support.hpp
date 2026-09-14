@@ -204,6 +204,20 @@ namespace MCMMemory
         return {};
     }
 
+    // Recorded commands may load settings, but must not write or delete external profiles.
+    inline bool IsProfileWriteCommand(std::string_view a_label, std::string_view a_state)
+    {
+        constexpr std::array terms{
+            FOREACH_MCM_PROFILE_WRITE_COMMAND(DECLARE_IGNORED_MCM_TEXT)
+        };
+        for (const auto term : terms) {
+            if (ContainsCaseInsensitive(a_label, term) || ContainsCaseInsensitive(a_state, term)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Ignore profile-management pages and text commands that do not store persistent settings.
     inline constexpr std::array ignoredMCMPageTerms
     {
@@ -239,6 +253,11 @@ namespace MCMMemory
 
         static bool IsIgnoredPage(std::string_view a_pageName);
 
+        static bool IsExcludedPage(std::string_view a_modID, std::string_view a_pageName, int a_pageIndex)
+        {
+            return HasMCMScript(a_modID, "nwsfollowermcmscript") && (a_pageIndex == 9 || EqualsCaseInsensitive(a_pageName, "$FF_Page10"));
+        }
+
         static bool IsIgnored(std::string_view a_modID, std::string_view a_pageName, int a_pageIndex, ControlType a_type, std::string_view a_stateName, std::string_view a_optionLabel);
     };
 
@@ -262,6 +281,10 @@ namespace MCMMemory
 
         // Checks whether a live control matches the saved activation control.
         static bool MatchesControl(const MCMControl& a_control, const MCMActivation& a_activation);
+
+        // Rechecks a stored command activation in older profiles, 
+        // since these commands may confuse activation with MCM normal controls.
+        static bool IsStoredCommandValid(const MCMActivation& a_activation);
 
     private:
 
@@ -392,7 +415,9 @@ namespace MCMMemory
 
         static bool IsCommand(std::string_view a_modID, std::string_view a_stateName, int a_pageIndex, std::string_view a_optionLabel);
 
-        static void OrderSettings(std::vector<CapturedSetting>& a_settings);
+        // Sorts MCM settings into their dependency order.
+        // MCMs listed in a_recordedMCMs are left alone: their profile order was captured.
+        static void OrderSettings(std::vector<CapturedSetting>& a_settings, const MCMFilter& a_recordedMCMs = {});
 
         static int RestoreOrder(const CapturedSetting& a_setting)
         {

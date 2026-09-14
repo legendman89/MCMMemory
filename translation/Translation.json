@@ -49,11 +49,16 @@
 
   "Profile.Delete.Title": "Delete Profile",
   "Profile.Delete.Prompt": "Delete {0} profile?",
+  "Profile.Forget.Title": "Forget Saved Settings",
+  "Profile.Forget.Prompt": "Send {0} MCMs in profile '{1}' to oblivion?",
+  "Profile.Forget.Failed": "The active profile could not be updated.",
 
   "Profile.Automation.Backup": "Automatic backup",
   "Profile.Automation.Restore": "Automatic restore",
   "Profile.Automation.Backup.Tooltip": "Keep the active profile updated when you change an MCM setting.",
   "Profile.Automation.Restore.Tooltip": "Restore the active profile after MCM registration finishes in a new game. This does not run when loading a save.",
+  "Profile.Automation.Record": "Record actions",
+  "Profile.Automation.Record.Tooltip": "Remember the order you change settings in, so MCMs that must be enabled first restore correctly. Requires automatic backup.",
 
   "Profile.MCM.Header": "MCM Management",
   "Profile.MCM.Waiting": "Waiting for MCM registration...",
@@ -63,16 +68,18 @@
   "Profile.MCM.HideUnavailable": "Hide unavailable MCMs",
   "Profile.MCM.BackUpSelected": "Back Up Selected",
   "Profile.MCM.RestoreSelected": "Restore Selected",
+  "Profile.MCM.ForgetSelected": "Forget Selected",
   "Profile.MCM.SelectAll.Tooltip": "Select every visible and registered MCM.",
   "Profile.MCM.Clear.Tooltip": "Clear the current MCM selection.",
-  "Profile.MCM.HideUnavailable.Tooltip": "Hide profile entries whose MCM is not registered in the current game.",
+  "Profile.MCM.HideUnavailable.Tooltip": "Hide MCMs that are not registered in the current game.",
   "Profile.MCM.BackUpSelected.Tooltip": "Back up only the selected MCMs to the active profile.",
   "Profile.MCM.RestoreSelected.Tooltip": "Restore only selected MCMs that already have saved settings.",
+  "Profile.MCM.ForgetSelected.Tooltip": "Remove the saved settings of the selected MCMs from the active profile. The MCMs themselves are not changed.",
 
   "Profile.MCM.Column.Selected": "Selected",
   "Profile.MCM.Column.SavedSettings": "Saved Settings",
   "Profile.MCM.Column.AutoRestore": "Auto Restore",
-  "Profile.MCM.Column.Selected.Tooltip": "Include this MCM when using Back Up Selected or Restore Selected.",
+  "Profile.MCM.Column.Selected.Tooltip": "Include this MCM when using Back Up Selected, Restore Selected or Forget Selected. An MCM that is no longer installed can still be selected to forget its saved settings.",
   "Profile.MCM.Column.AutoRestore.Tooltip": "Include this MCM in automatic restore. Manual restore is unaffected.",
 
   "Profile.MCM.Tooltip.BackupRestore": "Select this MCM to back up or restore its settings.",

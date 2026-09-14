@@ -97,6 +97,8 @@ namespace MCMMemory
         // Allows the Menu Maid 2 registry to turn its returned forms into normal registry we can use.
         friend class MCMMenuMaidRegistry;
 
+        // Keeps the unreadable marker error log to one line per game session.
+        static inline bool reportedMissingMarkers{};
 
         static const char* ReadScriptName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript)
         {

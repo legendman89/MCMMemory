@@ -13,6 +13,33 @@ namespace MCMMemory
         return static_cast<size_t>(a_value);
     }
 
+    // Hasing functions for page comparison.
+    inline constexpr uint64_t hashBasis{ 0xCBF29CE484222325ULL };
+    inline constexpr uint64_t hashPrime{ 0x100000001B3ULL };
+
+    inline void AddToHash(uint64_t& a_hash, uint64_t a_value)
+    {
+        a_hash = (a_hash ^ a_value) * hashPrime;
+    }
+
+    inline void AddTextToHash(uint64_t& a_hash, std::string_view a_text)
+    {
+        for (const auto character : a_text) {
+            AddToHash(a_hash, static_cast<unsigned char>(character));
+        }
+    }
+
+    // Lets a string-keyed map be looked up with a string_view, without building a temporary key.
+    struct StringHash
+    {
+        using is_transparent = void;
+
+        inline size_t operator()(std::string_view a_text) const
+        {
+            return std::hash<std::string_view>{}(a_text);
+        }
+    };
+
     inline unsigned char ToLowerASCII(unsigned char a_character)
     {
         if (a_character >= 'A' && a_character <= 'Z') {
@@ -58,14 +85,25 @@ namespace MCMMemory
         return false;
     }
 
-    inline bool ContainsCaseInsensitiveWordStart(std::string_view a_text, std::string_view a_search)
+    inline bool IsWordCharacter(char a_character)
     {
+        const auto value = static_cast<unsigned char>(a_character);
+        return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') || (value >= '0' && value <= '9');
+    }
+
+    // Matches a whole word only, so "Disable" does not match some non-activation control.
+    inline bool ContainsCaseInsensitiveWord(std::string_view a_text, std::string_view a_search)
+    {
+        if (a_search.empty()) {
+            return false;
+        }
         for (size_t start = 0; start + a_search.size() <= a_text.size(); ++start) {
-            if (start > 0) {
-                const auto previous = static_cast<unsigned char>(a_text[start - 1]);
-                if ((previous >= 'A' && previous <= 'Z') || (previous >= 'a' && previous <= 'z') || (previous >= '0' && previous <= '9')) {
-                    continue;
-                }
+            if (start > 0 && IsWordCharacter(a_text[start - 1])) {
+                continue;
+            }
+            const size_t end = start + a_search.size();
+            if (end < a_text.size() && IsWordCharacter(a_text[end])) {
+                continue;
             }
             if (EqualsCaseInsensitive(a_text.substr(start, a_search.size()), a_search)) {
                 return true;

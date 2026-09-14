@@ -477,7 +477,7 @@ namespace MCMMemory
     size_t Restore::FindMCMClose() const
     {
         size_t index = firstActionIndex;
-        while (index < actions.size() && actions[index].type != RestoreActionType::CloseConfig) {
+        while (index < actions.size() && (actions[index].type != RestoreActionType::CloseConfig || actions[index].reopenStep)) {
             ++index;
         }
         return index;
@@ -553,6 +553,7 @@ namespace MCMMemory
             const bool timedOut = callWatch.TimedOut();
             const bool confirmationDeclined = callWatch.ConfirmationDeclined();
             bool activationClose{};
+            bool reopenClose{};
             callWatch.Consume();
             if (confirmationDeclined && activeMCMIndex < restoreMCMs.size()) {
                 restoreMCMs[activeMCMIndex].confirmationRequired = true;
@@ -560,19 +561,30 @@ namespace MCMMemory
             if (pendingActionIndex < actions.size()) {
                 auto& completedAction = actions[pendingActionIndex];
                 activationClose = completedAction.activationStep && completedAction.type == RestoreActionType::CloseConfig;
+                reopenClose = completedAction.reopenStep && completedAction.type == RestoreActionType::CloseConfig;
                 if (completedAction.type == RestoreActionType::ActivateMCM && completedAction.mcmIndex < restoreMCMs.size()) {
                     restoreMCMs[completedAction.mcmIndex].activationPending = true;
                 }
-                if (completedAction.type == RestoreActionType::ApplyCycle) {
+                if (completedAction.type == RestoreActionType::ApplyClicks) {
+                    CompleteClicksAction(completedAction, status != OperationStatus::Stopping && !timedOut && !confirmationDeclined);
+                }
+                else if (completedAction.type == RestoreActionType::ApplyCycle) {
                     CompleteCycleAction(completedAction, status != OperationStatus::Stopping && !timedOut && !confirmationDeclined);
                 }
                 else if (IsRestoreApplyAction(completedAction.type)) {
-                    if (confirmationDeclined) {
+                    if (timedOut && completedAction.command) {
+                        ++mcmStats.skippedSettingCount;
+                        logger::warn("Command '{}' timed out; it will not be clicked again automatically", completedAction.optionLabel);
+                    }
+                    else if (confirmationDeclined) {
                         ++mcmStats.skippedSettingCount;
                         logger::warn("Restore of '{}' in '{}' needs user confirmation and was skipped", completedAction.optionLabel, restoreMCMs[completedAction.mcmIndex].identity.modID);
                     }
                     else {
                         ++mcmStats.appliedSettingCount;
+                        if (completedAction.type == RestoreActionType::ChangeKeymap) {
+                            VerifyKeymapAction(completedAction);
+                        }
                     }
                     completedAction.completed = true;
                 }
@@ -588,7 +600,8 @@ namespace MCMMemory
                 if (timedOut || confirmationDeclined) {
                     mcmFailed = true;
                 }
-                if (closing) {
+                // A reopen close is followed by the OpenConfig that continues with the same MCM.
+                if (closing && (!reopenClose || mcmFailed)) {
                     if (activationClose && !mcmFailed) {
                         auto& mcm = restoreMCMs[activeMCMIndex];
                         mcm.activationDeadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(GetSettings().scriptCallTimeoutSeconds + mcmActivationDelaySeconds));
@@ -630,7 +643,7 @@ namespace MCMMemory
         }
 
         auto& action = actions[currentActionIndex];
-        if (action.type == RestoreActionType::OpenConfig) {
+        if (action.type == RestoreActionType::OpenConfig && !action.reopenStep) {
             auto& mcm = restoreMCMs[action.mcmIndex];
             // Each MCM gets its own applied, unchanged and skipped counts.
             mcmStats = mcm.previousStats;
@@ -700,7 +713,15 @@ namespace MCMMemory
         // Some settings need one call to prepare their data and another call to apply the value.
         const bool applyAction = IsRestoreApplyAction(action.type);
         const bool requestAction = action.controlType != ControlType::Unknown && !applyAction;
-        const bool directRequestUnneeded = requestAction && currentActionIndex + 1 < actions.size() && (actions[currentActionIndex + 1].completed || (action.controlType != ControlType::Menu && !IsActionNeeded(actions[currentActionIndex + 1])));
+        bool directRequestUnneeded{};
+        if (requestAction && currentActionIndex + 1 < actions.size()) {
+            // A menu used to be excluded here because its value could only 
+            // be read from the dialog data. Saving the shown text with the index gives it a
+            // value that can be read directly from the page, so the call can be skipped too.
+            const auto& nextAction = actions[currentActionIndex + 1];
+            const bool readableValue = action.controlType != ControlType::Menu || !nextAction.valueText.empty();
+            directRequestUnneeded = nextAction.completed || (readableValue && !IsActionNeeded(nextAction));
+        }
         bool runAction = true;
         if (action.completed || directRequestUnneeded) {
             // The live value already matches, so its preparation call is unnecessary.
@@ -714,6 +735,13 @@ namespace MCMMemory
             logger::warn("Skipping '{}' because its data request failed", action.optionLabel);
         }
         else if (!IsActionValid(action)) {
+            // A page still being rebuilt reports the wrong control, so wait before giving up.
+            if (action.settleChecks < maximumSettleChecks && !IsActionPageReady(action)) {
+                ++action.settleChecks;
+                logger::debug("Waiting for page {} of '{}' before restoring '{}' (check {})", action.pageIndex, restoreMCMs[action.mcmIndex].identity.modID, action.optionLabel, action.settleChecks);
+                QueueNextAction(GetSettings().actionTrialDelaySeconds);
+                return;
+            }
             // The option index may now belong to another control after a mod update.
             runAction = false;
             if (requestAction) {
@@ -741,7 +769,7 @@ namespace MCMMemory
             if (!dispatched) {
                 pendingActionIndex = static_cast<size_t>(-1);
                 logger::error("Profile restore action {} ({}) failed; this MCM needs recovery", currentActionIndex, RestoreActionFunctionName(action.type));
-                if (action.type == RestoreActionType::CloseConfig) {
+                if (action.type == RestoreActionType::CloseConfig && !action.reopenStep) {
                     FinishCancellation(OperationResult::Failed, true);
                     return;
                 }

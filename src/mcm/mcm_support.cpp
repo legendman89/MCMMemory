@@ -18,7 +18,7 @@ namespace MCMMemory
 
     bool MCMCommandSupport::IsIgnored(std::string_view a_modID, std::string_view a_pageName, int a_pageIndex, ControlType a_type, std::string_view a_stateName, std::string_view a_optionLabel)
     {
-        if (IsIgnoredPage(a_pageName) || VioLensSupport::IsCommand(a_modID, a_stateName, a_pageIndex, a_optionLabel)) {
+        if (IsExcludedPage(a_modID, a_pageName, a_pageIndex) || IsIgnoredPage(a_pageName) || VioLensSupport::IsCommand(a_modID, a_stateName, a_pageIndex, a_optionLabel)) {
             return true;
         }
         for (const auto& control : ignoredMCMControls) {
@@ -85,14 +85,22 @@ namespace MCMMemory
         }
 
         for (const auto& command : mcmActivationCommands) {
-            if (ContainsCaseInsensitiveWordStart(a_control.optionLabel, command.enableText) || ContainsCaseInsensitiveWordStart(displayText, command.enableText)) {
+            if (ContainsCaseInsensitiveWord(a_control.optionLabel, command.enableText) || ContainsCaseInsensitiveWord(displayText, command.enableText)) {
                 return false;
             }
-            if (ContainsCaseInsensitiveWordStart(a_control.optionLabel, command.disableText) || ContainsCaseInsensitiveWordStart(displayText, command.disableText)) {
+            if (ContainsCaseInsensitiveWord(a_control.optionLabel, command.disableText) || ContainsCaseInsensitiveWord(displayText, command.disableText)) {
                 return true;
             }
         }
         return std::nullopt;
+    }
+
+    bool MCMActivationSupport::IsStoredCommandValid(const MCMActivation& a_activation)
+    {
+        MCMControl control;
+        control.optionLabel = a_activation.optionLabel;
+        control.type = a_activation.type;
+        return ReadCommandState(control, a_activation.selection.identity).has_value();
     }
 
     MCMActivation MCMActivationSupport::MakeActivation(const MCMIdentity& a_identity, std::string_view a_pageName, int a_pageIndex, int a_optionIndex, const MCMControl& a_control)
@@ -245,11 +253,11 @@ namespace MCMMemory
             return false;
         }
 
-        // File operations, batch edits and subpage navigation are not saved settings.
-        constexpr std::array<std::string_view, 8> commands{
+        // File operations and batch edits are not saved settings.
+        constexpr std::array<std::string_view, 7> commands{
             "SaveMainProfileMenu", "LoadMainProfileMenu", "DeleteMainProfileMenu",
             "SaveCustomizeKillmoveProfileMenu", "LoadCustomizeKillmoveProfileMenu", "DeleteCustomizeKillmoveProfileMenu",
-            "VL_SettingsMenu", "CustomizeWeaponMenu"
+            "VL_SettingsMenu"
         };
         if (std::ranges::find(commands, a_stateName) != commands.end()) {
             return true;
@@ -260,7 +268,7 @@ namespace MCMMemory
             a_optionLabel.remove_prefix(1);
         }
         if (a_pageIndex == 2) {
-            return a_optionLabel == "Page" || a_optionLabel == "Add/Remove";
+            return a_optionLabel == "Add/Remove";
         }
         if (a_pageIndex == 3) {
             return a_optionLabel == "Save" || a_optionLabel == "Load" || a_optionLabel == "Delete";
@@ -381,12 +389,13 @@ namespace MCMMemory
         return VioLensSupport::RestoreOrder(a_left) < VioLensSupport::RestoreOrder(a_right);
     }
 
-    void VioLensSupport::OrderSettings(std::vector<CapturedSetting>& a_settings)
+    void VioLensSupport::OrderSettings(std::vector<CapturedSetting>& a_settings, const MCMFilter& a_recordedMCMs)
     {
         std::vector<size_t> positions;
         std::vector<CapturedSetting> settings;
         for (size_t index = 0; index < a_settings.size(); ++index) {
-            if (IsSupported(a_settings[index].selection.identity.modID)) {
+            const auto& modID = a_settings[index].selection.identity.modID;
+            if (IsSupported(modID) && !ContainsMCMID(a_recordedMCMs, modID)) {
                 positions.push_back(index);
                 settings.push_back(std::move(a_settings[index]));
             }
@@ -842,12 +851,20 @@ namespace MCMMemory
                 registeredMCMs.push_back(std::move(*registeredMCM));
             }
         }
-        logger::info("MCM registry read {} MCM scripts from {} marker references", registeredMCMs.size(), markers.size());
+        if (!registeredMCMs.empty()) {
+            logger::info("MCM registry read {} MCM scripts from {} marker references", registeredMCMs.size(), markers.size());
+        }
+        else if (!reportedMissingMarkers) {
+            // Likely MCM Unlocked version mismatch.
+            reportedMissingMarkers = true;
+            logger::error("MCM Unlocked is installed but none of its {} MCM markers could be read. Check your MCM Unlocked version", markers.size());
+        }
         return registeredMCMs;
     }
 
     void MCMRegistry::Reset()
     {
+        reportedMissingMarkers = false;
         MCMKickerSupport::GetSingleton()->Reset();
         if (IsMCMMenuRedoneAvailable()) {
             MCMMenuRedoneRegistry::GetSingleton()->Reset();

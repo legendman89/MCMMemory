@@ -27,9 +27,9 @@ namespace MCMMemory
         // Calls an MCM function asynchronously through the Papyrus VM.
         bool Call(std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> a_result = {}) const;
 
-        std::vector<std::string> ReadPages() const;
+        void ReadPages(std::vector<std::string>& a_pages) const;
 
-        // Includes inherited script types, not just the mod's own script name.
+        // Includes inherited script types, not just the mod's script name.
         bool IsBasedOn(std::string_view a_scriptName) const;
 
         std::optional<MCMPage> ReadCurrentPage() const;
@@ -41,6 +41,10 @@ namespace MCMMemory
 
         std::optional<nlohmann::json> ReadCurrentValue(ControlType a_type, int a_optionIndex) const;
 
+        // Hash flags and labels per page, so a changed
+        // value leaves the hash alone and only a rebuilt page mutates it.
+        std::optional<uint64_t> ReadPageHash() const;
+
         std::optional<int> ReadMenuIndex() const;
 
         std::optional<std::string> ReadStateName(int a_optionIndex) const;
@@ -48,6 +52,10 @@ namespace MCMMemory
         std::optional<MCMControl> ReadControl(int a_optionIndex) const;
 
         bool CanSelectOption(int a_optionIndex) const;
+
+        // SkyUI stores text controls as type 2. 
+        // Some MCM pages have no typed value, only displayed text.
+        bool IsTextControl(int a_optionIndex) const;
 
         // A state-based toggle can move to another row after a page reset.
         // Some mods clear the page to hide disabled controls.
@@ -79,6 +87,9 @@ namespace MCMMemory
 
         // Supports normal variables, properties, and their generated Papyrus backing names.
         const RE::BSScript::Variable* FindVariable(std::string_view a_name) const;
+
+        // Read SkyUI property, not a mod separate variable with the same name.
+        RE::BSTSmartPointer<RE::BSScript::Array> ReadPageArray() const;
 
         inline RE::BSTSmartPointer<RE::BSScript::Array> ReadArray(std::string_view a_name) const
         {

@@ -1,22 +1,19 @@
 #pragma once
 
+#include "mcm/mcm_defs.hpp"
 #include "profile/types.hpp"
 
 namespace MCMMemory
 {
     // SkyUI stores the control type in the low byte of each option flag.
-    inline constexpr std::array<ControlType, 9> skyUIControlTypes
+#define DECLARE_SKYUI_CONTROL_TYPE(name, value, control) ControlType::control,
+
+    inline constexpr std::array<ControlType, ToIndex(SkyUIOptionType::Count)> skyUIControlTypes
     {
-        ControlType::Unknown,
-        ControlType::Unknown,
-        ControlType::Unknown,
-        ControlType::Option,
-        ControlType::Slider,
-        ControlType::Menu,
-        ControlType::Color,
-        ControlType::Keymap,
-        ControlType::Input
+        FOREACH_SKYUI_OPTION_TYPE(DECLARE_SKYUI_CONTROL_TYPE)
     };
+
+#undef DECLARE_SKYUI_CONTROL_TYPE
 
     class MCMScript
     {

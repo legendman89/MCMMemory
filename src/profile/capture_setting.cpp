@@ -100,12 +100,12 @@ namespace MCMMemory
                     auto type = JSON::ReadNumber(option, "optionType");
                     auto text = JSON::ReadString(option, "strValue");
                     auto number = JSON::ReadNumber(option, "numValue");
-                    if (type && *type == 3.0 && number) {
+                    if (type && *type == static_cast<double>(SkyUIOptionType::Toggle) && number) {
                         a_record.control = previous->control;
                         a_record.control->toggleValue = *number != 0.0;
                         return;
                     }
-                    if (type && *type == 2.0 && text && !text->empty()) {
+                    if (type && *type == static_cast<double>(SkyUIOptionType::Text) && text && !text->empty()) {
                         a_record.control = previous->control;
                         a_record.control->valueText = std::move(*text);
                         return;
@@ -195,7 +195,7 @@ namespace MCMMemory
             return false;
         }
 
-        if (IsRecordableTextSetting(a_record) && a_script.IsTextControl(*index) && *type == 2.0) {
+        if (IsRecordableTextSetting(a_record) && a_script.IsTextControl(*index) && *type == static_cast<double>(SkyUIOptionType::Text)) {
             auto text = JSON::ReadString(option, "strValue");
             if ((!text || text->empty() || *text == a_record.control->valueText) && !recordCommand) {
                 // A cycling setting advances its value when clicked. Unchanged means the handler is
@@ -215,8 +215,8 @@ namespace MCMMemory
         // SetToggleOptionValue updates the menu row, not the script's original page buffer.
         // Read the row even if a redraw or mouse movement changed the cursor.
         auto value = JSON::ReadNumber(option, "numValue");
-        const bool unchangedToggle = *type == 3.0 && value && a_record.control->toggleValue && (*value != 0.0) == *a_record.control->toggleValue;
-        if (recordCommand && (*type == 2.0 || unchangedToggle)) {
+        const bool unchangedToggle = *type == static_cast<double>(SkyUIOptionType::Toggle) && value && a_record.control->toggleValue && (*value != 0.0) == *a_record.control->toggleValue;
+        if (recordCommand && (*type == static_cast<double>(SkyUIOptionType::Text) || unchangedToggle)) {
             a_setting.type = a_record.control->type;
             a_setting.command = true;
             a_setting.confirmedCommand = a_record.confirmationAccepted;

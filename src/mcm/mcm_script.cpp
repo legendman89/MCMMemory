@@ -162,9 +162,9 @@ namespace MCMMemory
             }
 
             const int optionFlags = flagValue.GetSInt();
-            const int skyUIType = optionFlags % 256;
+            const auto skyUIType = static_cast<SkyUIOptionType>(optionFlags % 256);
             const int flagsOnly = optionFlags / 256;
-            if ((flagsOnly & 2) != 0 || skyUIType < 0 || static_cast<size_t>(skyUIType) >= skyUIControlTypes.size()) {
+            if ((flagsOnly & 2) != 0 || skyUIType < SkyUIOptionType::Empty || skyUIType >= SkyUIOptionType::Count) {
                 continue;
             }
 
@@ -172,7 +172,7 @@ namespace MCMMemory
             if (!label) {
                 continue;
             }
-            if (label->empty() && (skyUIType != 2 || !SkyUICycleSupport::Find(*this, static_cast<int>(optionIndex)))) {
+            if (label->empty() && (skyUIType != SkyUIOptionType::Text || !SkyUICycleSupport::Find(*this, static_cast<int>(optionIndex)))) {
                 continue;
             }
 
@@ -183,8 +183,8 @@ namespace MCMMemory
             setting.selection.pageIndex = a_pageIndex;
             setting.selection.optionIndex = static_cast<int>(optionIndex);
             setting.optionLabel = std::move(*label);
-            setting.type = skyUIControlTypes[static_cast<size_t>(skyUIType)];
-            if (setting.type == ControlType::Unknown && skyUIType != 2) {
+            setting.type = skyUIControlTypes[ToIndex(skyUIType)];
+            if (setting.type == ControlType::Unknown && skyUIType != SkyUIOptionType::Text) {
                 continue;
             }
             if (states && optionIndex < states->size()) {
@@ -198,42 +198,42 @@ namespace MCMMemory
             }
 
             switch (skyUIType) {
-            case 2:
+            case SkyUIOptionType::Text:
                 // Only known cycling controls are safe to discover without a recorded click.
                 SkyUICycleSupport::ReadSetting(*this, setting);
                 break;
-            case 3:
+            case SkyUIOptionType::Toggle:
                 setting.type = ControlType::Option;
                 if (auto value = ReadNumber("_numValueBuf", optionIndex)) {
                     setting.value = *value != 0.0F;
                     setting.valueSource = "script._numValueBuf";
                 }
                 break;
-            case 4:
+            case SkyUIOptionType::Slider:
                 setting.type = ControlType::Slider;
                 if (auto value = ReadNumber("_numValueBuf", optionIndex)) {
                     setting.value = *value;
                     setting.valueSource = "script._numValueBuf";
                 }
                 break;
-            case 5:
+            case SkyUIOptionType::Menu:
                 setting.type = ControlType::Menu;
                 break;
-            case 6:
+            case SkyUIOptionType::Color:
                 setting.type = ControlType::Color;
                 if (auto value = ReadNumber("_numValueBuf", optionIndex)) {
                     setting.value = static_cast<int>(*value);
                     setting.valueSource = "script._numValueBuf";
                 }
                 break;
-            case 7:
+            case SkyUIOptionType::Keymap:
                 setting.type = ControlType::Keymap;
                 if (auto value = ReadNumber("_numValueBuf", optionIndex)) {
                     setting.value = static_cast<int>(*value);
                     setting.valueSource = "script._numValueBuf";
                 }
                 break;
-            case 8:
+            case SkyUIOptionType::Input:
                 setting.type = ControlType::Input;
                 if (auto value = ReadString("_strValueBuf", optionIndex)) {
                     setting.value = std::move(*value);
@@ -300,7 +300,7 @@ namespace MCMMemory
             return false;
         }
         auto flag = ReadNumber("_optionFlagsBuf", static_cast<size_t>(a_optionIndex));
-        return flag && static_cast<int>(*flag) % 256 == 2;
+        return flag && static_cast<SkyUIOptionType>(static_cast<int>(*flag) % 256) == SkyUIOptionType::Text;
     }
 
     std::optional<uint64_t> MCMScript::ReadPageHash() const
@@ -351,14 +351,14 @@ namespace MCMMemory
             return std::nullopt;
         }
 
-        const int skyUIType = static_cast<int>(*flag) % 256;
-        if (skyUIType == 2 && SkyUICycleSupport::Find(*this, a_optionIndex)) {
+        const auto skyUIType = static_cast<SkyUIOptionType>(static_cast<int>(*flag) % 256);
+        if (skyUIType == SkyUIOptionType::Text && SkyUICycleSupport::Find(*this, a_optionIndex)) {
             return ControlType::Cycle;
         }
-        if (skyUIType < 0 || static_cast<size_t>(skyUIType) >= skyUIControlTypes.size()) {
+        if (skyUIType < SkyUIOptionType::Empty || skyUIType >= SkyUIOptionType::Count) {
             return std::nullopt;
         }
-        return skyUIControlTypes[static_cast<size_t>(skyUIType)];
+        return skyUIControlTypes[ToIndex(skyUIType)];
     }
 
     bool MCMScript::MatchesControl(ControlType a_type, int a_optionIndex, std::string_view a_stateName) const

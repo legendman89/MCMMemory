@@ -157,13 +157,13 @@ namespace MCMMemory
         const bool pageScopedState = NLMCMSupport::IsSupported(*this);
         for (size_t optionIndex = 0; optionIndex < optionCount; ++optionIndex) {
             const auto& flagValue = (*flags)[static_cast<uint32_t>(optionIndex)];
-            if (!flagValue.IsInt()) {
+            if (!flagValue.IsInt() || flagValue.GetSInt() < 0) {
                 continue;
             }
 
-            const int optionFlags = flagValue.GetSInt();
-            const auto skyUIType = static_cast<SkyUIOptionType>(optionFlags % 256);
-            const int flagsOnly = optionFlags / 256;
+            const auto optionFlags = static_cast<uint32_t>(flagValue.GetSInt());
+            const auto skyUIType = GET_TYPE_FROM_FLAGS(optionFlags);
+            const auto flagsOnly = GET_FLAGS_ONLY(optionFlags);
             if ((flagsOnly & 2) != 0 || skyUIType < SkyUIOptionType::Empty || skyUIType >= SkyUIOptionType::Count) {
                 continue;
             }
@@ -300,7 +300,7 @@ namespace MCMMemory
             return false;
         }
         auto flag = ReadNumber("_optionFlagsBuf", static_cast<size_t>(a_optionIndex));
-        return flag && static_cast<SkyUIOptionType>(static_cast<int>(*flag) % 256) == SkyUIOptionType::Text;
+        return flag && *flag >= 0 && GET_TYPE_FROM_FLAGS(static_cast<uint32_t>(*flag)) == SkyUIOptionType::Text;
     }
 
     std::optional<uint64_t> MCMScript::ReadPageHash() const
@@ -347,11 +347,11 @@ namespace MCMMemory
 
         const size_t index = static_cast<size_t>(a_optionIndex);
         auto flag = ReadNumber("_optionFlagsBuf", index);
-        if (!flag) {
+        if (!flag || *flag < 0) {
             return std::nullopt;
         }
 
-        const auto skyUIType = static_cast<SkyUIOptionType>(static_cast<int>(*flag) % 256);
+        const auto skyUIType = GET_TYPE_FROM_FLAGS(static_cast<uint32_t>(*flag));
         if (skyUIType == SkyUIOptionType::Text && SkyUICycleSupport::Find(*this, a_optionIndex)) {
             return ControlType::Cycle;
         }
@@ -401,10 +401,10 @@ namespace MCMMemory
     bool MCMScript::CanSelectOption(int a_optionIndex) const
     {
         auto flag = a_optionIndex >= 0 ? ReadNumber("_optionFlagsBuf", static_cast<size_t>(a_optionIndex)) : std::nullopt;
-        if (!flag) {
+        if (!flag || *flag < 0) {
             return false;
         }
-        const int flagsOnly = static_cast<int>(*flag) / 256;
+        const auto flagsOnly = GET_FLAGS_ONLY(static_cast<uint32_t>(*flag));
         return (flagsOnly & 2) == 0;
     }
 

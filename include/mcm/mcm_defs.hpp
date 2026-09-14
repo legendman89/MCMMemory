@@ -24,3 +24,7 @@ namespace MCMMemory
 }
 
 #undef DECLARE_SKYUI_OPTION_TYPE
+
+#define FLAGS_MASK 0xFFu
+#define GET_TYPE_FROM_FLAGS(FLAGS) (static_cast<MCMMemory::SkyUIOptionType>((FLAGS) & FLAGS_MASK))
+#define GET_FLAGS_ONLY(FLAGS) ((FLAGS) >> 8)

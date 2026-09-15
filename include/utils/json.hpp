@@ -1,5 +1,6 @@
 #pragma once
 
+#include "profile/profile_defs.hpp"
 #include "profile/types.hpp"
 #include "utils/helper.hpp"
 
@@ -196,14 +197,12 @@ namespace MCMMemory
 
         static nlohmann::json ToJson(const MCMSelection& a_selection)
         {
-            return {
-                { "modIndex", a_selection.modIndex },
-                { "modName", a_selection.identity.modName },
-                { "modID", a_selection.identity.modID },
-                { "pageIndex", a_selection.pageIndex },
-                { "pageName", a_selection.pageName },
-                { "optionIndex", a_selection.optionIndex }
-            };
+            nlohmann::json document;
+            document["modIndex"] = a_selection.modIndex;
+#define WRITE_SELECTION_FIELD(object, key, member) document[key] = object.member;
+            FOREACH_PROFILE_SELECTION_FIELD(WRITE_SELECTION_FIELD, a_selection)
+#undef WRITE_SELECTION_FIELD
+            return document;
         }
 
         static nlohmann::json ToJson(const CapturedSetting& a_setting, bool a_includeModIndex = true)
@@ -219,27 +218,15 @@ namespace MCMMemory
                 document["settingID"] = a_setting.settingID;
             }
             document["stateName"] = a_setting.stateName;
-            if (a_setting.pageScopedState) {
-                document["pageScopedState"] = true;
-            }
-            if (a_setting.textControl) {
-                document["textControl"] = true;
-            }
+#define WRITE_SETTING_FLAG(object, key, member) if (object.member) { document[key] = true; }
+            FOREACH_SETTING_FLAG(WRITE_SETTING_FLAG, a_setting)
+#undef WRITE_SETTING_FLAG
             if (a_setting.command) {
                 document["command"] = true;
                 document["confirmedCommand"] = a_setting.confirmedCommand;
             }
-            if (a_setting.recorded) {
-                document["recorded"] = true;
-            }
             if (a_setting.sequence != 0) {
                 document["sequence"] = a_setting.sequence;
-            }
-            if (a_setting.reopensConfig) {
-                document["reopensConfig"] = true;
-            }
-            if (a_setting.rebuildsPage) {
-                document["rebuildsPage"] = true;
             }
             document["value"] = a_setting.value;
             if (!a_setting.valueText.empty()) {

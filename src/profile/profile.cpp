@@ -1,9 +1,11 @@
+
+#include "utils/json.hpp"
+#include "utils/helper.hpp"
 #include "profile/action.hpp"
 #include "profile/profile.hpp"
-#include "mcm/mcm_support.hpp"
 #include "profile/profiles.hpp"
-#include "utils/helper.hpp"
-#include "utils/json.hpp"
+#include "profile/profile_defs.hpp"
+#include "mcm/mcm_support.hpp"
 
 #include "settings.hpp"
 
@@ -63,14 +65,9 @@ namespace MCMMemory
                         continue;
                     }
                     MCMActivation activation;
-                    JSON::ReadValue(activationDocument, "modName", activation.selection.identity.modName);
-                    JSON::ReadValue(activationDocument, "modID", activation.selection.identity.modID);
-                    JSON::ReadValue(activationDocument, "pageName", activation.selection.pageName);
-                    JSON::ReadValue(activationDocument, "pageIndex", activation.selection.pageIndex);
-                    JSON::ReadValue(activationDocument, "optionIndex", activation.selection.optionIndex);
-                    JSON::ReadValue(activationDocument, "optionLabel", activation.optionLabel);
-                    JSON::ReadValue(activationDocument, "stateName", activation.stateName);
-                    JSON::ReadValue(activationDocument, "enabledText", activation.enabledText);
+#define READ_ACTIVATION_FIELD(object, key, member) JSON::ReadValue(activationDocument, key, object.member);
+                    FOREACH_ACTIVATION_FIELD(READ_ACTIVATION_FIELD, activation)
+#undef READ_ACTIVATION_FIELD
                     JSON::ReadValue(activationDocument, "startCommand", activation.startCommand);
                     std::string controlType;
                     JSON::ReadValue(activationDocument, "controlType", controlType);
@@ -222,22 +219,18 @@ namespace MCMMemory
         JSON::ReadValue(a_document, "sourceEventID", a_setting.sourceEventID);
         JSON::ReadValue(a_document, "controlType", controlType);
         JSON::ReadValue(a_document, "modIndex", a_setting.selection.modIndex);
-        JSON::ReadValue(a_document, "modName", a_setting.selection.identity.modName);
-        JSON::ReadValue(a_document, "modID", a_setting.selection.identity.modID);
-        JSON::ReadValue(a_document, "pageIndex", a_setting.selection.pageIndex);
-        JSON::ReadValue(a_document, "pageName", a_setting.selection.pageName);
-        JSON::ReadValue(a_document, "optionIndex", a_setting.selection.optionIndex);
+#define READ_SELECTION_FIELD(object, key, member) JSON::ReadValue(a_document, key, object.member);
+        FOREACH_PROFILE_SELECTION_FIELD(READ_SELECTION_FIELD, a_setting.selection)
+#undef READ_SELECTION_FIELD
         JSON::ReadValue(a_document, "optionLabel", a_setting.optionLabel);
         JSON::ReadValue(a_document, "settingID", a_setting.settingID);
         JSON::ReadValue(a_document, "stateName", a_setting.stateName);
-        JSON::ReadValue(a_document, "pageScopedState", a_setting.pageScopedState);
-        JSON::ReadValue(a_document, "textControl", a_setting.textControl);
+#define READ_SETTING_FLAG(object, key, member) JSON::ReadValue(a_document, key, object.member);
+        FOREACH_SETTING_FLAG(READ_SETTING_FLAG, a_setting)
+#undef READ_SETTING_FLAG
         JSON::ReadValue(a_document, "command", a_setting.command);
         JSON::ReadValue(a_document, "confirmedCommand", a_setting.confirmedCommand);
-        JSON::ReadValue(a_document, "recorded", a_setting.recorded);
         JSON::ReadValue(a_document, "sequence", a_setting.sequence);
-        JSON::ReadValue(a_document, "rebuildsPage", a_setting.rebuildsPage);
-        JSON::ReadValue(a_document, "reopensConfig", a_setting.reopensConfig);
         // ReadString ignores a wrongly typed field instead of throwing the whole profile away.
         if (auto valueText = JSON::ReadString(a_document, "valueText")) {
             a_setting.valueText = std::move(*valueText);
@@ -274,14 +267,9 @@ namespace MCMMemory
             document["activations"] = nlohmann::json::array();
             for (const auto& activation : a_profile.activations) {
                 nlohmann::json activationDocument;
-                activationDocument["modName"] = activation.selection.identity.modName;
-                activationDocument["modID"] = activation.selection.identity.modID;
-                activationDocument["pageName"] = activation.selection.pageName;
-                activationDocument["pageIndex"] = activation.selection.pageIndex;
-                activationDocument["optionIndex"] = activation.selection.optionIndex;
-                activationDocument["optionLabel"] = activation.optionLabel;
-                activationDocument["stateName"] = activation.stateName;
-                activationDocument["enabledText"] = activation.enabledText;
+#define WRITE_ACTIVATION_FIELD(object, key, member) activationDocument[key] = object.member;
+                FOREACH_ACTIVATION_FIELD(WRITE_ACTIVATION_FIELD, activation)
+#undef WRITE_ACTIVATION_FIELD
                 if (activation.startCommand) {
                     activationDocument["startCommand"] = true;
                 }

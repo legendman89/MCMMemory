@@ -1,12 +1,10 @@
 #pragma once
 
 #include "mcm/mcm_script.hpp"
+#include "utils/time.hpp"
 
 namespace MCMMemory
 {
-    inline constexpr float mcmWatchIntervalSeconds{ 0.5F };
-    inline constexpr float mcmRecoverySeconds{ 10.0F };
-
     enum class MCMCallStatus
     {
         None,
@@ -122,7 +120,7 @@ namespace MCMMemory
 
         std::shared_ptr<MCMCallState> pending;
 
-        std::chrono::steady_clock::time_point recoveryDeadline{};
+        std::chrono::steady_clock::time_point recoveryWaitEndsAt{};
 
         float timeoutSeconds{ 30.0F };
 

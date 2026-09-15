@@ -1,18 +1,19 @@
-#include "menu/profile.hpp"
 
 #include "menu/icons.hpp"
+#include "menu/profile.hpp"
 #include "menu/translate.hpp"
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "profile/profile.hpp"
 #include "profile/profiles.hpp"
 #include "profile/restore.hpp"
-#include "settings.hpp"
 #include "utils/helper.hpp"
+#include "utils/time.hpp"
+
+#include "settings.hpp"
 
 namespace MCMMemory::Menu
 {
-    inline constexpr auto registryRefreshInterval{ std::chrono::seconds(5) };
     inline constexpr auto ProfileFieldWidth{ 240.0F };
 
     void ProfileMenu::RefreshProfileNames()
@@ -233,7 +234,7 @@ namespace MCMMemory::Menu
         if (profileAvailable) {
             profileWriteTime = std::filesystem::last_write_time(ProfileStorage::Path(), error);
         }
-        nextRegistryRefresh = std::chrono::steady_clock::now() + registryRefreshInterval;
+        nextRegistryRefresh = TimeAfter(std::chrono::steady_clock::now(), registryRefreshInterval);
         registryCacheGeneration = MCMRegistry::CacheGeneration();
         unavailableGeneration = MCMCallWatch::UnavailableGeneration();
         loaded = true;

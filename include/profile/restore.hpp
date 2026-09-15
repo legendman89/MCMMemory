@@ -3,12 +3,14 @@
 #include "mcm/mcm_registry.hpp"
 #include "mcm/mcm_script.hpp"
 #include "mcm/mcm_calls.hpp"
+#include "profile/restore_defs.hpp"
 #include "profile/activity.hpp"
 #include "profile/profile.hpp"
-#include "profile/restore_defs.hpp"
 #include "profile/stats.hpp"
-#include "settings.hpp"
 #include "utils/scheduler.hpp"
+#include "utils/time.hpp"
+
+#include "settings.hpp"
 
 #define DECLARE_RESTORE_ACTION_ENUM(actionName, functionName, argumentType, applyAction) actionName,
 #define DECLARE_RESTORE_FUNCTION_NAME(actionName, functionName, argumentType, applyAction) #functionName,
@@ -17,19 +19,6 @@
 
 namespace MCMMemory
 {
-    // Gives a newly enabled MCM time to finish starting before it is opened again.
-    // Givies enough time for the MCM to build.
-    inline constexpr float mcmActivationDelaySeconds{ 2.0F };
-
-    // A cycle normally ends when the value stops changing or returns to where it
-    // started; this just bounds a control whose text never repeats.
-    // Largest cycle I found so far when making patches is 6.
-    inline constexpr int maximumRecordedClicks{ 16 };
-
-    // A page can still be rebuilding when the next setting is checked, so give it a few tries
-    // before deciding the control is gone.
-    inline constexpr int maximumSettleChecks{ 5 };
-
     // Says which type of argument a restore script function expects.
     enum class RestoreArgumentType
     {
@@ -252,7 +241,7 @@ namespace MCMMemory
 
         RestoreStats previousStats;
 
-        std::chrono::steady_clock::time_point activationDeadline{};
+        std::chrono::steady_clock::time_point activationWaitEndsAt{};
 
         int queuedPageIndex{-1};
 

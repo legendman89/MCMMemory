@@ -3,12 +3,10 @@
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "utils/helper.hpp"
+#include "utils/time.hpp"
 
 namespace MCMMemory
 {
-    // Buffer checks are separate from the deadline for a Papyrus call to return.
-    inline constexpr uint32_t maximumScriptWaitChecks{ 5 };
-
     bool Backup::Install()
     {
         std::lock_guard lock(backupMutex);

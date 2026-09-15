@@ -6,6 +6,7 @@
 #include "menu/ui.hpp"
 #include "profile/stats.hpp"
 #include "utils/helper.hpp"
+#include "utils/time.hpp"
 
 #include <deque>
 
@@ -15,22 +16,6 @@
 namespace MCMMemory
 {
     struct Settings;
-
-    inline bool IsTimeSet(const std::chrono::steady_clock::time_point& a_time)
-    {
-        return a_time.time_since_epoch().count() != 0;
-    }
-
-    inline float SecondsSince(const std::chrono::steady_clock::time_point& a_startedAt, const std::chrono::steady_clock::time_point& a_now)
-    {
-        return std::chrono::duration<float>(a_now - a_startedAt).count();
-    }
-
-    inline std::chrono::steady_clock::time_point TimeAfter(const std::chrono::steady_clock::time_point& a_time, float a_seconds)
-    {
-        const auto delay = std::chrono::duration<float>(a_seconds);
-        return a_time + std::chrono::duration_cast<std::chrono::steady_clock::duration>(delay);
-    }
 
     inline float FadeAlpha(float a_ageSeconds, float a_fadeAtSeconds, float a_fadeSeconds)
     {

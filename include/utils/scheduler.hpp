@@ -1,11 +1,10 @@
 #pragma once
 
 #include "plugin.hpp"
+#include "utils/time.hpp"
 
 namespace MCMMemory
 {
-
-    inline constexpr float secondsPerFrame = 1.0F / 60.0F;
 
     struct DelayedTask
     {

@@ -1,7 +1,9 @@
 #include "mcm/mcm_calls.hpp"
 #include "mcm/mcm_messages.hpp"
-#include "settings.hpp"
 #include "utils/scheduler.hpp"
+#include "utils/time.hpp"
+
+#include "settings.hpp"
 
 namespace MCMMemory
 {
@@ -84,10 +86,10 @@ namespace MCMMemory
 
     void MCMCallWatch::Cancel()
     {
-        // Cancellation and timeout recovery share one deadline, including CloseConfig.
+        // Cancellation and timeout recovery share the same waiting period, including CloseConfig.
         if (!recovering) {
             recovering = true;
-            recoveryDeadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(mcmRecoverySeconds));
+            recoveryWaitEndsAt = TimeAfter(std::chrono::steady_clock::now(), mcmRecoverySeconds);
         }
     }
 
@@ -95,23 +97,23 @@ namespace MCMMemory
     {
         const auto now = std::chrono::steady_clock::now();
         if (!pending) {
-            return recovering && now >= recoveryDeadline ? MCMCallStatus::Expired : MCMCallStatus::None;
+            return recovering && now >= recoveryWaitEndsAt ? MCMCallStatus::Expired : MCMCallStatus::None;
         }
         const bool completed = pending->completed.load(std::memory_order_acquire) && !pending->simulateUnresponsive;
         const auto checkedTime = completed ? pending->finished : now;
-        const float elapsed = std::chrono::duration<float>(checkedTime - pending->started).count();
+        const float elapsed = SecondsSince(pending->started, checkedTime);
         if (!timedOut && elapsed >= timeoutSeconds) {
             timedOut = true;
             logger::warn("MCM call '{}' on '{}' exceeded {}s; waiting up to {}s for safe recovery", pending->functionName, pending->modID, timeoutSeconds, mcmRecoverySeconds);
             if (!recovering) {
                 recovering = true;
-                recoveryDeadline = pending->started + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(timeoutSeconds + mcmRecoverySeconds));
+                recoveryWaitEndsAt = TimeAfter(pending->started, timeoutSeconds + mcmRecoverySeconds);
             }
             if (!completed) {
                 TracePending();
             }
         }
-        if (recovering && !completed && now >= recoveryDeadline) {
+        if (recovering && !completed && now >= recoveryWaitEndsAt) {
             return MCMCallStatus::Expired;
         }
         return completed ? MCMCallStatus::Completed : MCMCallStatus::Waiting;

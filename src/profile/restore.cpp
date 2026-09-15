@@ -3,6 +3,7 @@
 
 #include "mcm/mcm_support.hpp"
 #include "utils/helper.hpp"
+#include "utils/time.hpp"
 
 namespace MCMMemory
 {
@@ -604,7 +605,7 @@ namespace MCMMemory
                 if (closing && (!reopenClose || mcmFailed)) {
                     if (activationClose && !mcmFailed) {
                         auto& mcm = restoreMCMs[activeMCMIndex];
-                        mcm.activationDeadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(GetSettings().scriptCallTimeoutSeconds + mcmActivationDelaySeconds));
+                        mcm.activationWaitEndsAt = TimeAfter(std::chrono::steady_clock::now(), GetSettings().scriptCallTimeoutSeconds + mcmActivationDelaySeconds);
                         if (mcm.activationPending) {
                             logger::info("MCM '{}' is starting; its settings will continue after a {} second delay", mcm.identity.modID, mcmActivationDelaySeconds);
                             QueueNextAction(mcmActivationDelaySeconds);
@@ -654,7 +655,7 @@ namespace MCMMemory
             mcmStatsRecorded = false;
             if (action.activationStep) {
                 mcm.activationPending = true;
-                mcm.activationDeadline = std::chrono::steady_clock::now() + std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(GetSettings().scriptCallTimeoutSeconds));
+                mcm.activationWaitEndsAt = TimeAfter(std::chrono::steady_clock::now(), GetSettings().scriptCallTimeoutSeconds);
             }
         }
 
@@ -668,7 +669,7 @@ namespace MCMMemory
                 logger::info("MCM '{}' is already enabled", activeMCM.identity.modID);
             }
             // Not yet, wo we retry again after a delay.
-            else if (!enabled && std::chrono::steady_clock::now() < activeMCM.activationDeadline && currentActionIndex > 0) {
+            else if (!enabled && std::chrono::steady_clock::now() < activeMCM.activationWaitEndsAt && currentActionIndex > 0) {
                 if (activeMCM.activation->selection.pageIndex >= 0) {
                     --currentActionIndex;
                 }
@@ -695,7 +696,7 @@ namespace MCMMemory
                 QueueNextAction(0.0F);
                 return;
             }
-            if (std::chrono::steady_clock::now() < activeMCM.activationDeadline && currentActionIndex > 0) {
+            if (std::chrono::steady_clock::now() < activeMCM.activationWaitEndsAt && currentActionIndex > 0) {
                 if (activeMCM.activation->selection.pageIndex >= 0) {
                     --currentActionIndex;
                 }
@@ -704,7 +705,7 @@ namespace MCMMemory
             }
 
             mcmFailed = true;
-            logger::error("MCM '{}' did not expose its enabled state before the restore deadline", activeMCM.identity.modID);
+            logger::error("MCM '{}' did not expose its enabled state before the activation wait expired", activeMCM.identity.modID);
             FailMCM();
             QueueNextAction(0.0F);
             return;

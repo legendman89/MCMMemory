@@ -1,15 +1,12 @@
 #pragma once
 
 #include "profile/types.hpp"
+#include "utils/time.hpp"
 
 // Each supported MCM manager gives us the live scripts needed by backup and restore.
 
 namespace MCMMemory
 {
-
-    inline constexpr uint32_t maximumRegistryChecks{ 30 };
-    inline constexpr uint32_t requiredStableRegistryChecks{ 2 };
-    inline constexpr float registryCheckDelaySeconds{ 5.0F };
 
     enum class RegistryWaitResult
     {

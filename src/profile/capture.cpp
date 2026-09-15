@@ -2,26 +2,13 @@
 #include "profile/activity.hpp"
 #include "profile/capture.hpp"
 #include "mcm/mcm_calls.hpp"
+#include "utils/time.hpp"
 
 namespace MCMMemory
 {
 
-    // Some values may become readable a few frames after the callback.
-    constexpr int QueueDelayFrames = 2;
-    // Check busy toggles and opening pages every 0.1 seconds, for about five seconds.
-    inline constexpr uint32_t captureReadDelayFrames = 6;
-    inline constexpr uint32_t maximumCaptureReads = 50;
-    // Recorded commands can wait for the player to answer a confirmation dialog.
-    inline constexpr uint32_t maximumCommandCaptureReads = 600;
     // Raw records are only for debugging, so keep their memory use bounded.
     constexpr size_t maximumRecords = 4096;
-
-    // Retry profile saves every 5 seconds, up to three times.
-    // TODO: I can inject several failing saves to test this more aggressivly.
-    inline constexpr float profileSaveRetryDelaySeconds = 5.0F;
-    inline constexpr uint32_t maximumProfileSaveRetries = 3;
-
-    inline constexpr auto profileSaveIdleDelay = std::chrono::seconds(5);
 
     void ProfileSaveTask::operator()() const
     {
@@ -104,7 +91,7 @@ namespace MCMMemory
 
     void Capture::DelayProfileSave()
     {
-        profileSaveAt = std::chrono::steady_clock::now() + profileSaveIdleDelay;
+        profileSaveAt = TimeAfter(std::chrono::steady_clock::now(), profileSaveIdleDelay);
         profileSaveAfterInactivity = true;
         QueueProfileSave(std::chrono::duration<float>(profileSaveIdleDelay).count());
     }
@@ -143,7 +130,7 @@ namespace MCMMemory
             return;
         }
         if (profileSaveAfterInactivity) {
-            const float remainingSeconds = std::chrono::duration<float>(profileSaveAt - std::chrono::steady_clock::now()).count();
+            const float remainingSeconds = SecondsUntil(profileSaveAt, std::chrono::steady_clock::now());
             if (remainingSeconds > 0.0F) {
                 QueueProfileSave(remainingSeconds);
                 return;

@@ -260,6 +260,9 @@ namespace MCMMemory
         bool confirmationAccepted{};
 
         bool confirmationCancelled{};
+
+        // Prevents an inactivity save while this setting still needs a menu read.
+        bool capturePending{};
     };
 
     // Adds a setting to the vector, replacing an existing one if it matches and a_replaceExisting is true.

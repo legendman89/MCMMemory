@@ -267,7 +267,8 @@ namespace MCMMemory
                 logger::error("Failed to update the activation state for '{}' in the persistent profile", a_record.selection.identity.modID);
                 return true;
             }
-            logger::info("Automatic backup captured MCM '{}' as {}; profile will be saved when the journal closes", a_record.selection.identity.modID, activation->enabled ? "enabled" : "disabled");
+            DelayProfileSave();
+            logger::info("Automatic backup captured MCM '{}' as {}; profile will be saved after inactivity or when the journal closes", a_record.selection.identity.modID, activation->enabled ? "enabled" : "disabled");
         }
         return true;
     }
@@ -467,6 +468,7 @@ namespace MCMMemory
             if (ProfileStorage::UpdateSetting(a_record.profileName, setting)) {
                 recordedConfigSessions[a_record.profileName][modID] = a_record.configSession;
                 Deduplicate(pendingAutoBackupSettings, setting);
+                DelayProfileSave();
             }
             else {
                 logger::error("Failed to update captured setting '{}' in the persistent profile", setting.optionLabel);

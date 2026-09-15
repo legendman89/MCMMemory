@@ -59,9 +59,9 @@ namespace MCMMemory
         BackupStats stats;
     };
 
-    struct RetryProfileSaveTask
+    struct ProfileSaveTask
     {
-        uint64_t retryID{};
+        uint64_t taskID{};
 
         void operator()() const;
     };
@@ -112,12 +112,16 @@ namespace MCMMemory
 
         friend struct FinishCaptureTask;
 
-        friend struct RetryProfileSaveTask;
+        friend struct ProfileSaveTask;
 
         // Leaves the current Scaleform callback before reading the menu.
         inline void QueueMenuRead(CaptureRequest a_request)
         {
-            if (!Scheduler::GetSingleton()->ScheduleUIAfterFrames(ReadCaptureTask{ a_request }, 0)) {
+            const bool queued = Scheduler::GetSingleton()->ScheduleUIAfterFrames(ReadCaptureTask{ a_request }, 0);
+            if (auto* record = FindRecord(a_request.eventID)) {
+                record->capturePending = queued && a_request.persist;
+            }
+            if (!queued) {
                 logger::error("Captured MCM event {} could not reach the UI task queue", a_request.eventID);
             }
         }
@@ -125,7 +129,11 @@ namespace MCMMemory
         // Schedules the second menu read after SkyUI updates the control.
         inline void QueueCaptureCompletion(CaptureRequest a_request, uint32_t a_delayFrames)
         {
-            if (!Scheduler::GetSingleton()->ScheduleUIAfterFrames(FinishCaptureTask{ a_request }, a_delayFrames)) {
+            const bool queued = Scheduler::GetSingleton()->ScheduleUIAfterFrames(FinishCaptureTask{ a_request }, a_delayFrames);
+            if (auto* record = FindRecord(a_request.eventID)) {
+                record->capturePending = queued && a_request.persist;
+            }
+            if (!queued) {
                 logger::error("Captured MCM event {} could not schedule its completion", a_request.eventID);
             }
         }
@@ -165,9 +173,14 @@ namespace MCMMemory
         // Queues a retry for pending profile changes when the last save failed.
         bool QueueProfileSaveRetry();
 
-        void RetryProfileSave(uint64_t a_retryID);
+        // Extends one queued save until settings have stopped changing.
+        void DelayProfileSave();
 
-        void CancelProfileSaveRetry();
+        bool QueueProfileSave(float a_delaySeconds);
+
+        void RunProfileSave(uint64_t a_taskID);
+
+        void CancelProfileSaveTask();
 
         // Takes the first safe menu read after the callback returns.
         void ReadMenu(const CaptureRequest& a_request);
@@ -175,7 +188,7 @@ namespace MCMMemory
         // Takes the second menu read and finishes one capture.
         void CompleteCapture(CaptureRequest a_request);
 
-        // Queues one result per changed MCM when the Journal Menu closes.
+        // Queues one result per changed MCM after its profile is saved.
         void ShowAutoBackupResults();
 
         // Returns false when a toggle still needs another read before saving.
@@ -244,6 +257,8 @@ namespace MCMMemory
         // Last recorded config session per profile and MCM. Reset on game load.
         std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> recordedConfigSessions;
 
+        std::chrono::steady_clock::time_point profileSaveAt{};
+
         // Gives each new callback its eventID.
         uint64_t eventCount{};
 
@@ -253,8 +268,8 @@ namespace MCMMemory
         // Old reads must not run against a newly opened Journal Menu.
         uint64_t menuOpenedEventID{};
 
-        // Gives each profile save retry its own ID, so a new retry cancels the old one.
-        uint64_t profileSaveRetryID{};
+        // Invalidates older inactivity and retry tasks after a save or session change.
+        uint64_t profileSaveTaskID{};
 
         // Counts how many times an MCM config was opened. Settings recorded under different
         // counts are separated by an OnConfigClose that the restore has to replay.
@@ -269,8 +284,11 @@ namespace MCMMemory
         // Rejects delayed reads after the Journal Menu closes.
         bool journalMenuOpen{};
 
-        // True when a profile save retry is already queued.
-        bool profileSaveRetryQueued{};
+        // Keeps inactivity saves and retries on one queued task.
+        bool profileSaveTaskQueued{};
+
+        // The shared save task is waiting for inactivity rather than retrying a failed write.
+        bool profileSaveAfterInactivity{};
 
     };
 

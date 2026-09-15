@@ -21,9 +21,11 @@ namespace MCMMemory
     inline constexpr float profileSaveRetryDelaySeconds = 5.0F;
     inline constexpr uint32_t maximumProfileSaveRetries = 3;
 
-    void RetryProfileSaveTask::operator()() const
+    inline constexpr auto profileSaveIdleDelay = std::chrono::seconds(5);
+
+    void ProfileSaveTask::operator()() const
     {
-        Capture::GetSingleton()->RetryProfileSave(retryID);
+        Capture::GetSingleton()->RunProfileSave(taskID);
     }
 
     bool Capture::Install()
@@ -57,7 +59,7 @@ namespace MCMMemory
     void Capture::Reset()
     {
         std::scoped_lock lock(captureMutex);
-        CancelProfileSaveRetry();
+        CancelProfileSaveTask();
         // Old scheduled tasks will stop when they see a different loaded game session.
         ++loadedGameSession;
         // To distinguish between MCMs opened in the same game session.
@@ -77,6 +79,9 @@ namespace MCMMemory
 
     bool Capture::SaveProfileChanges()
     {
+        if (profileSaveAfterInactivity) {
+            CancelProfileSaveTask();
+        }
         if (!ProfileStorage::FlushPending()) {
             const bool retryQueued = QueueProfileSaveRetry();
             if (profileSaveRetryCount == 0 || !retryQueued) {
@@ -84,16 +89,24 @@ namespace MCMMemory
             }
             return false;
         }
-        CancelProfileSaveRetry();
+        CancelProfileSaveTask();
         ShowAutoBackupResults();
         return true;
     }
 
-    void Capture::CancelProfileSaveRetry()
+    void Capture::CancelProfileSaveTask()
     {
-        ++profileSaveRetryID;
-        profileSaveRetryQueued = false;
+        ++profileSaveTaskID;
+        profileSaveTaskQueued = false;
         profileSaveRetryCount = 0;
+        profileSaveAfterInactivity = false;
+    }
+
+    void Capture::DelayProfileSave()
+    {
+        profileSaveAt = std::chrono::steady_clock::now() + profileSaveIdleDelay;
+        profileSaveAfterInactivity = true;
+        QueueProfileSave(std::chrono::duration<float>(profileSaveIdleDelay).count());
     }
 
     bool Capture::QueueProfileSaveRetry()
@@ -101,28 +114,56 @@ namespace MCMMemory
         if (journalMenuOpen || profileSaveRetryCount >= maximumProfileSaveRetries) {
             return false;
         }
-        if (profileSaveRetryQueued) {
+        return QueueProfileSave(profileSaveRetryDelaySeconds);
+    }
+
+    bool Capture::QueueProfileSave(float a_delaySeconds)
+    {
+        if (profileSaveTaskQueued) {
             return true;
         }
 
-        const auto retryID = ++profileSaveRetryID;
-        profileSaveRetryQueued = Scheduler::GetSingleton()->ScheduleAfterSeconds(RetryProfileSaveTask{ retryID }, profileSaveRetryDelaySeconds);
-        if (!profileSaveRetryQueued) {
-            logger::error("Could not schedule a retry for pending profile changes");
+        const auto taskID = ++profileSaveTaskID;
+        profileSaveTaskQueued = Scheduler::GetSingleton()->ScheduleAfterSeconds(ProfileSaveTask{ taskID }, a_delaySeconds);
+        if (!profileSaveTaskQueued) {
+            logger::error("Could not schedule a save for pending profile changes");
         }
 
-        return profileSaveRetryQueued;
+        return profileSaveTaskQueued;
     }
 
-    void Capture::RetryProfileSave(uint64_t a_retryID)
+    void Capture::RunProfileSave(uint64_t a_taskID)
     {
         std::scoped_lock lock(captureMutex);
-        if (a_retryID != profileSaveRetryID || !profileSaveRetryQueued) {
+        if (a_taskID != profileSaveTaskID || !profileSaveTaskQueued) {
             return;
         }
-        profileSaveRetryQueued = false;
+        profileSaveTaskQueued = false;
+        if (!IsGameLoaded()) {
+            return;
+        }
+        if (profileSaveAfterInactivity) {
+            const float remainingSeconds = std::chrono::duration<float>(profileSaveAt - std::chrono::steady_clock::now()).count();
+            if (remainingSeconds > 0.0F) {
+                QueueProfileSave(remainingSeconds);
+                return;
+            }
+            for (const auto& record : records) {
+                if (record.eventID > menuOpenedEventID && record.capturePending) {
+                    QueueProfileSave(profileSaveRetryDelaySeconds);
+                    return;
+                }
+            }
+            if (MCMCallWatch::IsBusy()) {
+                QueueProfileSave(profileSaveRetryDelaySeconds);
+                return;
+            }
+            logger::info("Saving pending profile changes after MCM inactivity");
+            SaveProfileChanges();
+            return;
+        }
         auto* ui = RE::UI::GetSingleton();
-        if (!IsGameLoaded() || !ui || journalMenuOpen || ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
+        if (!ui || journalMenuOpen || ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
             return;
         }
         ++profileSaveRetryCount;
@@ -205,6 +246,10 @@ namespace MCMMemory
         }
 
         auto eventID = RecordEvent(type, *a_event);
+        if (IsValueChange(type) && profileSaveAfterInactivity) {
+            DelayProfileSave();
+        }
+        
         QueueMenuRead(CaptureRequest{ eventID, loadedGameSession, IsValueChange(type) });
 
         return RE::BSEventNotifyControl::kContinue;
@@ -217,6 +262,7 @@ namespace MCMMemory
             return;
         }
 
+        record->capturePending = false;
         record->state = MCMMenu::ReadState();
         if (record->selection.modIndex == selection.modIndex) {
             FindActiveMCMIdentity(record->type, record->state);
@@ -249,12 +295,13 @@ namespace MCMMemory
 
     void Capture::CompleteCapture(CaptureRequest a_request)
     {
-        if (MCMCallWatch::IsBusy()) {
-            return;
-        }
         // Find the raw record made before the menu finished updating.
         auto* record = FindRecord(a_request.eventID);
         if (!record) {
+            return;
+        }
+        record->capturePending = false;
+        if (MCMCallWatch::IsBusy()) {
             return;
         }
 
@@ -302,7 +349,7 @@ namespace MCMMemory
 
         std::scoped_lock lock(captureMutex);
         if (a_event->opening) {
-            CancelProfileSaveRetry();
+            CancelProfileSaveTask();
             journalMenuOpen = true;
             menuOpenedEventID = eventCount;
             logger::info("Journal Menu opened; watching for MCM configuration events");

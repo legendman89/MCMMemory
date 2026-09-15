@@ -94,11 +94,14 @@ namespace MCMMemory
 
         static bool Load(std::string_view a_name, Profile& a_profile);
 
-        // Adds or replaces one captured setting in the selected profile.
-        static bool UpdateSetting(const CapturedSetting& a_setting);
+        // Adds or replaces a captured setting in memory until the journal closes.
+        static bool UpdateSetting(std::string_view a_name, const CapturedSetting& a_setting);
 
         // Remembers whether the player allowed a staged MCM to start automatically.
-        static bool UpdateActivation(const MCMActivation& a_activation, bool a_enabled);
+        static bool UpdateActivation(std::string_view a_name, const MCMActivation& a_activation, bool a_enabled);
+
+        // Saves pending profiles. Failed writes remain in memory for retry.
+        static bool FlushPending();
 
         // Removes every saved setting, activation and mode for these MCMs from the named profile.
         static bool ForgetMCMs(std::string_view a_name, const MCMFilter& a_modIDs, size_t& a_settingCount);
@@ -114,11 +117,22 @@ namespace MCMMemory
 
     private:
 
+        static bool LoadFile(std::string_view a_name, Profile& a_profile);
+
+        static bool SaveFile(std::string_view a_name, const Profile& a_profile);
+
+        static Profile* GetPendingProfile(std::string_view a_name);
+
         // Converts one JSON setting into a CapturedSetting.
         static bool FromJson(const nlohmann::json& a_document, CapturedSetting& a_setting);
         
         // Converts the in-memory profile into its JSON layout.
         static nlohmann::json ToJson(const Profile& a_profile);
+
+        inline static std::mutex profileMutex;
+
+        // Holds profiles that have been changed in memory but not yet saved to disk.
+        inline static std::unordered_map<std::string, Profile, StringHash, std::equal_to<>> pendingProfiles;
 
     };
 }

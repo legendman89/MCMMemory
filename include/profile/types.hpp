@@ -225,6 +225,9 @@ namespace MCMMemory
     // Keeps the raw event and menu state for Capture.json debugging.
     struct CaptureRecord
     {
+        // Profile selected when this event arrived.
+        std::string profileName;
+
         // Stores strArg from the callback.
         std::string stringArgument;
 

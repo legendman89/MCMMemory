@@ -11,12 +11,24 @@
 
 namespace MCMMemory
 {
+
     bool ProfileStorage::Load(Profile& a_profile)
     {
         return Load(GetSettings().activeProfile, a_profile);
     }
 
     bool ProfileStorage::Load(std::string_view a_name, Profile& a_profile)
+    {
+        std::scoped_lock lock(profileMutex);
+        const auto found = pendingProfiles.find(a_name);
+        if (found != pendingProfiles.end()) {
+            a_profile = found->second;
+            return true;
+        }
+        return LoadFile(a_name, a_profile);
+    }
+
+    bool ProfileStorage::LoadFile(std::string_view a_name, Profile& a_profile)
     {
         a_profile.Clear();
         const auto path = Path(a_name);
@@ -97,9 +109,13 @@ namespace MCMMemory
             return false;
         }
 
+        std::scoped_lock lock(profileMutex);
         Profile profile;
-        std::error_code error;
-        if (!std::filesystem::exists(Path(a_name), error) || error || !Load(a_name, profile)) {
+        const auto pending = pendingProfiles.find(a_name);
+        if (pending != pendingProfiles.end()) {
+            profile = pending->second;
+        }
+        else if (!LoadFile(a_name, profile)) {
             logger::error("Refusing to edit an unreadable persistent profile at {}", ToUTF8(Path(a_name)));
             return false;
         }
@@ -130,22 +146,50 @@ namespace MCMMemory
             profile.mods.erase(modID);
         }
 
-        return Save(a_name, profile);
+        if (!SaveFile(a_name, profile)) {
+            a_settingCount = 0;
+            return false;
+        }
+        if (pending != pendingProfiles.end()) {
+            pendingProfiles.erase(pending);
+        }
+        return true;
     }
 
-    bool ProfileStorage::UpdateSetting(const CapturedSetting& a_setting)
+    Profile* ProfileStorage::GetPendingProfile(std::string_view a_name)
+    {
+        if (!Profiles::IsValidName(a_name)) {
+            return nullptr;
+        }
+        const auto found = pendingProfiles.find(a_name);
+        if (found != pendingProfiles.end()) {
+            return std::addressof(found->second);
+        }
+
+        Profile profile;
+        std::error_code error;
+        const bool exists = std::filesystem::exists(Path(a_name), error);
+        if (error || (exists && !LoadFile(a_name, profile))) {
+            logger::error("Refusing to overwrite an unreadable persistent profile at {}", ToUTF8(Path(a_name)));
+            return nullptr;
+        }
+        auto inserted = pendingProfiles.emplace(std::string(a_name), std::move(profile));
+        logger::debug("Loaded profile '{}' into memory for automatic backup", a_name);
+        return std::addressof(inserted.first->second);
+    }
+
+    bool ProfileStorage::UpdateSetting(std::string_view a_name, const CapturedSetting& a_setting)
     {
         if (!a_setting.identityComplete) {
             return false;
         }
 
-        Profile profile;
-        std::error_code error;
-        bool profileExists = std::filesystem::exists(Path(), error);
-        if (error || (profileExists && !Load(profile))) {
-            logger::error("Refusing to overwrite an unreadable persistent profile at {}", ToUTF8(Path()));
+        std::scoped_lock lock(profileMutex);
+        auto* pending = GetPendingProfile(a_name);
+        if (!pending) {
             return false;
         }
+        auto& profile = *pending;
 
         const auto& modID = a_setting.selection.identity.modID;
         if (GetSettings().recordActions && !profile.IsActionMode(modID)) {
@@ -161,18 +205,17 @@ namespace MCMMemory
             Deduplicate(profile.settings, a_setting);
         }
 
-        return Save(profile);
+        return true;
     }
 
-    bool ProfileStorage::UpdateActivation(const MCMActivation& a_activation, bool a_enabled)
+    bool ProfileStorage::UpdateActivation(std::string_view a_name, const MCMActivation& a_activation, bool a_enabled)
     {
-        Profile profile;
-        std::error_code error;
-        const bool profileExists = std::filesystem::exists(Path(), error);
-        if (error || (profileExists && !Load(profile))) {
-            logger::error("Refusing to overwrite an unreadable persistent profile at {}", ToUTF8(Path()));
+        std::scoped_lock lock(profileMutex);
+        auto* pending = GetPendingProfile(a_name);
+        if (!pending) {
             return false;
         }
+        auto& profile = *pending;
 
         if (a_enabled) {
             profile.SetActivation(a_activation);
@@ -180,7 +223,25 @@ namespace MCMMemory
         else {
             profile.RemoveActivation(a_activation.selection.identity.modID);
         }
-        return Save(profile);
+        return true;
+    }
+
+    bool ProfileStorage::FlushPending()
+    {
+        std::scoped_lock lock(profileMutex);
+        bool saved = true;
+        auto pending = pendingProfiles.begin();
+        while (pending != pendingProfiles.end()) {
+            if (SaveFile(pending->first, pending->second)) {
+                pending = pendingProfiles.erase(pending);
+            }
+            else {
+                logger::error("Could not save profile '{}'; captured changes remain in memory for retry", pending->first);
+                saved = false;
+                ++pending;
+            }
+        }
+        return saved;
     }
 
     bool ProfileStorage::Save(const Profile& a_profile)
@@ -189,6 +250,19 @@ namespace MCMMemory
     }
 
     bool ProfileStorage::Save(std::string_view a_name, const Profile& a_profile)
+    {
+        std::scoped_lock lock(profileMutex);
+        if (!SaveFile(a_name, a_profile)) {
+            return false;
+        }
+        const auto pending = pendingProfiles.find(a_name);
+        if (pending != pendingProfiles.end()) {
+            pendingProfiles.erase(pending);
+        }
+        return true;
+    }
+
+    bool ProfileStorage::SaveFile(std::string_view a_name, const Profile& a_profile)
     {
         const auto path = Path(a_name);
         if (!JSON::WriteFile(path, ToJson(a_profile))) {

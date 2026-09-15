@@ -59,6 +59,13 @@ namespace MCMMemory
         BackupStats stats;
     };
 
+    struct RetryProfileSaveTask
+    {
+        uint64_t retryID{};
+
+        void operator()() const;
+    };
+
     class Capture final : public RE::BSTEventSink<SKSE::ModCallbackEvent>, public RE::BSTEventSink<RE::MenuOpenCloseEvent>
     {
     public:
@@ -75,6 +82,12 @@ namespace MCMMemory
         // Clears capture data when a game is started or loaded.
         void Reset();
 
+        // Saves the current changes before switching profiles and cancels older capture tasks.
+        bool PrepareProfileChange();
+
+        // Removes a profile from memory.
+        void ForgetProfile(std::string_view a_name);
+
         // Keeps captured settings hidden from this MCM's scan, without replacing fresh reads.
         void MergeSettings(std::vector<CapturedSetting>& a_settings, std::string_view a_modID);
 
@@ -82,7 +95,7 @@ namespace MCMMemory
         std::optional<MCMActivationState> FindDetectedActivation(std::string_view a_modID);
 
         // True when a config close separates this change from the last one written for the MCM.
-        bool IsConfigReopened(const std::string& a_modID, uint32_t a_configSession) const;
+        bool IsConfigReopened(const std::string& a_profileName, const std::string& a_modID, uint32_t a_configSession) const;
 
         // Forget what this game still remembers about MCMs whose saved settings were removed.
         void ForgetMCMs(const MCMFilter& a_modIDs);
@@ -98,6 +111,8 @@ namespace MCMMemory
         friend struct ReadCaptureTask;
 
         friend struct FinishCaptureTask;
+
+        friend struct RetryProfileSaveTask;
 
         // Leaves the current Scaleform callback before reading the menu.
         inline void QueueMenuRead(CaptureRequest a_request)
@@ -143,6 +158,16 @@ namespace MCMMemory
             for (; record != records.rend() && record->eventID != a_eventID; ++record) {}
             return record != records.rend() ? std::addressof(*record) : nullptr;
         }
+
+        // Saves the current changes to the active profile and clears the pending list.
+        bool SaveProfileChanges();
+
+        // Queues a retry for pending profile changes when the last save failed.
+        bool QueueProfileSaveRetry();
+
+        void RetryProfileSave(uint64_t a_retryID);
+
+        void CancelProfileSaveRetry();
 
         // Takes the first safe menu read after the callback returns.
         void ReadMenu(const CaptureRequest& a_request);
@@ -213,12 +238,11 @@ namespace MCMMemory
         // Remembers staged MCM choices until a manual backup, even when automatic backup is off.
         std::vector<MCMActivationState> detectedActivations;
 
-        // Holds settings automatically saved during the current Journal Menu visit.
+        // Captured settings awaiting a successful save notification.
         std::vector<CapturedSetting> pendingAutoBackupSettings;
 
-        // Config session each MCM was last written under, so the next change can tell whether the
-        // player left and came back. Covers this game only, which is the scope we want.
-        std::unordered_map<std::string, uint32_t> recordedConfigSessions;
+        // Last recorded config session per profile and MCM. Reset on game load.
+        std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> recordedConfigSessions;
 
         // Gives each new callback its eventID.
         uint64_t eventCount{};
@@ -229,15 +253,24 @@ namespace MCMMemory
         // Old reads must not run against a newly opened Journal Menu.
         uint64_t menuOpenedEventID{};
 
+        // Gives each profile save retry its own ID, so a new retry cancels the old one.
+        uint64_t profileSaveRetryID{};
+
         // Counts how many times an MCM config was opened. Settings recorded under different
         // counts are separated by an OnConfigClose that the restore has to replay.
         uint32_t configSession{ 1 };
+
+        // Counts retry attempts for saving a profile when the last save failed.
+        uint32_t profileSaveRetryCount{};
 
         // Prevents the event listeners from being installed twice.
         bool installed{};
 
         // Rejects delayed reads after the Journal Menu closes.
         bool journalMenuOpen{};
+
+        // True when a profile save retry is already queued.
+        bool profileSaveRetryQueued{};
 
     };
 

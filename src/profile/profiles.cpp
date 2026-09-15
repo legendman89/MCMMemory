@@ -1,4 +1,5 @@
 #include "profile/profiles.hpp"
+#include "profile/capture.hpp"
 
 #include "settings.hpp"
 #include "utils/helper.hpp"
@@ -35,6 +36,11 @@ namespace MCMMemory
         a_error.clear();
         if (!IsValidName(a_name)) {
             a_error = "Profile.Error.InvalidName";
+            return false;
+        }
+
+        if (!ProfileStorage::FlushPending()) {
+            a_error = "Profile.Error.CreateFailed";
             return false;
         }
 
@@ -75,6 +81,10 @@ namespace MCMMemory
     bool Profiles::Delete(std::string_view a_name, std::string& a_error)
     {
         a_error.clear();
+        if (!ProfileStorage::FlushPending()) {
+            a_error = "Profile.Error.DeleteFailed";
+            return false;
+        }
         const auto names = ReadNames();
         if (names.size() <= 1) {
             a_error = "Profile.Error.DeleteLast";
@@ -100,6 +110,7 @@ namespace MCMMemory
             return false;
         }
 
+        Capture::GetSingleton()->ForgetProfile(a_name);
         logger::info("Deleted profile '{}' and selected '{}'", a_name, nextName);
         return true;
     }
@@ -114,6 +125,10 @@ namespace MCMMemory
 
         auto& settings = GetSettings();
         const auto previous = settings.activeProfile;
+        if (a_name != previous && !Capture::GetSingleton()->PrepareProfileChange()) {
+            a_error = "Profile.Error.SaveSelection";
+            return false;
+        }
         settings.activeProfile = a_name;
         if (!SettingsStorage::Save()) {
             settings.activeProfile = previous;
@@ -134,8 +149,8 @@ namespace MCMMemory
         }
 
         logger::warn("Active profile '{}' is unavailable; selecting Default", settings.activeProfile);
-        settings.activeProfile = "Default";
-        return SettingsStorage::Save();
+        std::string selectionError;
+        return Select("Default", selectionError);
     }
 
     bool Profiles::IsValidName(std::string_view a_name)

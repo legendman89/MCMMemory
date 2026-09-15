@@ -225,6 +225,8 @@
   "HUD.Failure.ExistingProfileUnreadable": "Existing profile could not be read",
   "HUD.Failure.NoSelectedMCMs": "No selected MCMs were available",
   "HUD.Failure.ProfileUnchanged": "Existing profile was not changed",
+  "HUD.Failure.ProfileSavePending": "Changes remain unsaved; return to gameplay to retry saving",
+  "HUD.Failure.ProfileSaveRetry": "Changes remain unsaved; saving will retry automatically while the pause menu is closed",
   "HUD.Failure.ProfileLoadFailed": "Profile could not be loaded",
   "HUD.Failure.NoRegisteredMCMs": "No MCMs were registered",
   "HUD.Failure.RegistrationIncomplete": "MCM registration did not finish",

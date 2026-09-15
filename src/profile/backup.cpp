@@ -101,6 +101,10 @@ namespace MCMMemory
 
     bool Backup::ReadExistingProfile(Profile& a_profile) const
     {
+        if (!ProfileStorage::FlushPending()) {
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", "HUD.Failure.ProfileSavePending");
+            return false;
+        }
         std::error_code error;
         const bool exists = std::filesystem::exists(ProfileStorage::Path(), error);
         if (error || (exists && !ProfileStorage::Load(a_profile))) {

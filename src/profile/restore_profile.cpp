@@ -231,6 +231,10 @@ namespace MCMMemory
 
     bool Restore::LoadProfile()
     {
+        if (!ProfileStorage::FlushPending()) {
+            logger::error("Restore could not save pending profile changes");
+            return false;
+        }
         Profile profile;
         if (!ProfileStorage::Load(profile)) {
             logger::info("No readable persistent profile is available at {}; automatic restoration is inactive", ToUTF8(ProfileStorage::Path()));

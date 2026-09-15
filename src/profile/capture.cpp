@@ -16,6 +16,16 @@ namespace MCMMemory
     // Raw records are only for debugging, so keep their memory use bounded.
     constexpr size_t maximumRecords = 4096;
 
+    // Retry profile saves every 5 seconds, up to three times.
+    // TODO: I can inject several failing saves to test this more aggressivly.
+    inline constexpr float profileSaveRetryDelaySeconds = 5.0F;
+    inline constexpr uint32_t maximumProfileSaveRetries = 3;
+
+    void RetryProfileSaveTask::operator()() const
+    {
+        Capture::GetSingleton()->RetryProfileSave(retryID);
+    }
+
     bool Capture::Install()
     {
         if (installed) {
@@ -47,6 +57,7 @@ namespace MCMMemory
     void Capture::Reset()
     {
         std::scoped_lock lock(captureMutex);
+        CancelProfileSaveRetry();
         // Old scheduled tasks will stop when they see a different loaded game session.
         ++loadedGameSession;
         // To distinguish between MCMs opened in the same game session.
@@ -59,9 +70,82 @@ namespace MCMMemory
         settings.clear();
         mcmIdentities.clear();
         detectedActivations.clear();
-        pendingAutoBackupSettings.clear();
+        SaveProfileChanges();
         recordedConfigSessions.clear();
         logger::info("Capture session reset");
+    }
+
+    bool Capture::SaveProfileChanges()
+    {
+        if (!ProfileStorage::FlushPending()) {
+            const bool retryQueued = QueueProfileSaveRetry();
+            if (profileSaveRetryCount == 0 || !retryQueued) {
+                HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", retryQueued ? "HUD.Failure.ProfileSaveRetry" : "HUD.Failure.ProfileSavePending");
+            }
+            return false;
+        }
+        CancelProfileSaveRetry();
+        ShowAutoBackupResults();
+        return true;
+    }
+
+    void Capture::CancelProfileSaveRetry()
+    {
+        ++profileSaveRetryID;
+        profileSaveRetryQueued = false;
+        profileSaveRetryCount = 0;
+    }
+
+    bool Capture::QueueProfileSaveRetry()
+    {
+        if (journalMenuOpen || profileSaveRetryCount >= maximumProfileSaveRetries) {
+            return false;
+        }
+        if (profileSaveRetryQueued) {
+            return true;
+        }
+
+        const auto retryID = ++profileSaveRetryID;
+        profileSaveRetryQueued = Scheduler::GetSingleton()->ScheduleAfterSeconds(RetryProfileSaveTask{ retryID }, profileSaveRetryDelaySeconds);
+        if (!profileSaveRetryQueued) {
+            logger::error("Could not schedule a retry for pending profile changes");
+        }
+
+        return profileSaveRetryQueued;
+    }
+
+    void Capture::RetryProfileSave(uint64_t a_retryID)
+    {
+        std::scoped_lock lock(captureMutex);
+        if (a_retryID != profileSaveRetryID || !profileSaveRetryQueued) {
+            return;
+        }
+        profileSaveRetryQueued = false;
+        auto* ui = RE::UI::GetSingleton();
+        if (!IsGameLoaded() || !ui || journalMenuOpen || ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
+            return;
+        }
+        ++profileSaveRetryCount;
+        logger::info("Retrying pending profile saves ({}/{})", profileSaveRetryCount, maximumProfileSaveRetries);
+        SaveProfileChanges();
+    }
+
+    bool Capture::PrepareProfileChange()
+    {
+        std::scoped_lock lock(captureMutex);
+        if (!SaveProfileChanges()) {
+            return false;
+        }
+        menuOpenedEventID = eventCount;
+        detectedActivations.clear();
+        settings.clear();
+        return true;
+    }
+
+    void Capture::ForgetProfile(std::string_view a_name)
+    {
+        std::scoped_lock lock(captureMutex);
+        recordedConfigSessions.erase(std::string(a_name));
     }
 
     void Capture::MergeSettings(std::vector<CapturedSetting>& a_settings, std::string_view a_modID)
@@ -218,9 +302,9 @@ namespace MCMMemory
 
         std::scoped_lock lock(captureMutex);
         if (a_event->opening) {
+            CancelProfileSaveRetry();
             journalMenuOpen = true;
             menuOpenedEventID = eventCount;
-            pendingAutoBackupSettings.clear();
             logger::info("Journal Menu opened; watching for MCM configuration events");
         }
         else {
@@ -230,7 +314,7 @@ namespace MCMMemory
             if (!records.empty()) {
                 CaptureStorage::Save(records, settings, GetSettings().captureRawRecords);
             }
-            ShowAutoBackupResults();
+            SaveProfileChanges();
         }
 
         return RE::BSEventNotifyControl::kContinue;
@@ -238,8 +322,7 @@ namespace MCMMemory
 
     void Capture::ShowAutoBackupResults()
     {
-        if (!GetSettings().autoBackup || pendingAutoBackupSettings.empty()) {
-            pendingAutoBackupSettings.clear();
+        if (pendingAutoBackupSettings.empty()) {
             return;
         }
 
@@ -281,8 +364,11 @@ namespace MCMMemory
         }
 
         std::scoped_lock lock(captureMutex);
-        for (const auto& modID : a_modIDs) {
-            recordedConfigSessions.erase(modID);
+        auto profile = recordedConfigSessions.find(GetSettings().activeProfile);
+        if (profile != recordedConfigSessions.end()) {
+            for (const auto& modID : a_modIDs) {
+                profile->second.erase(modID);
+            }
         }
 
         auto activation = detectedActivations.begin();
@@ -317,11 +403,15 @@ namespace MCMMemory
         }
     }
 
-    bool Capture::IsConfigReopened(const std::string& a_modID, uint32_t a_configSession) const
+    bool Capture::IsConfigReopened(const std::string& a_profileName, const std::string& a_modID, uint32_t a_configSession) const
     {
-        auto existing = recordedConfigSessions.find(a_modID);
+        const auto profile = recordedConfigSessions.find(a_profileName);
+        if (profile == recordedConfigSessions.end()) {
+            return false;
+        }
+        const auto existing = profile->second.find(a_modID);
         // Nothing written for this MCM yet in this game, so there is no break to replay.
-        return existing != recordedConfigSessions.end() && existing->second != a_configSession;
+        return existing != profile->second.end() && existing->second != a_configSession;
     }
 
     uint64_t Capture::RecordEvent(EventType a_type, const SKSE::ModCallbackEvent& a_event)
@@ -331,6 +421,7 @@ namespace MCMMemory
         }
 
         CaptureRecord record;
+        record.profileName = GetSettings().activeProfile;
         record.eventID = ++eventCount;
         record.type = a_type;
         // The meaning of these arguments depends on the event type.

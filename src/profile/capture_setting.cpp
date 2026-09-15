@@ -240,6 +240,9 @@ namespace MCMMemory
 
     bool Capture::CaptureMCMActivation(CaptureRecord& a_record, const MCMScript& a_script)
     {
+        if (a_record.profileName != GetSettings().activeProfile) {
+            return false;
+        }
         if (a_record.activationEvent || a_record.type != EventType::OptionSelected || !a_record.control) {
             return false;
         }
@@ -260,11 +263,11 @@ namespace MCMMemory
         RememberActivation(*activation);
         logger::info("Remembered MCM '{}' as {} for the next manual backup", a_record.selection.identity.modID, activation->enabled ? "enabled" : "disabled");
         if (GetSettings().autoBackup) {
-            if (!ProfileStorage::UpdateActivation(activation->activation, activation->enabled)) {
+            if (!ProfileStorage::UpdateActivation(a_record.profileName, activation->activation, activation->enabled)) {
                 logger::error("Failed to update the activation state for '{}' in the persistent profile", a_record.selection.identity.modID);
                 return true;
             }
-            logger::info("Automatic backup recorded MCM '{}' as {}", a_record.selection.identity.modID, activation->enabled ? "enabled" : "disabled");
+            logger::info("Automatic backup captured MCM '{}' as {}; profile will be saved when the journal closes", a_record.selection.identity.modID, activation->enabled ? "enabled" : "disabled");
         }
         return true;
     }
@@ -282,6 +285,9 @@ namespace MCMMemory
 
     bool Capture::ProcessCapturedEvent(CaptureRecord& a_record)
     {
+        if (a_record.profileName != GetSettings().activeProfile) {
+            return true;
+        }
         if (MCMCommandSupport::IsExcludedPage(a_record.selection.identity.modID, a_record.selection.pageName, a_record.selection.pageIndex)) {
             return true;
         }
@@ -454,11 +460,12 @@ namespace MCMMemory
                                    !setting.selection.identity.modID.empty() && setting.selection.optionIndex >= 0 && 
                                    !setting.optionLabel.empty() && (setting.type != ControlType::Unknown || setting.command) &&
                                    !setting.valueSource.empty();
+                                   
         if (setting.identityComplete && GetSettings().autoBackup) {
             const auto& modID = setting.selection.identity.modID;
-            setting.reopensConfig = IsConfigReopened(modID, a_record.configSession);
-            if (ProfileStorage::UpdateSetting(setting)) {
-                recordedConfigSessions[modID] = a_record.configSession;
+            setting.reopensConfig = IsConfigReopened(a_record.profileName, modID, a_record.configSession);
+            if (ProfileStorage::UpdateSetting(a_record.profileName, setting)) {
+                recordedConfigSessions[a_record.profileName][modID] = a_record.configSession;
                 Deduplicate(pendingAutoBackupSettings, setting);
             }
             else {

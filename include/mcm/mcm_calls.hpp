@@ -77,7 +77,8 @@ namespace MCMMemory
         void Release(bool a_abandonPending = false);
 
         // Calls an MCM function asynchronously through the Papyrus VM.
-        bool Call(const MCMScript& a_script, std::string_view a_modID, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_task, bool a_acceptConfirmation = false);
+        // Activation and commands may use longer timeout via a_allowLongCall.
+        bool Call(const MCMScript& a_script, std::string_view a_modID, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_task, bool a_acceptConfirmation = false, bool a_allowLongCall = false);
 
         // Checks the status of the pending MCM call.
         MCMCallStatus Check();
@@ -122,7 +123,7 @@ namespace MCMMemory
 
         std::chrono::steady_clock::time_point recoveryWaitEndsAt{};
 
-        float timeoutSeconds{ 30.0F };
+        float configuredTimeoutSeconds{}, timeoutSeconds{};
 
         bool recovering{};
 

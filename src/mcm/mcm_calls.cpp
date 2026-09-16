@@ -31,7 +31,7 @@ namespace MCMMemory
         }
         Consume();
         EndRecovery();
-        timeoutSeconds = GetSettings().scriptCallTimeoutSeconds;
+        configuredTimeoutSeconds = GetSettings().scriptCallTimeoutSeconds;
         return true;
     }
 
@@ -55,12 +55,14 @@ namespace MCMMemory
         }
     }
 
-    bool MCMCallWatch::Call(const MCMScript& a_script, std::string_view a_modID, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_task, bool a_acceptConfirmation)
+    bool MCMCallWatch::Call(const MCMScript& a_script, std::string_view a_modID, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_task, bool a_acceptConfirmation, bool a_allowLongCall)
     {
         if (owner.load() != this || pending || IsUnavailable(a_modID)) {
             delete a_arguments;
             return false;
         }
+        const bool lifecycleCall = a_functionName == "OpenConfig" || a_functionName == "SetPage" || a_functionName == "CloseConfig";
+        timeoutSeconds = a_allowLongCall || lifecycleCall ? configuredTimeoutSeconds : std::min(configuredTimeoutSeconds, mcmControlTimeoutSeconds);
         pending = std::make_shared<MCMCallState>();
         pending->modID = a_modID;
         pending->functionName = a_functionName;

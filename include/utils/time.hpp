@@ -24,6 +24,9 @@ namespace MCMMemory
     inline constexpr uint32_t maximumProfileSaveRetries = 3;
     inline constexpr auto profileSaveIdleDelay = std::chrono::seconds(5);
 
+    // Normal control calls use at most five seconds before recovery starts.
+    inline constexpr float mcmControlTimeoutSeconds{ 5.0F };
+
     // A watchdog for MCMs that fail to respond.
     inline constexpr float mcmWatchIntervalSeconds{ 0.5F };
     inline constexpr float mcmRecoverySeconds{ 10.0F };

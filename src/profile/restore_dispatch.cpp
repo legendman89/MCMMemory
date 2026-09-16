@@ -5,14 +5,14 @@
 
 namespace MCMMemory
 {
-    bool Restore::CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_result, bool a_acceptConfirmation)
+    bool Restore::CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_result, bool a_acceptConfirmation, bool a_allowLongCall)
     {
         if (a_mcmIndex >= restoreMCMs.size()) {
             delete a_arguments;
             return false;
         }
         const auto& mcm = restoreMCMs[a_mcmIndex];
-        return callWatch.Call(MCMScript(mcm.mcmScript), mcm.identity.modID, a_functionName, a_arguments, std::move(a_result), a_acceptConfirmation);
+        return callWatch.Call(MCMScript(mcm.mcmScript), mcm.identity.modID, a_functionName, a_arguments, std::move(a_result), a_acceptConfirmation, a_allowLongCall);
     }
 
     bool Restore::RestoreToggle(const RestoreAction& a_action, std::function<void()> a_result)
@@ -248,7 +248,7 @@ namespace MCMMemory
 
         if (a_action.type == RestoreActionType::ApplyCommand) {
             logger::info("Replaying command '{}' in '{}'", a_action.optionLabel, restoreMCMs[a_action.mcmIndex].identity.modID);
-            return CallMCMFunction(a_action.mcmIndex, "SelectOption", RE::MakeFunctionArguments(int{ a_action.optionIndex }), std::move(a_result), a_action.confirmedCommand);
+            return CallMCMFunction(a_action.mcmIndex, "SelectOption", RE::MakeFunctionArguments(int{ a_action.optionIndex }), std::move(a_result), a_action.confirmedCommand, true);
         }
 
         if (a_action.type == RestoreActionType::ApplyClicks) {
@@ -297,7 +297,7 @@ namespace MCMMemory
             }
             a_action.optionIndex = *optionIndex;
             logger::info("Activating MCM '{}' before restoring its settings", restoreMCMs[a_action.mcmIndex].identity.modID);
-            return CallMCMFunction(a_action.mcmIndex, "SelectOption", RE::MakeFunctionArguments(int{ *optionIndex }), std::move(a_result), true);
+            return CallMCMFunction(a_action.mcmIndex, "SelectOption", RE::MakeFunctionArguments(int{ *optionIndex }), std::move(a_result), true, true);
         }
 
         auto functionName = RestoreActionFunctionName(a_action.type);
@@ -317,7 +317,7 @@ namespace MCMMemory
         case RestoreArgumentType::OptionIndex:
             return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.optionIndex }), std::move(a_result));
         case RestoreArgumentType::IntegerValue:
-            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.integerValue }), std::move(a_result), a_action.command && a_action.confirmedCommand);
+            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.integerValue }), std::move(a_result), a_action.command && a_action.confirmedCommand, a_action.command);
         case RestoreArgumentType::FloatValue:
             return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(float{ a_action.floatValue }), std::move(a_result));
         case RestoreArgumentType::StringValue:

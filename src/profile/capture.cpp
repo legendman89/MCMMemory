@@ -356,7 +356,8 @@ namespace MCMMemory
 
     void Capture::ShowAutoBackupResults()
     {
-        if (pendingAutoBackupSettings.empty()) {
+        // Inactivity saves keep accumulating results until the player closes the journal.
+        if (journalMenuOpen || pendingAutoBackupSettings.empty()) {
             return;
         }
 

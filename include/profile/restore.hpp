@@ -369,7 +369,7 @@ namespace MCMMemory
         bool IsActionPageReady(const RestoreAction& a_action) const;
 
         // Calls one function on a live MCM script.
-        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_result, bool a_acceptConfirmation = false);
+        bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_result, bool a_acceptConfirmation = false, bool a_allowLongCall = false);
 
         // Flips a toggle only when its current state differs from the profile.
         bool RestoreToggle(const RestoreAction& a_action, std::function<void()> a_result);

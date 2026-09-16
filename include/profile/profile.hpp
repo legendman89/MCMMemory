@@ -126,8 +126,8 @@ namespace MCMMemory
         // Converts one JSON setting into a CapturedSetting.
         static bool FromJson(const nlohmann::json& a_document, CapturedSetting& a_setting);
         
-        // Converts the in-memory profile into its JSON layout.
-        static nlohmann::json ToJson(const Profile& a_profile);
+        // Converts the in-memory profile into its JSON format.
+        static nlohmann::ordered_json ToJson(const Profile& a_profile);
 
         inline static std::mutex profileMutex;
 

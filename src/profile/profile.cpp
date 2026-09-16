@@ -318,10 +318,10 @@ namespace MCMMemory
         return (a_setting.type != ControlType::Unknown || (a_setting.command && a_setting.recorded)) && !a_setting.selection.identity.modID.empty() && a_setting.selection.optionIndex >= 0 && !a_setting.value.is_null();
     }
 
-    nlohmann::json ProfileStorage::ToJson(const Profile& a_profile)
+    nlohmann::ordered_json ProfileStorage::ToJson(const Profile& a_profile)
     {
-        // Keep selection fields flat and omit the temporary MCM list index.
-        nlohmann::json document;
+        // Keep the profile description before its saved MCM data.
+        nlohmann::ordered_json document;
         document["formatVersion"] = 2;
         document["purpose"] = "Persistent MCM settings profile";
         // Value is the default, so only mods that record actions are written here.

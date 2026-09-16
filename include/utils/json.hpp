@@ -60,24 +60,25 @@ namespace MCMMemory
             return decoded;
         }
 
-        static nlohmann::json EncodeDocumentText(const nlohmann::json& a_document, std::string_view a_path = "$")
+        template <class Json>
+        static Json EncodeDocumentText(const Json& a_document, std::string_view a_path = "$")
         {
             if (a_document.is_string()) {
-                const auto& text = a_document.get_ref<const std::string&>();
+                const auto& text = a_document.template get_ref<const std::string&>();
                 if (!IsValidUTF8(text)) {
                     logger::warn("Encoded malformed UTF-8 JSON text at {}", a_path);
                 }
                 return EncodeText(text);
             }
             if (a_document.is_array()) {
-                auto encoded = nlohmann::json::array();
+                auto encoded = Json::array();
                 for (size_t index = 0; index < a_document.size(); ++index) {
                     encoded.push_back(EncodeDocumentText(a_document[index], std::format("{}[{}]", a_path, index)));
                 }
                 return encoded;
             }
             if (a_document.is_object()) {
-                auto encoded = nlohmann::json::object();
+                auto encoded = Json::object();
                 for (auto item = a_document.begin(); item != a_document.end(); ++item) {
                     const auto key = EncodeText(item.key());
                     encoded[key] = EncodeDocumentText(item.value(), std::format("{}.{}", a_path, IsValidUTF8(item.key()) ? item.key() : "<invalid-key>"));
@@ -112,7 +113,8 @@ namespace MCMMemory
             return a_document;
         }
 
-        static std::string Dump(const nlohmann::json& a_document, int a_indent = -1)
+        template <class Json>
+        static std::string Dump(const Json& a_document, int a_indent = -1)
         {
             try {
                 return a_document.dump(a_indent);
@@ -154,7 +156,8 @@ namespace MCMMemory
             return value->get<std::string>();
         }
 
-        static bool WriteFile(const std::filesystem::path& a_path, const nlohmann::json& a_document)
+        template <class Json>
+        static bool WriteFile(const std::filesystem::path& a_path, const Json& a_document)
         {
             std::error_code error;
             std::filesystem::create_directories(a_path.parent_path(), error);

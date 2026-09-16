@@ -4,18 +4,20 @@
 
 namespace MCMMemory
 {
-    bool CaptureStorage::Save(const std::vector<CaptureRecord>& a_records, const std::vector<CapturedSetting>& a_settings, bool a_includeRawRecords)
+    bool CaptureStorage::Save(const std::vector<CaptureRecord>& a_records, const std::vector<CapturedSetting>& a_settings, bool a_debugEnabled)
     {
+        if (!a_debugEnabled) {
+            return true;
+        }
+
         nlohmann::json document;
         document["formatVersion"] = 1;
         document["purpose"] = "Current-session MCM registry capture debugging";
-        document["rawRecordsIncluded"] = a_includeRawRecords;
+        document["rawRecordsIncluded"] = true;
         document["records"] = nlohmann::json::array();
         document["settings"] = nlohmann::json::array();
-        if (a_includeRawRecords) {
-            for (const auto& record : a_records) {
-                document["records"].push_back(ToJson(record));
-            }
+        for (const auto& record : a_records) {
+            document["records"].push_back(ToJson(record));
         }
         for (const auto& setting : a_settings) {
             document["settings"].push_back(JSON::ToJson(setting));
@@ -24,7 +26,7 @@ namespace MCMMemory
         if (!JSON::WriteFile(Path(), document)) {
             return false;
         }
-        logger::info("Saved {} settings and {} raw records to {}", a_settings.size(), a_includeRawRecords ? a_records.size() : 0, ToUTF8(Path()));
+        logger::info("Saved {} settings and {} raw records to {}", a_settings.size(), a_records.size(), ToUTF8(Path()));
         return true;
     }
 

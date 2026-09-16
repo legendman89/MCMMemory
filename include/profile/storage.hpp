@@ -10,7 +10,8 @@ namespace MCMMemory
 
         static inline std::filesystem::path Path() { return GetPluginDataPath() / "Capture.json"; }
 
-        static bool Save(const std::vector<CaptureRecord>& a_records, const std::vector<CapturedSetting>& a_settings, bool a_includeRawRecords);
+        // Writes Capture.json only when capture debugging is enabled.
+        static bool Save(const std::vector<CaptureRecord>& a_records, const std::vector<CapturedSetting>& a_settings, bool a_debugEnabled);
 
         static nlohmann::json ToJson(const CaptureRecord& a_record);
 

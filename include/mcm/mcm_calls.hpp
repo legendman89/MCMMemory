@@ -23,7 +23,7 @@ namespace MCMMemory
         void operator()() const { operation->CheckCalls(loadedGameSession); }
     };
 
-    // The VM callback only publishes completion. Operation state stays on game tasks.
+    // The VM callback only announces completion. Operation state stays on game tasks.
     struct MCMCallState
     {
         std::string modID;

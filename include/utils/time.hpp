@@ -18,10 +18,7 @@ namespace MCMMemory
     // Recorded commands can wait for the player to answer a confirmation dialog.
     inline constexpr uint32_t maximumCommandCaptureReads = 600;
 
-    // Retry profile saves every 5 seconds, up to three times.
-    // TODO: I can inject several failing saves to test this more aggressively.
-    inline constexpr float profileSaveRetryDelaySeconds = 5.0F;
-    inline constexpr uint32_t maximumProfileSaveRetries = 3;
+    // Save captured changes after five seconds without another change.
     inline constexpr auto profileSaveIdleDelay = std::chrono::seconds(5);
 
     // Normal control calls use at most five seconds before recovery starts.

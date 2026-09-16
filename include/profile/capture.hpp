@@ -167,11 +167,14 @@ namespace MCMMemory
             return record != records.rend() ? std::addressof(*record) : nullptr;
         }
 
+        inline void CancelProfileSaveTask()
+        {
+            ++profileSaveTaskID;
+            profileSaveTaskQueued = false;
+        }
+
         // Saves the current changes to the active profile and clears the pending list.
         bool SaveProfileChanges();
-
-        // Queues a retry for pending profile changes when the last save failed.
-        bool QueueProfileSaveRetry();
 
         // Extends one queued save until settings have stopped changing.
         void DelayProfileSave();
@@ -179,8 +182,6 @@ namespace MCMMemory
         bool QueueProfileSave(float a_delaySeconds);
 
         void RunProfileSave(uint64_t a_taskID);
-
-        void CancelProfileSaveTask();
 
         // Takes the first safe menu read after the callback returns.
         void ReadMenu(const CaptureRequest& a_request);
@@ -268,15 +269,12 @@ namespace MCMMemory
         // Old reads must not run against a newly opened Journal Menu.
         uint64_t menuOpenedEventID{};
 
-        // Invalidates older inactivity and retry tasks after a save or session change.
+        // Invalidates older inactivity tasks after a save or session change.
         uint64_t profileSaveTaskID{};
 
         // Counts how many times an MCM config was opened. Settings recorded under different
         // counts are separated by an OnConfigClose that the restore has to replay.
         uint32_t configSession{ 1 };
-
-        // Counts retry attempts for saving a profile when the last save failed.
-        uint32_t profileSaveRetryCount{};
 
         // Prevents the event listeners from being installed twice.
         bool installed{};
@@ -284,11 +282,8 @@ namespace MCMMemory
         // Rejects delayed reads after the Journal Menu closes.
         bool journalMenuOpen{};
 
-        // Keeps inactivity saves and retries on one queued task.
+        // Keeps inactivity saves on one queued task.
         bool profileSaveTaskQueued{};
-
-        // The shared save task is waiting for inactivity rather than retrying a failed write.
-        bool profileSaveAfterInactivity{};
 
     };
 
@@ -304,8 +299,7 @@ namespace MCMMemory
     }
 
     // A text row that shows its own value can be replayed by clicking it, but a command button
-    // like Save or Reset must never become a setting. Accepting the row rewrites its type to Cycle,
-    // which hides it from the command check later.
+    // like Save or Reset must never become a setting.
     inline bool IsRecordableTextSetting(const CaptureRecord& a_record)
     {
         if (!GetSettings().recordActions || !a_record.control || !IsRecordableTextControl(*a_record.control)) {

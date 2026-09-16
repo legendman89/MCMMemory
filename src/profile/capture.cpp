@@ -66,42 +66,19 @@ namespace MCMMemory
 
     bool Capture::SaveProfileChanges()
     {
-        if (profileSaveAfterInactivity) {
-            CancelProfileSaveTask();
-        }
+        CancelProfileSaveTask();
         if (!ProfileStorage::FlushPending()) {
-            const bool retryQueued = QueueProfileSaveRetry();
-            if (profileSaveRetryCount == 0 || !retryQueued) {
-                HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", retryQueued ? "HUD.Failure.ProfileSaveRetry" : "HUD.Failure.ProfileSavePending");
-            }
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupFailed", "HUD.Failure.ProfileSavePending");
             return false;
         }
-        CancelProfileSaveTask();
         ShowAutoBackupResults();
         return true;
-    }
-
-    void Capture::CancelProfileSaveTask()
-    {
-        ++profileSaveTaskID;
-        profileSaveTaskQueued = false;
-        profileSaveRetryCount = 0;
-        profileSaveAfterInactivity = false;
     }
 
     void Capture::DelayProfileSave()
     {
         profileSaveAt = TimeAfter(std::chrono::steady_clock::now(), profileSaveIdleDelay);
-        profileSaveAfterInactivity = true;
         QueueProfileSave(std::chrono::duration<float>(profileSaveIdleDelay).count());
-    }
-
-    bool Capture::QueueProfileSaveRetry()
-    {
-        if (journalMenuOpen || profileSaveRetryCount >= maximumProfileSaveRetries) {
-            return false;
-        }
-        return QueueProfileSave(profileSaveRetryDelaySeconds);
     }
 
     bool Capture::QueueProfileSave(float a_delaySeconds)
@@ -129,32 +106,22 @@ namespace MCMMemory
         if (!IsGameLoaded()) {
             return;
         }
-        if (profileSaveAfterInactivity) {
-            const float remainingSeconds = SecondsUntil(profileSaveAt, std::chrono::steady_clock::now());
-            if (remainingSeconds > 0.0F) {
-                QueueProfileSave(remainingSeconds);
-                return;
-            }
-            for (const auto& record : records) {
-                if (record.eventID > menuOpenedEventID && record.capturePending) {
-                    QueueProfileSave(profileSaveRetryDelaySeconds);
-                    return;
-                }
-            }
-            if (MCMCallWatch::IsBusy()) {
-                QueueProfileSave(profileSaveRetryDelaySeconds);
-                return;
-            }
-            logger::info("Saving pending profile changes after MCM inactivity");
-            SaveProfileChanges();
+        const float remainingSeconds = SecondsUntil(profileSaveAt, std::chrono::steady_clock::now());
+        if (remainingSeconds > 0.0F) {
+            QueueProfileSave(remainingSeconds);
             return;
         }
-        auto* ui = RE::UI::GetSingleton();
-        if (!ui || journalMenuOpen || ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
+        for (const auto& record : records) {
+            if (record.eventID > menuOpenedEventID && record.capturePending) {
+                QueueProfileSave(std::chrono::duration<float>(profileSaveIdleDelay).count());
+                return;
+            }
+        }
+        if (MCMCallWatch::IsBusy()) {
+            QueueProfileSave(std::chrono::duration<float>(profileSaveIdleDelay).count());
             return;
         }
-        ++profileSaveRetryCount;
-        logger::info("Retrying pending profile saves ({}/{})", profileSaveRetryCount, maximumProfileSaveRetries);
+        logger::info("Saving pending profile changes after MCM inactivity");
         SaveProfileChanges();
     }
 
@@ -233,7 +200,7 @@ namespace MCMMemory
         }
 
         auto eventID = RecordEvent(type, *a_event);
-        if (IsValueChange(type) && profileSaveAfterInactivity) {
+        if (IsValueChange(type) && profileSaveTaskQueued) {
             DelayProfileSave();
         }
         

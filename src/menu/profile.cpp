@@ -22,6 +22,10 @@ namespace MCMMemory::Menu
             return a_left.originalIndex < a_right.originalIndex;
         }
 
+        if (bySelected && a_left.selected != a_right.selected) {
+            return descending ? a_left.selected : a_right.selected;
+        }
+
         if (bySettingCount && a_left.settingCount != a_right.settingCount) {
             return descending ? a_left.settingCount > a_right.settingCount : a_left.settingCount < a_right.settingCount;
         }
@@ -278,6 +282,7 @@ namespace MCMMemory::Menu
 
     void ProfileMenu::SelectVisibleMCMs(bool a_selected)
     {
+        sortPending = true;
         for (auto& mcm : mcms) {
             if (!a_selected) {
                 mcm.selected = false;
@@ -605,15 +610,14 @@ namespace MCMMemory::Menu
             return;
         }
 
-        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.Selected").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_NoSort, 75.0F);
+        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.Selected").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, 75.0F);
         GUI::TableSetupColumn(Trans::Tr("Common.MCM").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 600.0F);
         GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.SavedSettings").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, 160.0F);
         GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.AutoRestore").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_NoSort, 105.0F);
         GUI::TableNextRow(GUI::ImGuiTableRowFlags_Headers);
         GUI::TableSetColumnIndex(0);
         const auto selectedLabel = Trans::Tr("Profile.MCM.Column.Selected");
-        CenterNextItem(GUI::CalcTextSize(selectedLabel.c_str()).x);
-        GUI::TextUnformatted(selectedLabel.c_str());
+        GUI::TableHeader(selectedLabel.c_str());
         GUI::TableSetColumnIndex(1);
         GUI::TableHeader(Trans::Tr("Common.MCM").c_str());
         GUI::TableSetColumnIndex(2);
@@ -629,6 +633,7 @@ namespace MCMMemory::Menu
             order.originalOrder = sortSpecs->SpecsCount == 0;
             if (!order.originalOrder) {
                 const auto& column = sortSpecs->Specs[0];
+                order.bySelected = column.ColumnIndex == 0;
                 order.bySettingCount = column.ColumnIndex == 2;
                 order.descending = column.SortDirection == GUI::ImGuiSortDirection_Descending;
             }
@@ -654,7 +659,9 @@ namespace MCMMemory::Menu
             GUI::BeginDisabled((!mcm.CanSelect() && !mcm.CanForget()) || !a_operationAvailable);
 
             CenterNextItem(GUI::GetFrameHeight());
-            GUI::Checkbox("##Selected", std::addressof(mcm.selected));
+            if (GUI::Checkbox("##Selected", std::addressof(mcm.selected))) {
+                sortPending = true;
+            }
 
             GUI::EndDisabled();
             WrappedTooltip(Trans::Tr("Profile.MCM.Column.Selected.Tooltip").c_str());

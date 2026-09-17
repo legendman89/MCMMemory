@@ -41,6 +41,8 @@ namespace MCMMemory::Menu
 
         bool originalOrder{};
 
+        bool bySelected{};
+
         bool bySettingCount{};
 
         bool descending{};

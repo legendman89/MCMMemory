@@ -88,12 +88,6 @@ namespace MCMMemory
         // Read SkyUI property, not a mod separate variable with the same name.
         RE::BSTSmartPointer<RE::BSScript::Array> ReadPageArray() const;
 
-        inline RE::BSTSmartPointer<RE::BSScript::Array> ReadArray(std::string_view a_name) const
-        {
-            const auto* value = FindVariable(a_name);
-            return value && value->IsArray() ? value->GetArray() : RE::BSTSmartPointer<RE::BSScript::Array>();
-        }
-
         std::optional<float> ReadNumber(std::string_view a_name, size_t a_index) const;
 
         std::optional<std::string> ReadString(std::string_view a_name, size_t a_index) const;
@@ -104,6 +98,12 @@ namespace MCMMemory
         {
             const auto* value = FindVariable(a_name);
             return value && value->IsInt() ? std::optional<int>(value->GetSInt()) : std::nullopt;
+        }
+
+        inline RE::BSTSmartPointer<RE::BSScript::Array> ReadArray(std::string_view a_name) const
+        {
+            const auto* value = FindVariable(a_name);
+            return value && value->IsArray() ? value->GetArray() : RE::BSTSmartPointer<RE::BSScript::Array>();
         }
 
         // Keeps the live config script alive while backup or restore is using it.

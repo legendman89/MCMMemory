@@ -125,16 +125,16 @@ namespace MCMMemory::Menu
 
         bool MatchesSearch(const ProfileMCMRow& a_mcm) const;
 
-        inline bool IsVisible(const ProfileMCMRow& a_mcm) const
-        {
-            return MatchesSearch(a_mcm) && (!hideUnavailable || a_mcm.available);
-        }
-
         ProfileMCMRow& FindOrAddMCM(const MCMIdentity& a_identity, const MCMFilter& a_selectedMCMs);
 
         SelectedMCMFilters ReadSelectedMCMs() const;
 
         void SelectVisibleMCMs(bool a_selected);
+
+        inline bool IsVisible(const ProfileMCMRow& a_mcm) const
+        {
+            return MatchesSearch(a_mcm) && (!hideUnavailable || a_mcm.available);
+        }
 
         std::vector<ProfileMCMRow> mcms;
 

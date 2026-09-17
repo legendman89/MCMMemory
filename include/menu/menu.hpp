@@ -140,22 +140,8 @@ namespace MCMMemory::Menu
         };
         const auto contentColor = GUI::GetColorU32(a_colors.text);
 
-        GUI::ImDrawListManager::AddText(
-            GUI::GetWindowDrawList(),
-            iconFont,
-            iconFontSize,
-            iconPosition,
-            contentColor,
-            iconText.c_str()
-        );
-        GUI::ImDrawListManager::AddText(
-            GUI::GetWindowDrawList(),
-            labelFont,
-            labelFontSize,
-            labelPosition,
-            contentColor,
-            a_label
-        );
+        GUI::ImDrawListManager::AddText( GUI::GetWindowDrawList(), iconFont, iconFontSize, iconPosition, contentColor, iconText.c_str() );
+        GUI::ImDrawListManager::AddText( GUI::GetWindowDrawList(), labelFont, labelFontSize, labelPosition, contentColor, a_label );
 
         if (!a_enabled) {
             GUI::EndDisabled();

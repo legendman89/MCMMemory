@@ -10,15 +10,16 @@ namespace MCMMemory::Menu
 {
     inline constexpr std::array<std::string_view, ToIndex(OperationMode::Count)> operationModeTranslationKeys
     {
-        "Activity.Mode.Automatic",
-        "Activity.Mode.Manual"
+#define DECLARE_OPERATION_MODE_KEY(name) "Activity.Mode." #name,
+        FOREACH_OPERATION_MODE(DECLARE_OPERATION_MODE_KEY)
+#undef DECLARE_OPERATION_MODE_KEY
     };
 
     inline constexpr std::array<std::string_view, ToIndex(OperationResult::Count)> operationResultTranslationKeys
     {
-        "Activity.Result.Completed",
-        "Activity.Result.Failed",
-        "Activity.Result.Cancelled"
+#define DECLARE_OPERATION_RESULT_KEY(name) "Activity.Result." #name,
+        FOREACH_OPERATION_RESULT(DECLARE_OPERATION_RESULT_KEY)
+#undef DECLARE_OPERATION_RESULT_KEY
     };
 
 #define MAKE_ACTIVITY_COLUMN(label, width, renderer, member) ActivityColumn{ label, width },

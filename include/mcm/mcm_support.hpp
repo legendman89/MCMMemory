@@ -323,17 +323,17 @@ namespace MCMMemory
             return std::addressof(singleton);
         }
 
-        void Install();
-
-        void Reset();
-
-        Status GetStatus()
+        inline Status GetStatus()
         {
             std::lock_guard lock(kickerMutex);
             return status;
         }
 
-        uint64_t CacheGeneration() const { return cacheGeneration.load(); }
+        inline uint64_t CacheGeneration() const { return cacheGeneration.load(); }
+
+        void Install();
+
+        void Reset();
 
         RE::BSEventNotifyControl ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*) override;
 
@@ -343,7 +343,7 @@ namespace MCMMemory
         {
             uint64_t loadedGameSession{};
 
-            void operator()() const { GetSingleton()->Check(loadedGameSession); }
+            inline void operator()() const { GetSingleton()->Check(loadedGameSession); }
         };
 
         bool IsKickDue() const;
@@ -413,12 +413,6 @@ namespace MCMMemory
             return HasMCMScript(a_modID, scriptName);
         }
 
-        static bool IsCommand(std::string_view a_modID, std::string_view a_stateName, int a_pageIndex, std::string_view a_optionLabel);
-
-        // Sorts MCM settings into their dependency order.
-        // MCMs listed in a_recordedMCMs are left alone: their profile order was captured.
-        static void OrderSettings(std::vector<CapturedSetting>& a_settings, const MCMFilter& a_recordedMCMs = {});
-
         static int RestoreOrder(const CapturedSetting& a_setting)
         {
             if (a_setting.settingID == "KillmoveOID") {
@@ -436,6 +430,12 @@ namespace MCMMemory
             // Ranged Killmoves set to Off disables the camera control.
             return a_setting.settingID == "RangedPerspectiveOID" ? 4 : 5;
         }
+
+        static bool IsCommand(std::string_view a_modID, std::string_view a_stateName, int a_pageIndex, std::string_view a_optionLabel);
+
+        // Sorts MCM settings into their dependency order.
+        // MCMs listed in a_recordedMCMs are left alone: their profile order was captured.
+        static void OrderSettings(std::vector<CapturedSetting>& a_settings, const MCMFilter& a_recordedMCMs = {});
     };
 
     // Reads stable setting IDs and values from MCM Helper JSON and INI files.
@@ -454,7 +454,7 @@ namespace MCMMemory
 
     private:
 
-        bool IsMCMHelperScript(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript) const
+        inline bool IsMCMHelperScript(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript) const
         {
             return MCMScript(a_mcmScript).IsBasedOn(mcmHelperBaseScriptName);
         }
@@ -485,13 +485,13 @@ namespace MCMMemory
             return std::addressof(singleton);
         }
 
-        bool IsRefreshing()
+        inline bool IsRefreshing()
         {
             std::lock_guard lock(registryMutex);
             return refreshing;
         }
 
-        uint64_t CacheGeneration()
+        inline uint64_t CacheGeneration()
         {
             std::lock_guard lock(registryMutex);
             return cacheGeneration;
@@ -533,7 +533,7 @@ namespace MCMMemory
         {
             MCMRegistryRequest request;
 
-            void operator()() const
+            inline void operator()() const
             {
                 MCMMenuRedoneRegistry::GetSingleton()->DispatchCount(request);
             }
@@ -545,7 +545,7 @@ namespace MCMMemory
 
             int menuCount{-1};
 
-            void operator()() const
+            inline void operator()() const
             {
                 MCMMenuRedoneRegistry::GetSingleton()->ReceiveCount(request, menuCount);
             }
@@ -559,7 +559,7 @@ namespace MCMMemory
 
             size_t registryIndex{};
 
-            void operator()() const
+            inline void operator()() const
             {
                 MCMMenuRedoneRegistry::GetSingleton()->ReceiveMenu(request, registryIndex, menuQuest);
             }
@@ -610,13 +610,13 @@ namespace MCMMemory
             return std::addressof(singleton);
         }
 
-        bool IsRefreshing()
+        inline bool IsRefreshing()
         {
             std::lock_guard lock(registryMutex);
             return refreshing;
         }
 
-        uint64_t CacheGeneration()
+        inline uint64_t CacheGeneration()
         {
             std::lock_guard lock(registryMutex);
             return cacheGeneration;
@@ -654,7 +654,7 @@ namespace MCMMemory
         {
             MCMRegistryRequest request;
 
-            void operator()() const
+            inline void operator()() const
             {
                 MCMMenuMaidRegistry::GetSingleton()->Dispatch(request, ResultType::Hired, "Hired");
             }
@@ -668,7 +668,7 @@ namespace MCMMemory
 
             ResultType type{};
 
-            void operator()() const
+            inline void operator()() const
             {
                 MCMMenuMaidRegistry::GetSingleton()->Receive(request, type, result);
             }

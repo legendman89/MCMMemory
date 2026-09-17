@@ -1,5 +1,6 @@
 #pragma once
 
+#include "profile/operation_defs.hpp"
 #include "profile/stats_defs.hpp"
 
 #include <cstdint>
@@ -9,8 +10,9 @@ namespace MCMMemory
 {
     enum class OperationMode
     {
-        Automatic,
-        Manual,
+#define DECLARE_OPERATION_MODE(name) name,
+        FOREACH_OPERATION_MODE(DECLARE_OPERATION_MODE)
+#undef DECLARE_OPERATION_MODE
         Count
     };
 

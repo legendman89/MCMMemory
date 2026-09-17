@@ -17,17 +17,17 @@ namespace MCMMemory
 
     enum class OperationResult
     {
-        Completed,
-        Failed,
-        Cancelled,
+#define DECLARE_OPERATION_RESULT(name) name,
+        FOREACH_OPERATION_RESULT(DECLARE_OPERATION_RESULT)
+#undef DECLARE_OPERATION_RESULT
         Count
     };
 
     inline constexpr std::array<std::string_view, ToIndex(OperationResult::Count)> operationResultNames
     {
-        "Completed",
-        "Failed",
-        "Cancelled"
+#define DECLARE_OPERATION_RESULT_NAME(name) #name,
+        FOREACH_OPERATION_RESULT(DECLARE_OPERATION_RESULT_NAME)
+#undef DECLARE_OPERATION_RESULT_NAME
     };
 
     inline std::string_view OperationResultName(OperationResult a_result)

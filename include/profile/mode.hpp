@@ -2,20 +2,26 @@
 
 #include "utils/helper.hpp"
 
+#define FOREACH_PROFILE_MODE(MODE) \
+    MODE(Value, "value") \
+    MODE(Action, "action")
+
 namespace MCMMemory
 {
     // Value keeps the final value of each control, Action keeps the order the player changed them in.
     enum class ProfileMode
     {
-        Value,
-        Action,
+#define DECLARE_PROFILE_MODE(name, text) name,
+        FOREACH_PROFILE_MODE(DECLARE_PROFILE_MODE)
+#undef DECLARE_PROFILE_MODE
         Count
     };
 
     inline constexpr std::array<std::string_view, ToIndex(ProfileMode::Count)> profileModeNames
     {
-        "value",
-        "action"
+#define DECLARE_PROFILE_MODE_NAME(name, text) text,
+        FOREACH_PROFILE_MODE(DECLARE_PROFILE_MODE_NAME)
+#undef DECLARE_PROFILE_MODE_NAME
     };
 
     inline std::string_view ProfileModeName(ProfileMode a_mode)

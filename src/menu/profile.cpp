@@ -16,9 +16,31 @@ namespace MCMMemory::Menu
 {
     inline constexpr auto ProfileFieldWidth{ 240.0F };
 
-    void ProfileMenu::RefreshProfileNames()
+    bool ProfileMCMRowOrder::operator()(const ProfileMCMRow& a_left, const ProfileMCMRow& a_right) const
     {
-        profileNames = Profiles::ReadNames();
+        if (originalOrder) {
+            return a_left.originalIndex < a_right.originalIndex;
+        }
+
+        if (bySettingCount && a_left.settingCount != a_right.settingCount) {
+            return descending ? a_left.settingCount > a_right.settingCount : a_left.settingCount < a_right.settingCount;
+        }
+
+        const auto leftName = GetDisplayModName(a_left.identity.modName);
+        const auto rightName = GetDisplayModName(a_right.identity.modName);
+        for (size_t index = 0; index < std::min(leftName.size(), rightName.size()); ++index) {
+            const auto leftCharacter = ToLowerASCII(static_cast<uchar_t>(leftName[index]));
+            const auto rightCharacter = ToLowerASCII(static_cast<uchar_t>(rightName[index]));
+            if (leftCharacter != rightCharacter) {
+                return descending ? leftCharacter > rightCharacter : leftCharacter < rightCharacter;
+            }
+        }
+
+        if (leftName.size() != rightName.size()) {
+            return descending ? leftName.size() > rightName.size() : leftName.size() < rightName.size();
+        }
+
+        return descending ? a_left.identity.modID > a_right.identity.modID : a_left.identity.modID < a_right.identity.modID;
     }
 
     void ProfileMenu::RenderProfileSelector(bool a_operationRunning)
@@ -183,6 +205,7 @@ namespace MCMMemory::Menu
 
         ProfileMCMRow row;
         row.identity = a_identity;
+        row.originalIndex = mcms.size();
         row.selected = ContainsMCMID(a_selectedMCMs, row.identity.modID);
         mcms.push_back(std::move(row));
         return mcms.back();
@@ -196,7 +219,10 @@ namespace MCMMemory::Menu
             registryWait.Reset();
             registrySettled = false;
         }
+
         mcms.clear();
+
+        sortPending = true;
 
         std::error_code error;
         profileAvailable = std::filesystem::exists(ProfileStorage::Path(), error) && !error;
@@ -223,7 +249,9 @@ namespace MCMMemory::Menu
                 MCMRegistry::Refresh();
             }
         }
+
         gameLoaded = currentGameLoaded;
+
         for (auto& mcm : mcms) {
             mcm.unresponsive = MCMCallWatch::IsUnavailable(mcm.identity.modID);
             if (!mcm.CanSelect() && !mcm.CanForget()) {
@@ -234,6 +262,7 @@ namespace MCMMemory::Menu
         if (profileAvailable) {
             profileWriteTime = std::filesystem::last_write_time(ProfileStorage::Path(), error);
         }
+
         nextRegistryRefresh = TimeAfter(std::chrono::steady_clock::now(), registryRefreshInterval);
         registryCacheGeneration = MCMRegistry::CacheGeneration();
         unavailableGeneration = MCMCallWatch::UnavailableGeneration();
@@ -272,8 +301,8 @@ namespace MCMMemory::Menu
         const bool operationAvailable = IsGameLoaded() && !operationRunning && !journalMenuOpen && !createProfileWindow.open && !deleteProfileWindow.open && !forgetMCMsWindow.open;
         std::string backupLabel = Trans::Tr("Profile.Action.BackUpNow");
         std::string restoreLabel = Trans::Tr("Profile.Action.RestoreNow");
-        unsigned backupIcon = Icons::kSave;
-        unsigned restoreIcon = Icons::kRestore;
+        uint32_t backupIcon = Icons::kSave;
+        uint32_t restoreIcon = Icons::kRestore;
         const Color::CTAColors* backupColors = std::addressof(Color::kBackupButtonColors);
         const Color::CTAColors* restoreColors = std::addressof(Color::kRestoreButtonColors);
         bool backupEnabled = operationAvailable;
@@ -571,28 +600,42 @@ namespace MCMMemory::Menu
 
         constexpr size_t maximumVisibleRows{ 10 };
         const float tableHeight = GUI::GetFrameHeightWithSpacing() * static_cast<float>(std::min(visibleMCMCount, maximumVisibleRows) + 1);
-        const auto tableFlags = GUI::ImGuiTableFlags_RowBg | GUI::ImGuiTableFlags_BordersInnerH | GUI::ImGuiTableFlags_BordersOuterH | GUI::ImGuiTableFlags_ScrollY;
+        const auto tableFlags = GUI::ImGuiTableFlags_RowBg | GUI::ImGuiTableFlags_BordersInnerH | GUI::ImGuiTableFlags_BordersOuterH | GUI::ImGuiTableFlags_ScrollY | GUI::ImGuiTableFlags_Sortable | GUI::ImGuiTableFlags_SortTristate;
         if (!GUI::BeginTable("Profile MCMs", 4, tableFlags, GUI::ImVec2{ 0.0F, tableHeight })) {
             return;
         }
 
-        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.Selected").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 75.0F);
+        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.Selected").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_NoSort, 75.0F);
         GUI::TableSetupColumn(Trans::Tr("Common.MCM").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 600.0F);
-        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.SavedSettings").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 160.0F);
-        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.AutoRestore").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 105.0F);
+        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.SavedSettings").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, 160.0F);
+        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.AutoRestore").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_NoSort, 105.0F);
         GUI::TableNextRow(GUI::ImGuiTableRowFlags_Headers);
         GUI::TableSetColumnIndex(0);
         const auto selectedLabel = Trans::Tr("Profile.MCM.Column.Selected");
         CenterNextItem(GUI::CalcTextSize(selectedLabel.c_str()).x);
         GUI::TextUnformatted(selectedLabel.c_str());
         GUI::TableSetColumnIndex(1);
-        GUI::TextUnformatted(Trans::Tr("Common.MCM").c_str());
+        GUI::TableHeader(Trans::Tr("Common.MCM").c_str());
         GUI::TableSetColumnIndex(2);
-        GUI::TextUnformatted(Trans::Tr("Profile.MCM.Column.SavedSettings").c_str());
+        GUI::TableHeader(Trans::Tr("Profile.MCM.Column.SavedSettings").c_str());
         GUI::TableSetColumnIndex(3);
         const auto autoRestoreLabel = Trans::Tr("Profile.MCM.Column.AutoRestore");
         CenterNextItem(GUI::CalcTextSize(autoRestoreLabel.c_str()).x);
         GUI::TextUnformatted(autoRestoreLabel.c_str());
+
+        auto* sortSpecs = GUI::TableGetSortSpecs();
+        if (sortSpecs && (sortSpecs->SpecsDirty || sortPending)) {
+            ProfileMCMRowOrder order;
+            order.originalOrder = sortSpecs->SpecsCount == 0;
+            if (!order.originalOrder) {
+                const auto& column = sortSpecs->Specs[0];
+                order.bySettingCount = column.ColumnIndex == 2;
+                order.descending = column.SortDirection == GUI::ImGuiSortDirection_Descending;
+            }
+            std::sort(mcms.begin(), mcms.end(), order);
+            sortSpecs->SpecsDirty = false;
+            sortPending = false;
+        }
 
         auto& settings = GetSettings();
         bool settingsChanged{};

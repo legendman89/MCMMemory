@@ -29,7 +29,7 @@ namespace MCMMemory
             std::string encoded(encodedTextPrefix);
             encoded.reserve(encodedTextPrefix.size() + a_text.size() * 2);
             for (const auto character : a_text) {
-                const auto byte = static_cast<unsigned char>(character);
+                const auto byte = static_cast<uchar_t>(character);
                 encoded.push_back(hexDigits[byte >> 4]);
                 encoded.push_back(hexDigits[byte & 0x0F]);
             }

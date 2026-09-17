@@ -32,6 +32,8 @@ namespace logger = SKSE::log;
 
 namespace MCMMemory
 {
+    using uchar_t = unsigned char;
+
     inline std::atomic<bool> gameLoaded{};
 
     inline bool IsGameLoaded()

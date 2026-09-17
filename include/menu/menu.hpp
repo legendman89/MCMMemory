@@ -80,7 +80,7 @@ namespace MCMMemory::Menu
         GUI::PushStyleColor(GUI::ImGuiCol_Text, a_colors.text);
     }
 
-    inline IconButtonMetrics MeasureIconButton(const char* a_label, const unsigned a_icon)
+    inline IconButtonMetrics MeasureIconButton(const char* a_label, const uint32_t a_icon)
     {
         IconButtonMetrics metrics;
         metrics.labelSize = GUI::CalcTextSize(a_label, nullptr, false, -1.0F);
@@ -103,7 +103,7 @@ namespace MCMMemory::Menu
     }
 
     template <class Colors>
-    inline bool RenderIconButton(const char* a_label, const unsigned a_icon, const Colors& a_colors, const bool a_enabled, const char* a_id, const GUI::ImVec2& a_size = {})
+    inline bool RenderIconButton(const char* a_label, const uint32_t a_icon, const Colors& a_colors, const bool a_enabled, const char* a_id, const GUI::ImVec2& a_size = {})
     {
         const auto iconText = FontAwesome::UnicodeToUtf8(a_icon);
         const auto* labelFont = GUI::GetFont();
@@ -174,13 +174,13 @@ namespace MCMMemory::Menu
         return clicked && a_enabled;
     }
 
-    inline bool IconCTAButton(const char* a_label, const bool a_enabled, const unsigned a_icon, const Color::CTAColors& a_colors, const GUI::ImVec2& a_size = {})
+    inline bool IconCTAButton(const char* a_label, const bool a_enabled, const uint32_t a_icon, const Color::CTAColors& a_colors, const GUI::ImVec2& a_size = {})
     {
         const auto& colors = a_enabled ? a_colors : Color::kDisabledButtonColors;
         return RenderIconButton(a_label, a_icon, colors, a_enabled, "CTAButton", a_size);
     }
 
-    inline bool IconButton(const char* a_label, const unsigned a_icon, const Color::ButtonColors& a_colors)
+    inline bool IconButton(const char* a_label, const uint32_t a_icon, const Color::ButtonColors& a_colors)
     {
         return RenderIconButton(a_label, a_icon, a_colors, true, "IconButton");
     }

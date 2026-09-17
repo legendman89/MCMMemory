@@ -158,7 +158,7 @@ namespace MCMMemory
         if (a_name.empty() || a_name.size() > 80 || a_name == "." || a_name == ".." || a_name.back() == ' ' || a_name.back() == '.') {
             return false;
         }
-        for (const unsigned char character : a_name) {
+        for (const uchar_t character : a_name) {
             if (character < 32 || std::string_view{ "<>:\"/\\|?*" }.contains(static_cast<char>(character))) {
                 return false;
             }
@@ -171,7 +171,7 @@ namespace MCMMemory
         const auto stem = a_name.substr(0, a_name.find('.'));
         std::string lower;
         lower.reserve(stem.size());
-        for (const unsigned char character : stem) {
+        for (const uchar_t character : stem) {
             lower.push_back(static_cast<char>(ToLowerASCII(character)));
         }
         if (lower == "con" || lower == "prn" || lower == "aux" || lower == "nul") {

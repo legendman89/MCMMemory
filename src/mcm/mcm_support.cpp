@@ -42,7 +42,7 @@ namespace MCMMemory
         for (size_t start = 0; start + a_status.disabledText.size() <= a_text.size(); ++start) {
             bool matches = true;
             for (size_t index = 0; index < a_status.disabledText.size(); ++index) {
-                if (ToLowerASCII(static_cast<unsigned char>(a_text[start + index])) != ToLowerASCII(static_cast<unsigned char>(a_status.disabledText[index]))) {
+                if (ToLowerASCII(static_cast<uchar_t>(a_text[start + index])) != ToLowerASCII(static_cast<uchar_t>(a_status.disabledText[index]))) {
                     matches = false;
                     break;
                 }

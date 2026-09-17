@@ -25,7 +25,7 @@ namespace MCMMemory
     inline void AddTextToHash(uint64_t& a_hash, std::string_view a_text)
     {
         for (const auto character : a_text) {
-            AddToHash(a_hash, static_cast<unsigned char>(character));
+            AddToHash(a_hash, static_cast<uchar_t>(character));
         }
     }
 
@@ -40,10 +40,10 @@ namespace MCMMemory
         }
     };
 
-    inline unsigned char ToLowerASCII(unsigned char a_character)
+    inline uchar_t ToLowerASCII(uchar_t a_character)
     {
         if (a_character >= 'A' && a_character <= 'Z') {
-            return static_cast<unsigned char>(a_character + ('a' - 'A'));
+            return static_cast<uchar_t>(a_character + ('a' - 'A'));
         }
         return a_character;
     }
@@ -54,7 +54,7 @@ namespace MCMMemory
             return false;
         }
         for (size_t index = 0; index < a_left.size(); ++index) {
-            if (ToLowerASCII(static_cast<unsigned char>(a_left[index])) != ToLowerASCII(static_cast<unsigned char>(a_right[index]))) {
+            if (ToLowerASCII(static_cast<uchar_t>(a_left[index])) != ToLowerASCII(static_cast<uchar_t>(a_right[index]))) {
                 return false;
             }
         }
@@ -72,8 +72,8 @@ namespace MCMMemory
         for (size_t start = 0; start + a_search.size() <= a_text.size(); ++start) {
             size_t index{};
             for (; index < a_search.size(); ++index) {
-                const auto textCharacter = static_cast<unsigned char>(a_text[start + index]);
-                const auto searchCharacter = static_cast<unsigned char>(a_search[index]);
+                const auto textCharacter = static_cast<uchar_t>(a_text[start + index]);
+                const auto searchCharacter = static_cast<uchar_t>(a_search[index]);
                 if (ToLowerASCII(textCharacter) != ToLowerASCII(searchCharacter)) {
                     break;
                 }
@@ -87,7 +87,7 @@ namespace MCMMemory
 
     inline bool IsWordCharacter(char a_character)
     {
-        const auto value = static_cast<unsigned char>(a_character);
+        const auto value = static_cast<uchar_t>(a_character);
         return (value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z') || (value >= '0' && value <= '9');
     }
 

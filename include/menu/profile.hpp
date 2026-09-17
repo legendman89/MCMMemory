@@ -4,6 +4,7 @@
 #include "mcm/mcm_calls.hpp"
 #include "menu/menu.hpp"
 #include "profile/types.hpp"
+#include "profile/profiles.hpp"
 
 namespace MCMMemory::Menu
 {
@@ -23,6 +24,8 @@ namespace MCMMemory::Menu
 
         MCMIdentity identity;
 
+        size_t originalIndex{};
+
         uint32_t settingCount{};
 
         bool available{};
@@ -30,6 +33,17 @@ namespace MCMMemory::Menu
         bool selected{};
 
         bool unresponsive{};
+    };
+
+    struct ProfileMCMRowOrder
+    {
+        bool operator()(const ProfileMCMRow& a_left, const ProfileMCMRow& a_right) const;
+
+        bool originalOrder{};
+
+        bool bySettingCount{};
+
+        bool descending{};
     };
 
     struct SelectedMCMFilters
@@ -97,8 +111,6 @@ namespace MCMMemory::Menu
 
         bool NeedsRefresh() const;
 
-        void RefreshProfileNames();
-
         void RenderProfileControls();
 
         void RenderProfileSelector(bool a_operationRunning);
@@ -136,6 +148,11 @@ namespace MCMMemory::Menu
             return MatchesSearch(a_mcm) && (!hideUnavailable || a_mcm.available);
         }
 
+        inline void RefreshProfileNames()
+        {
+            profileNames = Profiles::ReadNames();
+        }
+
         std::vector<ProfileMCMRow> mcms;
 
         std::vector<std::string> profileNames;
@@ -157,6 +174,8 @@ namespace MCMMemory::Menu
         uint64_t unavailableGeneration{};
 
         std::array<char, 128> search{};
+
+        bool sortPending{ true };
 
         bool loaded{};
 

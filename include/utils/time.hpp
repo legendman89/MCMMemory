@@ -18,8 +18,8 @@ namespace MCMMemory
     // Recorded commands can wait for the player to answer a confirmation dialog.
     inline constexpr uint32_t maximumCommandCaptureReads = 600;
 
-    // Save captured changes after five seconds without another change.
-    inline constexpr auto profileSaveIdleDelay = std::chrono::seconds(5);
+    // Save captured changes after k seconds without another change.
+    inline constexpr auto profileSaveIdleDelay = std::chrono::seconds(6);
 
     // Normal control calls use at most five seconds before recovery starts.
     inline constexpr float mcmControlTimeoutSeconds{ 5.0F };

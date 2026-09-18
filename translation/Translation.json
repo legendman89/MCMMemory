@@ -81,6 +81,7 @@
   "Profile.MCM.Column.AutoRestore": "Auto Restore",
   "Profile.MCM.Column.Selected.Tooltip": "Include this MCM when using Back Up Selected, Restore Selected or Forget Selected. An MCM that is no longer installed can still be selected to forget its saved settings.",
   "Profile.MCM.Column.AutoRestore.Tooltip": "Include this MCM in automatic restore. Manual restore is unaffected.",
+  "Profile.MCM.Column.Header.Tooltip": "Click to sort, click again to reverse, and click a third time to restore the original order.",
 
   "Profile.MCM.Tooltip.BackupRestore": "Select this MCM to back up or restore its settings.",
   "Profile.MCM.Tooltip.BackupOnly": "Select this MCM to back it up.",

@@ -610,18 +610,30 @@ namespace MCMMemory::Menu
             return;
         }
 
-        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.Selected").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, 75.0F);
+        const auto selectedLabel = Trans::Tr("Profile.MCM.Column.Selected");
+        const auto* style = GUI::GetStyle();
+        const float headerPadding = style ? style->FramePadding.x + 2.0F * style->CellPadding.x : 12.0F;
+        const float selectedWidth = std::max(GUI::GetFrameHeight(), GUI::CalcTextSize(selectedLabel.c_str()).x + GUI::GetFontSize() + headerPadding);
+        GUI::TableSetupColumn(selectedLabel.c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, selectedWidth);
         GUI::TableSetupColumn(Trans::Tr("Common.MCM").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 600.0F);
         GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.SavedSettings").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, 160.0F);
         GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.AutoRestore").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_NoSort, 105.0F);
         GUI::TableNextRow(GUI::ImGuiTableRowFlags_Headers);
         GUI::TableSetColumnIndex(0);
-        const auto selectedLabel = Trans::Tr("Profile.MCM.Column.Selected");
-        GUI::TableHeader(selectedLabel.c_str());
+
+        std::string paddedSelectedLabel = "  ";
+        paddedSelectedLabel += selectedLabel;
+        GUI::TableHeader(paddedSelectedLabel.c_str());
+        WrappedTooltip(Trans::Tr("Profile.MCM.Column.Header.Tooltip").c_str());
+
         GUI::TableSetColumnIndex(1);
         GUI::TableHeader(Trans::Tr("Common.MCM").c_str());
+        WrappedTooltip(Trans::Tr("Profile.MCM.Column.Header.Tooltip").c_str());
+
         GUI::TableSetColumnIndex(2);
         GUI::TableHeader(Trans::Tr("Profile.MCM.Column.SavedSettings").c_str());
+        WrappedTooltip(Trans::Tr("Profile.MCM.Column.Header.Tooltip").c_str());
+
         GUI::TableSetColumnIndex(3);
         const auto autoRestoreLabel = Trans::Tr("Profile.MCM.Column.AutoRestore");
         CenterNextItem(GUI::CalcTextSize(autoRestoreLabel.c_str()).x);

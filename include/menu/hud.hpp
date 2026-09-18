@@ -60,9 +60,9 @@ namespace MCMMemory
     {
         std::vector<HUDSegment> segments;
 
-        std::chrono::steady_clock::time_point createdAt{ std::chrono::steady_clock::now() };
+        TimePoint createdAt{ std::chrono::steady_clock::now() };
 
-        std::chrono::steady_clock::time_point showAt{};
+        TimePoint showAt{};
 
         HUDMessageType type{ HUDMessageType::MCMResult };
 
@@ -73,11 +73,11 @@ namespace MCMMemory
     {
         HUDMessage message;
 
-        std::chrono::steady_clock::time_point startedAt{};
+        TimePoint startedAt{};
 
-        std::chrono::steady_clock::time_point pausedAt{};
+        TimePoint pausedAt{};
 
-        std::chrono::steady_clock::time_point nextAt{};
+        TimePoint nextAt{};
 
         bool active{};
 
@@ -95,9 +95,9 @@ namespace MCMMemory
     {
         std::string detailKey;
 
-        std::chrono::steady_clock::time_point startedAt{};
+        TimePoint startedAt{};
 
-        std::chrono::steady_clock::time_point pausedAt{};
+        TimePoint pausedAt{};
 
         bool active{};
 
@@ -180,9 +180,9 @@ namespace MCMMemory
 
     private:
 
-        void StartPreview(const std::chrono::steady_clock::time_point& a_now);
+        void StartPreview(const TimePoint& a_now);
 
-        void StartMessage(HUDMessage a_message, const std::chrono::steady_clock::time_point& a_now)
+        void StartMessage(HUDMessage a_message, const TimePoint& a_now)
         {
             AppendBackupAge(a_message, a_now);
             display.message = std::move(a_message);
@@ -229,17 +229,17 @@ namespace MCMMemory
 
         void QueueFailure(HUDMessage a_message);
 
-        bool UpdateMenuDelay(bool a_blocked, const std::chrono::steady_clock::time_point& a_now);
+        bool UpdateMenuDelay(bool a_blocked, const TimePoint& a_now);
 
-        bool UpdateActiveMessage(const std::chrono::steady_clock::time_point& a_now);
+        bool UpdateActiveMessage(const TimePoint& a_now);
 
-        bool StartNextMessage(const std::chrono::steady_clock::time_point& a_now);
+        bool StartNextMessage(const TimePoint& a_now);
 
-        void AppendBackupAge(HUDMessage& a_message, const std::chrono::steady_clock::time_point& a_now) const;
+        void AppendBackupAge(HUDMessage& a_message, const TimePoint& a_now) const;
 
         void DrawMessage(const HUDMessage& a_message, float a_alpha) const;
 
-        void UpdateMenuWarning(bool a_blocked, const std::chrono::steady_clock::time_point& a_now);
+        void UpdateMenuWarning(bool a_blocked, const TimePoint& a_now);
 
         void DrawMenuWarning(float a_alpha) const;
 
@@ -252,7 +252,7 @@ namespace MCMMemory
 
         HUDWarning warning;
 
-        std::chrono::steady_clock::time_point menuResumeAt{};
+        TimePoint menuResumeAt{};
 
         HUDOptions options;
 

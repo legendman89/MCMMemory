@@ -1,5 +1,6 @@
 #pragma once
 
+#include "utils/time.hpp"
 #include "mcm/mcm_support.hpp"
 #include "mcm/mcm_calls.hpp"
 #include "menu/menu.hpp"
@@ -169,7 +170,7 @@ namespace MCMMemory::Menu
 
         std::filesystem::file_time_type profileWriteTime{};
 
-        std::chrono::steady_clock::time_point nextRegistryRefresh{};
+        TimePoint nextRegistryRefresh{};
 
         uint64_t registryCacheGeneration{};
 

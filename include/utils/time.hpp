@@ -5,6 +5,9 @@
 
 namespace MCMMemory
 {
+
+    using TimePoint = std::chrono::steady_clock::time_point;
+
     // Converts frame counts to seconds assuming a 60 FPS menu rate.
     inline constexpr float secondsPerFrame = 1.0F / 60.0F;
 
@@ -49,27 +52,27 @@ namespace MCMMemory
     // before deciding the control is gone.
     inline constexpr int maximumSettleChecks{ 5 };
 
-    inline bool IsTimeSet(const std::chrono::steady_clock::time_point& a_time)
+    inline bool IsTimeSet(const TimePoint& a_time)
     {
         return a_time.time_since_epoch().count() != 0;
     }
 
-    inline float SecondsSince(const std::chrono::steady_clock::time_point& a_startedAt, const std::chrono::steady_clock::time_point& a_now)
+    inline float SecondsSince(const TimePoint& a_startedAt, const TimePoint& a_now)
     {
         return std::chrono::duration<float>(a_now - a_startedAt).count();
     }
 
-    inline float SecondsUntil(const std::chrono::steady_clock::time_point& a_target, const std::chrono::steady_clock::time_point& a_now)
+    inline float SecondsUntil(const TimePoint& a_target, const TimePoint& a_now)
     {
         return SecondsSince(a_now, a_target);
     }
 
-    inline std::chrono::steady_clock::time_point TimeAfter(const std::chrono::steady_clock::time_point& a_time, std::chrono::steady_clock::duration a_delay)
+    inline TimePoint TimeAfter(const TimePoint& a_time, std::chrono::steady_clock::duration a_delay)
     {
         return a_time + a_delay;
     }
 
-    inline std::chrono::steady_clock::time_point TimeAfter(const std::chrono::steady_clock::time_point& a_time, float a_seconds)
+    inline TimePoint TimeAfter(const TimePoint& a_time, float a_seconds)
     {
         return TimeAfter(a_time, std::chrono::duration_cast<std::chrono::steady_clock::duration>(std::chrono::duration<float>(a_seconds)));
     }

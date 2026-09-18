@@ -1,5 +1,6 @@
 #pragma once
 
+#include "utils/time.hpp"
 #include "mcm/mcm_menu.hpp"
 #include "mcm/mcm_support.hpp"
 #include "mcm/mcm_registry.hpp"
@@ -258,7 +259,7 @@ namespace MCMMemory
         // Last recorded config session per profile and MCM. Reset on game load.
         std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> recordedConfigSessions;
 
-        std::chrono::steady_clock::time_point profileSaveAt{};
+        TimePoint profileSaveAt{};
 
         // Gives each new callback its eventID.
         uint64_t eventCount{};

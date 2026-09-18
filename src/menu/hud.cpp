@@ -225,7 +225,7 @@ namespace MCMMemory
         warning.Reset();
     }
 
-    void HUD::StartPreview(const std::chrono::steady_clock::time_point& a_now)
+    void HUD::StartPreview(const TimePoint& a_now)
     {
         HUDMessage message;
         message.type = HUDMessageType::Preview;
@@ -299,7 +299,7 @@ namespace MCMMemory
         notificationQueue.push_back(std::move(a_message));
     }
 
-    bool HUD::UpdateMenuDelay(bool a_blocked, const std::chrono::steady_clock::time_point& a_now)
+    bool HUD::UpdateMenuDelay(bool a_blocked, const TimePoint& a_now)
     {
         const bool previewActive = display.active && display.message.type == HUDMessageType::Preview;
         if (a_blocked && !previewActive) {
@@ -334,7 +334,7 @@ namespace MCMMemory
         return false;
     }
 
-    bool HUD::UpdateActiveMessage(const std::chrono::steady_clock::time_point& a_now)
+    bool HUD::UpdateActiveMessage(const TimePoint& a_now)
     {
         if (!display.active) {
             return false;
@@ -352,7 +352,7 @@ namespace MCMMemory
         return true;
     }
 
-    bool HUD::StartNextMessage(const std::chrono::steady_clock::time_point& a_now)
+    bool HUD::StartNextMessage(const TimePoint& a_now)
     {
         if (IsTimeSet(display.nextAt) && a_now < display.nextAt) {
             return false;
@@ -368,7 +368,7 @@ namespace MCMMemory
         return true;
     }
 
-    void HUD::AppendBackupAge(HUDMessage& a_message, const std::chrono::steady_clock::time_point& a_now) const
+    void HUD::AppendBackupAge(HUDMessage& a_message, const TimePoint& a_now) const
     {
         if (a_message.type != HUDMessageType::BackupSummary && a_message.type != HUDMessageType::Preview) {
             return;
@@ -445,7 +445,7 @@ namespace MCMMemory
         }
     }
 
-    void HUD::UpdateMenuWarning(bool a_blocked, const std::chrono::steady_clock::time_point& a_now)
+    void HUD::UpdateMenuWarning(bool a_blocked, const TimePoint& a_now)
     {
         if (!warning.active) {
             return;

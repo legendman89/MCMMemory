@@ -30,9 +30,9 @@ namespace MCMMemory
 
         std::string functionName;
 
-        std::chrono::steady_clock::time_point started;
+        TimePoint started;
 
-        std::chrono::steady_clock::time_point finished;
+        TimePoint finished;
 
         RE::BSScript::IStackCallbackFunctor* callback{};
 
@@ -121,7 +121,7 @@ namespace MCMMemory
 
         std::shared_ptr<MCMCallState> pending;
 
-        std::chrono::steady_clock::time_point recoveryWaitEndsAt{};
+        TimePoint recoveryWaitEndsAt{};
 
         float configuredTimeoutSeconds{}, timeoutSeconds{};
 

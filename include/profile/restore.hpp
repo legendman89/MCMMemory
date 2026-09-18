@@ -241,7 +241,7 @@ namespace MCMMemory
 
         RestoreStats previousStats;
 
-        std::chrono::steady_clock::time_point activationWaitEndsAt{};
+        TimePoint activationWaitEndsAt{};
 
         int queuedPageIndex{-1};
 

@@ -182,7 +182,7 @@ namespace MCMMemory
         a_setting.selection.optionIndex = *index;
         a_setting.optionLabel = a_record.control->optionLabel;
         a_setting.stateName = a_record.control->stateName;
-        const bool recordCommand = GetSettings().recordActions && a_record.type == EventType::OptionSelected && !IsProfileWriteCommand(a_setting.optionLabel, a_setting.stateName);
+        const bool recordCommand = CanRecordCommand(a_record);
         if (a_record.control->type == ControlType::Cycle) {
             if (!SkyUICycleSupport::ReadSetting(a_script, a_setting)) {
                 return false;
@@ -291,17 +291,12 @@ namespace MCMMemory
 
     bool Capture::CapturePendingCommand(CaptureRecord& a_record)
     {
-        if (a_record.captureComplete || !GetSettings().recordActions || a_record.profileName != GetSettings().activeProfile ||
-            a_record.type != EventType::OptionSelected || !a_record.control || a_record.control->type != ControlType::Unknown ||
-            a_record.confirmationCancelled || a_record.activationEvent) {
+        if (!IsPendingTextClick(a_record) || !CanRecordCommand(a_record) || ShouldSkipCapture(a_record)) {
             return false;
         }
         const auto& control = *a_record.control;
         const auto& selection = a_record.selection;
-        if (IsProfileWriteCommand(control.optionLabel, control.stateName) || MCMCommandSupport::IsExcludedPage(selection.identity.modID, selection.pageName, selection.pageIndex) || !GetMCMExclusionReason(selection.identity.modID).empty()) {
-            return false;
-        }
-        if (selection.identity.modName.empty() || selection.identity.modID.empty() || selection.optionIndex < 0 || control.optionLabel.empty()) {
+        if (!HasControlIdentity(selection, control.optionLabel)) {
             return false;
         }
 
@@ -325,7 +320,7 @@ namespace MCMMemory
             return;
         }
         for (auto& record : records) {
-            if (record.eventID > menuOpenedEventID && record.type == EventType::OptionSelected && !record.captureComplete && record.control && record.control->type == ControlType::Unknown) {
+            if (record.eventID > menuOpenedEventID && IsPendingTextClick(record)) {
                 CapturePendingCommand(record);
                 record.captureComplete = true;
                 record.capturePending = false;
@@ -333,7 +328,7 @@ namespace MCMMemory
         }
     }
 
-    bool Capture::ProcessCapturedEvent(CaptureRecord& a_record)
+    bool Capture::ShouldSkipCapture(const CaptureRecord& a_record) const
     {
         if (a_record.profileName != GetSettings().activeProfile) {
             return true;
@@ -344,6 +339,15 @@ namespace MCMMemory
 
         if (const auto reason = GetMCMExclusionReason(a_record.selection.identity.modID); !reason.empty()) {
             logger::debug("Skipped capture {}: {}", a_record.eventID, reason);
+            return true;
+        }
+
+        return a_record.activationEvent || a_record.confirmationCancelled;
+    }
+
+    bool Capture::ProcessCapturedEvent(CaptureRecord& a_record)
+    {
+        if (ShouldSkipCapture(a_record)) {
             return true;
         }
 
@@ -359,10 +363,6 @@ namespace MCMMemory
         }
 
         MCMScript mcmScript(activeMCMScript);
-        if (a_record.activationEvent || a_record.confirmationCancelled) {
-            return true;
-        }
-
         const bool menuSetting = setting.type == ControlType::Menu;
         if (menuSetting) {
             if (!activeMCMScript || !IsCapturePageCurrent(a_record)) {
@@ -399,7 +399,7 @@ namespace MCMMemory
             // Only known cycling text settings may be saved; ordinary text buttons are commands.
             // While recording, a text row that shows its own value can be replayed by clicking it.
             const bool recordableText = IsRecordableTextSetting(a_record);
-            const bool commandCandidate = GetSettings().recordActions && a_record.type == EventType::OptionSelected && a_record.control && !IsProfileWriteCommand(a_record.control->optionLabel, a_record.control->stateName);
+            const bool commandCandidate = CanRecordCommand(a_record);
             if (a_record.control && a_record.control->type != ControlType::Option && a_record.control->type != ControlType::Cycle && !recordableText && !commandCandidate) {
                 return true;
             }
@@ -514,10 +514,8 @@ namespace MCMMemory
         a_record.captureComplete = true;
         a_record.capturePending = false;
         // Incomplete settings stay in Capture.json but not in the selected profile.
-        a_setting.identityComplete = !a_setting.selection.identity.modName.empty() &&
-                                   !a_setting.selection.identity.modID.empty() && a_setting.selection.optionIndex >= 0 &&
-                                   !a_setting.optionLabel.empty() && (a_setting.type != ControlType::Unknown || a_setting.command) &&
-                                   !a_setting.valueSource.empty();
+        a_setting.identityComplete = HasControlIdentity(a_setting.selection, a_setting.optionLabel) &&
+                                     (a_setting.type != ControlType::Unknown || a_setting.command) && !a_setting.valueSource.empty();
 
         if (a_setting.identityComplete && GetSettings().autoBackup) {
             const auto& modID = a_setting.selection.identity.modID;

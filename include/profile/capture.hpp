@@ -174,6 +174,21 @@ namespace MCMMemory
             profileSaveTaskQueued = false;
         }
 
+        inline bool CanRecordCommand(const CaptureRecord& a_record) const
+        {
+            return GetSettings().recordActions && a_record.type == EventType::OptionSelected && a_record.control && !IsProfileWriteCommand(a_record.control->optionLabel, a_record.control->stateName);
+        }
+
+        inline bool HasControlIdentity(const MCMSelection& a_selection, std::string_view a_label) const
+        {
+            return !a_selection.identity.modName.empty() && !a_selection.identity.modID.empty() && a_selection.optionIndex >= 0 && !a_label.empty();
+        }
+
+        inline bool IsPendingTextClick(const CaptureRecord& a_record) const
+        {
+            return !a_record.captureComplete && a_record.type == EventType::OptionSelected && a_record.control && a_record.control->type == ControlType::Unknown;
+        }
+
         inline void SetCapturedCommand(CapturedSetting& a_setting, bool a_confirmed) const
         {
             a_setting.value = true;
@@ -182,6 +197,8 @@ namespace MCMMemory
             a_setting.confirmedCommand = a_confirmed;
             a_setting.valueSource = "event.optionSelected";
         }
+
+        bool ShouldSkipCapture(const CaptureRecord& a_record) const;
 
         // Saves the current changes to the active profile and clears the pending list.
         bool SaveProfileChanges();

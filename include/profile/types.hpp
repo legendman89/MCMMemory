@@ -136,7 +136,7 @@ namespace MCMMemory
 
         nlohmann::json value;
 
-        // Text a menu row shows for the stored index. A menu is the only control whose live value
+        // Text a menu row shows for the stored index. A menu is the only control whose current value
         // costs a script call to read, so this lets restore compare it for free.
         std::string valueText;
 
@@ -256,6 +256,12 @@ namespace MCMMemory
         RE::FormID senderFormID{};
 
         bool activationEvent{};
+
+        // NL_MCM dynamic pages require matching state names within the same page.
+        bool pageScopedState{};
+
+        // Stops queued reads from saving an action again after navigation.
+        bool captureComplete{};
 
         bool confirmationAccepted{};
 

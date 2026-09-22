@@ -191,6 +191,11 @@ namespace MCMMemory
             return RE::BSEventNotifyControl::kContinue;
         }
 
+        if (type == EventType::ModSelected || IsValueChange(type)) {
+            // Store older commands first so subsequent settings keep their recorded order.
+            CapturePendingCommands();
+        }
+
         // Keep the callback data now, then read Scaleform after this callback returns.
         UpdateSelectionFromEvent(type, *a_event);
 
@@ -212,7 +217,7 @@ namespace MCMMemory
     void Capture::ReadMenu(const CaptureRequest& a_request)
     {
         auto* record = FindRecord(a_request.eventID);
-        if (!record) {
+        if (!record || record->captureComplete) {
             return;
         }
 
@@ -231,7 +236,9 @@ namespace MCMMemory
             // Only a change can rebuild a page, and an unidentified MCM simply records no rebuild.
             auto activeMCM = MCMRegistry().ReadActiveMCM();
             if (activeMCM && activeMCM->identity.modID == record->selection.identity.modID) {
-                record->pageHash = MCMScript(activeMCM->mcmScript).ReadPageHash();
+                MCMScript script(activeMCM->mcmScript);
+                record->pageHash = script.ReadPageHash();
+                record->pageScopedState = NLMCMSupport::IsSupported(script);
             }
         }
         if (record->type == EventType::OptionHighlighted || record->type == EventType::MenuSelected || ControlTypeForEvent(record->type) == ControlType::Option) {
@@ -251,7 +258,7 @@ namespace MCMMemory
     {
         // Find the raw record made before the menu finished updating.
         auto* record = FindRecord(a_request.eventID);
-        if (!record) {
+        if (!record || record->captureComplete) {
             return;
         }
         record->capturePending = false;
@@ -261,7 +268,9 @@ namespace MCMMemory
 
         const bool pageReady = SyncOpeningPage(*record);
         if (pageReady && ControlTypeForEvent(record->type) == ControlType::Option && !IsCapturePageCurrent(*record)) {
-            logger::info("Stopped toggle capture {} after navigation or a newer change", a_request.eventID);
+            CapturePendingCommand(*record);
+            record->captureComplete = true;
+            logger::debug("Stopped automatic capture {} after navigation or a newer change", a_request.eventID);
             return;
         }
 
@@ -309,6 +318,9 @@ namespace MCMMemory
             logger::info("Journal Menu opened; watching for MCM configuration events");
         }
         else {
+            if (!MCMCallWatch::IsBusy()) {
+                CapturePendingCommands();
+            }
             journalMenuOpen = false;
             menuOpenedEventID = eventCount;
             ++configSession;
@@ -432,6 +444,10 @@ namespace MCMMemory
         record.senderFormID = a_event.sender ? a_event.sender->GetFormID() : 0;
         record.selection = selection;
         record.configSession = configSession;
+        if (a_type == EventType::OptionSelected) {
+            // Copy the highlighted identity before the handler can hide or replace its control.
+            RememberControl(record, false);
+        }
         records.push_back(std::move(record));
 
         logger::info("Captured {} with mod: '{}', modID: '{}', page: '{}', option: {}, str: '{}', num: {}", 

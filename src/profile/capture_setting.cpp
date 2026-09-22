@@ -79,7 +79,7 @@ namespace MCMMemory
         return true;
     }
 
-    void Capture::RememberControl(CaptureRecord& a_record)
+    void Capture::RememberControl(CaptureRecord& a_record, bool a_allowMenuRead)
     {
         if (a_record.control) {
             return;
@@ -102,11 +102,13 @@ namespace MCMMemory
                     auto number = JSON::ReadNumber(option, "numValue");
                     if (type && *type == static_cast<double>(SkyUIOptionType::Toggle) && number) {
                         a_record.control = previous->control;
+                        a_record.pageScopedState = previous->pageScopedState;
                         a_record.control->toggleValue = *number != 0.0;
                         return;
                     }
                     if (type && *type == static_cast<double>(SkyUIOptionType::Text) && text && !text->empty()) {
                         a_record.control = previous->control;
+                        a_record.pageScopedState = previous->pageScopedState;
                         a_record.control->valueText = std::move(*text);
                         return;
                     }
@@ -115,13 +117,15 @@ namespace MCMMemory
             }
             if (previous->selection.modIndex == a_record.selection.modIndex && previous->selection.pageIndex == a_record.selection.pageIndex && previous->selection.optionIndex == a_record.selection.optionIndex && previous->control) {
                 a_record.control = previous->control;
+                a_record.pageScopedState = previous->pageScopedState;
                 return;
             }
         }
 
-        if (!IsCapturePageCurrent(a_record)) {
+        if (!a_allowMenuRead || !IsCapturePageCurrent(a_record)) {
             return;
         }
+        
         for (auto later = records.rbegin(); later != records.rend() && later->eventID > a_record.eventID; ++later) {
             if (later->type == EventType::PageSelected) {
                 return;
@@ -133,6 +137,7 @@ namespace MCMMemory
             MCMScript script(activeMCM->mcmScript);
             if (script.IsPageReady(a_record.selection.pageIndex)) {
                 a_record.control = script.ReadControl(a_record.selection.optionIndex);
+                a_record.pageScopedState = NLMCMSupport::IsSupported(script);
                 if (a_record.control && a_record.control->type == ControlType::Option && !IsValueChange(a_record.type)) {
                     const auto option = MCMMenu::ReadOption(a_record.selection.optionIndex);
                     auto value = JSON::ReadNumber(option, "numValue");
@@ -218,11 +223,7 @@ namespace MCMMemory
         const bool unchangedToggle = *type == static_cast<double>(SkyUIOptionType::Toggle) && value && a_record.control->toggleValue && (*value != 0.0) == *a_record.control->toggleValue;
         if (recordCommand && (*type == static_cast<double>(SkyUIOptionType::Text) || unchangedToggle)) {
             a_setting.type = a_record.control->type;
-            a_setting.command = true;
-            a_setting.confirmedCommand = a_record.confirmationAccepted;
-            a_setting.recorded = true;
-            a_setting.value = true;
-            a_setting.valueSource = "event.optionSelected";
+            SetCapturedCommand(a_setting, a_record.confirmationAccepted);
             logger::info("Finished command capture {}: mod: '{}', option: '{}'", a_record.eventID, a_setting.selection.identity.modName, a_setting.optionLabel);
             return true;
         }
@@ -259,8 +260,12 @@ namespace MCMMemory
         // Instead of waiting to read the new state of the control, clicking on disabled means enabled,
         // so we remember that now because some activation controls close the MCM immediately.
         activation->enabled = !activation->enabled;
-        a_record.activationEvent = true;
         RememberActivation(*activation);
+        if (GetSettings().recordActions) {
+            // Leave this click for action recording. 
+            return false;
+        }
+        a_record.activationEvent = true;
         logger::info("Remembered MCM '{}' as {} for the next manual backup", a_record.selection.identity.modID, activation->enabled ? "enabled" : "disabled");
         if (GetSettings().autoBackup) {
             if (!ProfileStorage::UpdateActivation(a_record.profileName, activation->activation, activation->enabled)) {
@@ -282,6 +287,50 @@ namespace MCMMemory
             }
         }
         detectedActivations.push_back(a_activation);
+    }
+
+    bool Capture::CapturePendingCommand(CaptureRecord& a_record)
+    {
+        if (a_record.captureComplete || !GetSettings().recordActions || a_record.profileName != GetSettings().activeProfile ||
+            a_record.type != EventType::OptionSelected || !a_record.control || a_record.control->type != ControlType::Unknown ||
+            a_record.confirmationCancelled || a_record.activationEvent) {
+            return false;
+        }
+        const auto& control = *a_record.control;
+        const auto& selection = a_record.selection;
+        if (IsProfileWriteCommand(control.optionLabel, control.stateName) || MCMCommandSupport::IsExcludedPage(selection.identity.modID, selection.pageName, selection.pageIndex) || !GetMCMExclusionReason(selection.identity.modID).empty()) {
+            return false;
+        }
+        if (selection.identity.modName.empty() || selection.identity.modID.empty() || selection.optionIndex < 0 || control.optionLabel.empty()) {
+            return false;
+        }
+
+        // Initialization can hide its own control or wait for CloseConfig. No current menu read is needed.
+        CapturedSetting setting;
+        setting.sourceEventID = a_record.eventID;
+        setting.selection = selection;
+        setting.optionLabel = control.optionLabel;
+        setting.stateName = control.stateName;
+        setting.type = control.type;
+        setting.pageScopedState = a_record.pageScopedState;
+        SetCapturedCommand(setting, a_record.confirmationAccepted);
+        StoreCapturedSetting(a_record, std::move(setting));
+        logger::info("Captured command {} before leaving its control: mod: '{}', option: '{}'", a_record.eventID, selection.identity.modName, control.optionLabel);
+        return true;
+    }
+
+    void Capture::CapturePendingCommands()
+    {
+        if (!GetSettings().recordActions) {
+            return;
+        }
+        for (auto& record : records) {
+            if (record.eventID > menuOpenedEventID && record.type == EventType::OptionSelected && !record.captureComplete && record.control && record.control->type == ControlType::Unknown) {
+                CapturePendingCommand(record);
+                record.captureComplete = true;
+                record.capturePending = false;
+            }
+        }
     }
 
     bool Capture::ProcessCapturedEvent(CaptureRecord& a_record)
@@ -322,7 +371,7 @@ namespace MCMMemory
             }
             RememberControl(a_record);
             if (!a_record.control || a_record.control->type != ControlType::Menu) {
-                // Page and file commands can clear the live buffers before this read.
+                // Page and file commands can clear the current buffers before this read.
                 // A translated dialog title alone cannot tell us which command ran.
                 logger::debug("Ignored menu capture {} in '{}' without a confirmed control identity", a_record.eventID, setting.selection.identity.modID);
                 return true;
@@ -456,28 +505,34 @@ namespace MCMMemory
 
         }
 
+        StoreCapturedSetting(a_record, std::move(setting));
+        return true;
+    }
+
+    void Capture::StoreCapturedSetting(CaptureRecord& a_record, CapturedSetting a_setting)
+    {
+        a_record.captureComplete = true;
+        a_record.capturePending = false;
         // Incomplete settings stay in Capture.json but not in the selected profile.
-        setting.identityComplete = !setting.selection.identity.modName.empty() && 
-                                   !setting.selection.identity.modID.empty() && setting.selection.optionIndex >= 0 && 
-                                   !setting.optionLabel.empty() && (setting.type != ControlType::Unknown || setting.command) &&
-                                   !setting.valueSource.empty();
-                                   
-        if (setting.identityComplete && GetSettings().autoBackup) {
-            const auto& modID = setting.selection.identity.modID;
-            setting.reopensConfig = IsConfigReopened(a_record.profileName, modID, a_record.configSession);
-            if (ProfileStorage::UpdateSetting(a_record.profileName, setting)) {
+        a_setting.identityComplete = !a_setting.selection.identity.modName.empty() &&
+                                   !a_setting.selection.identity.modID.empty() && a_setting.selection.optionIndex >= 0 &&
+                                   !a_setting.optionLabel.empty() && (a_setting.type != ControlType::Unknown || a_setting.command) &&
+                                   !a_setting.valueSource.empty();
+
+        if (a_setting.identityComplete && GetSettings().autoBackup) {
+            const auto& modID = a_setting.selection.identity.modID;
+            a_setting.reopensConfig = IsConfigReopened(a_record.profileName, modID, a_record.configSession);
+            if (ProfileStorage::UpdateSetting(a_record.profileName, a_setting)) {
                 recordedConfigSessions[a_record.profileName][modID] = a_record.configSession;
-                Deduplicate(pendingAutoBackupSettings, setting);
+                Deduplicate(pendingAutoBackupSettings, a_setting);
                 DelayProfileSave();
             }
             else {
-                logger::error("Failed to update captured setting '{}' in the persistent profile", setting.optionLabel);
+                logger::error("Failed to update captured setting '{}' in the persistent profile", a_setting.optionLabel);
             }
         }
 
-        Deduplicate(settings, std::move(setting));
-        
-        return true;
+        Deduplicate(settings, std::move(a_setting));
     }
 
 }

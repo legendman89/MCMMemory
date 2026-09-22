@@ -3,7 +3,7 @@
 #include "profile/types.hpp"
 #include "utils/time.hpp"
 
-// Each supported MCM manager gives us the live scripts needed by backup and restore.
+// Each supported MCM manager gives us the registered scripts needed by backup and restore.
 
 namespace MCMMemory
 {
@@ -24,7 +24,7 @@ namespace MCMMemory
         // The script type helps distinguish them. Therefore, we combine mod name + script name.
         MCMIdentity identity;
 
-        // Live MCM script used by restore.
+        // MCM script instance used by restore.
         RE::BSTSmartPointer<RE::BSScript::Object> mcmScript;
 
         explicit MCMRegistryEntry(MCMIdentity a_identity, RE::BSTSmartPointer<RE::BSScript::Object> a_mcmScript) :
@@ -123,7 +123,7 @@ namespace MCMMemory
 
         static std::vector<MCMRegistryEntry> ReadSkyUIRegistry();
 
-        // Follows an MCM Unlocked marker to the live MCM script it represents.
+        // Follows an MCM Unlocked marker to the MCM script instance it represents.
         static std::optional<MCMRegistryEntry> ReadMCMFromMarker(RE::TESObjectREFR* a_marker, RE::BSScript::Internal::VirtualMachine* a_vm, RE::BSScript::IObjectHandlePolicy* a_policy);
 
         static void TryAddMarker(std::vector<RE::NiPointer<RE::TESObjectREFR>>& a_markers, RE::TESObjectREFR* a_reference, const RE::TESBoundObject* a_markerBase);

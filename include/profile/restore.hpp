@@ -234,7 +234,7 @@ namespace MCMMemory
         // Setting actions kept in their original profile order.
         std::vector<RestoreAction> settingActions;
 
-        // MCM Registry gives us this live MCM script after registration.
+        // MCM Registry gives us this MCM script instance after registration.
         RE::BSTSmartPointer<RE::BSScript::Object> mcmScript;
 
         std::optional<MCMActivation> activation;
@@ -368,7 +368,7 @@ namespace MCMMemory
         // True when SkyUI has finished building the page this action belongs to.
         bool IsActionPageReady(const RestoreAction& a_action) const;
 
-        // Calls one function on a live MCM script.
+        // Calls one function on a MCM script instance.
         bool CallMCMFunction(size_t a_mcmIndex, std::string_view a_functionName, RE::BSScript::IFunctionArguments* a_arguments, std::function<void()> a_result, bool a_acceptConfirmation = false, bool a_allowLongCall = false);
 
         // Flips a toggle only when its current state differs from the profile.
@@ -395,7 +395,7 @@ namespace MCMMemory
             }
         }
 
-        // Matches profile MCM IDs with their live config scripts.
+        // Matches profile MCM IDs with their registered config scripts.
         void MatchRegisteredMCMs(const std::vector<MCMRegistryEntry>& a_registeredMCMs);
 
         // Reads the current registry on the game task queue.

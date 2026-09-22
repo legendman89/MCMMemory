@@ -5,7 +5,7 @@ namespace MCMMemory
 {
     void Restore::MatchRegisteredMCMs(const std::vector<MCMRegistryEntry>& a_registeredMCMs)
     {
-        // Match saved stable IDs to the live MCM scripts.
+        // Match saved stable IDs to the registered MCM scripts.
         for (auto& mcm : restoreMCMs) {
             mcm.mcmScript = {};
             for (const auto& registeredMCM : a_registeredMCMs) {

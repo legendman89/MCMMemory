@@ -725,7 +725,7 @@ namespace MCMMemory
         }
         bool runAction = true;
         if (action.completed || directRequestUnneeded) {
-            // The live value already matches, so its preparation call is unnecessary.
+            // The current value already matches, so its preparation call is unnecessary.
             runAction = false;
         }
         else if (applyAction && requestFailed) {

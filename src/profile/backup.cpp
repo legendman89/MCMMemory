@@ -333,7 +333,7 @@ namespace MCMMemory
         }
 
         if (kickerStatus == MCMKickerSupport::Status::Ready) {
-            // Live capture stays enabled while Kicker registers, so reread any changes made while waiting.
+            // Automatic capture stays enabled while Kicker registers, so reread any changes made while waiting.
             if (!ReadExistingProfile(profile)) {
                 status = OperationStatus::Idle;
                 return;

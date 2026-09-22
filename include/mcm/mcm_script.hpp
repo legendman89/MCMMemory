@@ -58,7 +58,7 @@ namespace MCMMemory
         // Some mods clear the page to hide disabled controls.
         std::optional<int> FindControlIndex(const MCMControl& a_control, int a_previousIndex) const;
 
-        // Confirms the saved setting still points to the same live control before restore.
+        // Confirms the saved setting still points to the same current control before restore.
         bool MatchesControl(ControlType a_type, int a_optionIndex, std::string_view a_stateName) const;
 
         // These checks stop us from reading SkyUI buffers while it is still updating them.
@@ -106,7 +106,7 @@ namespace MCMMemory
             return value && value->IsArray() ? value->GetArray() : RE::BSTSmartPointer<RE::BSScript::Array>();
         }
 
-        // Keeps the live config script alive while backup or restore is using it.
+        // Keeps the config script instance alive while backup or restore is using it.
         RE::BSTSmartPointer<RE::BSScript::Object> script;
     };
 }

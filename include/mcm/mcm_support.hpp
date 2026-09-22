@@ -279,7 +279,7 @@ namespace MCMMemory
         // Finds the current option index for a saved activation control.
         static std::optional<int> FindOption(const MCMScript& a_script, const MCMActivation& a_activation);
 
-        // Checks whether a live control matches the saved activation control.
+        // Checks whether a current control matches the saved activation control.
         static bool MatchesControl(const MCMControl& a_control, const MCMActivation& a_activation);
 
         // Rechecks a stored command activation in older profiles, 
@@ -439,7 +439,7 @@ namespace MCMMemory
     };
 
     // Reads stable setting IDs and values from MCM Helper JSON and INI files.
-    // This is used to restore keymap settings from MCM Helper mods that don't provide a live MCM script.
+    // This is used to restore keymap settings from MCM Helper mods that don't provide a MCM script instance.
     class MCMHelperSupport
     {
     public:

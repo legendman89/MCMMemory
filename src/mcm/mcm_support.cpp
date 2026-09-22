@@ -30,7 +30,8 @@ namespace MCMMemory
             return false;
         }
         for (const auto term : ignoredMCMCommandTerms) {
-            if (ContainsCaseInsensitive(a_optionLabel, term)) {
+            // We compare whole words now to avoid matching "reset" in "preset" for example.
+            if (ContainsCaseInsensitiveWord(a_optionLabel, term)) {
                 return true;
             }
         }
@@ -818,7 +819,7 @@ namespace MCMMemory
             return std::nullopt;
         }
 
-        // InstanceScript points to the live MCM script represented by this marker.
+        // InstanceScript points to the MCM script instance represented by this marker.
         const RE::BSScript::Variable* mcmScriptValue = markerScript->GetProperty("InstanceScript");
         if (!mcmScriptValue || !mcmScriptValue->IsObject()) {
             mcmScriptValue = markerScript->GetVariable("::InstanceScript_var");

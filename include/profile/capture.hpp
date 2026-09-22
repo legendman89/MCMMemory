@@ -174,6 +174,15 @@ namespace MCMMemory
             profileSaveTaskQueued = false;
         }
 
+        inline void SetCapturedCommand(CapturedSetting& a_setting, bool a_confirmed) const
+        {
+            a_setting.value = true;
+            a_setting.command = true;
+            a_setting.recorded = true;
+            a_setting.confirmedCommand = a_confirmed;
+            a_setting.valueSource = "event.optionSelected";
+        }
+
         // Saves the current changes to the active profile and clears the pending list.
         bool SaveProfileChanges();
 
@@ -196,6 +205,13 @@ namespace MCMMemory
         // Returns false when a toggle still needs another read before saving.
         bool ProcessCapturedEvent(CaptureRecord& a_record);
 
+        // Handles unresolved text commands using their captured ID before leaving the MCM.
+        void CapturePendingCommands();
+
+        bool CapturePendingCommand(CaptureRecord& a_record);
+
+        void StoreCapturedSetting(CaptureRecord& a_record, CapturedSetting a_setting);
+
         // Saves a staged MCM enable choice separately from its normal settings.
         bool CaptureMCMActivation(CaptureRecord& a_record, const MCMScript& a_script);
 
@@ -203,7 +219,7 @@ namespace MCMMemory
 
         // Keeps the highlighted control or opened dropdown label and state before a redraw.
         // Needed for mods that clear a page to hide disabled controls.
-        void RememberControl(CaptureRecord& a_record);
+        void RememberControl(CaptureRecord& a_record, bool a_allowMenuRead = true);
 
         // Stops old reads after navigation or a newer setting change.
         bool IsCapturePageCurrent(const CaptureRecord& a_record) const;

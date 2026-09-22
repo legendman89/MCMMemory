@@ -68,7 +68,7 @@ namespace MCMMemory
             auto liveState = script.ReadStateName(a_action.optionIndex);
             auto liveLabel = script.ReadOptionLabel(a_action.optionIndex);
             const auto& modID = restoreMCMs[a_action.mcmIndex].identity.modID;
-            // Older profiles may not contain the state name. Check the live row as well.
+            // Older profiles may not contain the state name. Check the current row as well.
             const bool savedCommand = MCMCommandSupport::IsIgnored(modID, a_action.pageName, a_action.pageIndex, a_action.controlType, a_action.stateName, a_action.optionLabel);
             const bool liveCommand = MCMCommandSupport::IsIgnored(modID, page->name, page->index, a_action.controlType, liveState.value_or(""), liveLabel.value_or(""));
             if (savedCommand || liveCommand) {

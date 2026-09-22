@@ -120,7 +120,7 @@ namespace MCMMemory
             return {};
         }
 
-        // Cache the live scripts before doing any extra work with their names.
+        // Cache the registered scripts before doing any extra work with their names.
         std::vector<RE::BSTSmartPointer<RE::BSScript::Object>> mcmScripts;
         std::vector<size_t> registryIndices;
         mcmScripts.reserve(registeredMCMArray->size());

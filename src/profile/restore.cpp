@@ -1,5 +1,6 @@
 #include "menu/hud.hpp"
 #include "profile/restore.hpp"
+#include "session.hpp"
 
 #include "mcm/mcm_support.hpp"
 #include "utils/helper.hpp"
@@ -182,16 +183,22 @@ namespace MCMMemory
             return RE::BSEventNotifyControl::kContinue;
         }
 
+        CheckAutomaticRestore();
+        return RE::BSEventNotifyControl::kContinue;
+    }
+
+    void Restore::CheckAutomaticRestore()
+    {
         std::lock_guard lock(restoreMutex);
         if (started || !autoRestoreAllowed || !GetSettings().autoRestore) {
-            return RE::BSEventNotifyControl::kContinue;
+            return;
         }
         if (!configLoaded) {
             configLoaded = true;
             configValid = LoadProfile();
         }
         if (!configValid) {
-            return RE::BSEventNotifyControl::kContinue;
+            return;
         }
         if (!registryCheckQueued) {
             status = OperationStatus::Running;
@@ -200,8 +207,6 @@ namespace MCMMemory
                 status = OperationStatus::Idle;
             }
         }
-
-        return RE::BSEventNotifyControl::kContinue;
     }
 
     RE::BSEventNotifyControl Restore::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
@@ -215,6 +220,11 @@ namespace MCMMemory
         const bool characterMenu = menuName == RE::RaceSexMenu::MENU_NAME;
         if (!journalMenu && !characterMenu) {
             return RE::BSEventNotifyControl::kContinue;
+        }
+
+        if (characterMenu && a_event->opening && REL::Module::IsVR() && !GameSession::GetSingleton()->HasNewGameStarted()) {
+            GameSession::GetSingleton()->Start(true, "VR character creation");
+            CheckAutomaticRestore();
         }
 
         std::lock_guard lock(restoreMutex);

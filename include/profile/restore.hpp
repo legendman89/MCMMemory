@@ -319,6 +319,8 @@ namespace MCMMemory
 
         friend struct MCMWatchTask<Restore>;
 
+        void CheckAutomaticRestore();
+
         void CheckCalls(uint64_t a_loadedGameSession);
 
         void HandleExpiredCall();

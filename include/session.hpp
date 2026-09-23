@@ -3,8 +3,8 @@
 #include "plugin.hpp"
 
 #include "menu/hud.hpp"
-#include "mcm/mcm_support.hpp"
 #include "mcm/mcm_calls.hpp"
+#include "mcm/mcm_support.hpp"
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "profile/restore.hpp"
@@ -25,6 +25,7 @@ namespace MCMMemory
         inline void PrepareLoad()
         {
             waitingForLoadMessage = true;
+            newGameStarted = false;
             SetGameLoaded(false);
             HUD::GetSingleton()->Reset();
         }
@@ -32,6 +33,7 @@ namespace MCMMemory
         inline void Start(bool a_autoRestoreAllowed, std::string_view a_reason)
         {
             waitingForLoadMessage = false;
+            newGameStarted = a_autoRestoreAllowed;
             HUD::GetSingleton()->Reset();
             MCMRegistry::Reset();
             Backup::GetSingleton()->Reset();
@@ -42,6 +44,11 @@ namespace MCMMemory
             logger::info("Game session started from {}; automatic restore allowed: {}", a_reason, a_autoRestoreAllowed);
         }
 
+        inline bool HasNewGameStarted() const
+        {
+            return newGameStarted;
+        }
+
         inline bool IsWaitingForLoadMessage() const
         {
             return waitingForLoadMessage;
@@ -50,5 +57,8 @@ namespace MCMMemory
     private:
 
         bool waitingForLoadMessage{};
+
+        // For VR workaround.
+        bool newGameStarted{};
     };
 }

@@ -158,7 +158,7 @@ namespace MCMMemory::Menu
             return;
         }
 
-        GUI::SetNextWindowSize(GUI::ImVec2{ 780.0F, 470.0F }, GUI::ImGuiCond_FirstUseEver);
+        GUI::SetNextWindowSize(GUI::ImVec2{ 800.0F, 470.0F }, GUI::ImGuiCond_FirstUseEver);
 
         CenterNextWindow();
 
@@ -183,7 +183,7 @@ namespace MCMMemory::Menu
 
                 GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Name").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 340.0F);
                 GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Status").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 170.0F);
-                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Mode").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 260.0F);
+                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Mode").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 280.0F);
 
                 GUI::TableSetupScrollFreeze(0, 1);
 

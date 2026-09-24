@@ -83,13 +83,13 @@
   "Profile.MCM.Column.AutoRestore.Tooltip": "Include this MCM in automatic restore. Manual restore is unaffected.",
   "Profile.MCM.Column.Header.Tooltip": "Click to sort, click again to reverse, and click a third time to restore the original order.",
 
-  "Profile.MCM.Tooltip.BackupRestore": "Select this MCM to back up or restore its settings.",
-  "Profile.MCM.Tooltip.BackupOnly": "Select this MCM to back it up.",
-  "Profile.MCM.Tooltip.Unavailable": "This MCM is saved in the profile but is not currently registered.",
+  "Profile.MCM.Tooltip.BackupRestore": "Select this MCM to back up or restore its settings. Click the MCM name to view its pages.",
+  "Profile.MCM.Tooltip.BackupOnly": "Select this MCM to back it up. Click the MCM name to view its pages.",
+  "Profile.MCM.Tooltip.Unavailable": "This MCM is saved in the profile but is not currently registered. Click the MCM name to view its pages.",
   "Profile.MCM.Excluded": "Excluded",
-  "Profile.MCM.Tooltip.Excluded": "Ignored by MCM Memory.",
+  "Profile.MCM.Tooltip.Excluded": "Ignored by MCM Memory. Click the MCM name to view its pages.",
   "Profile.MCM.Unresponsive": "Unavailable",
-  "Profile.MCM.Tooltip.Unresponsive": "Skipped because this MCM did not finish an earlier scripted operation. Manual changes are still captured.",
+  "Profile.MCM.Tooltip.Unresponsive": "Skipped because this MCM did not finish an earlier scripted operation. Manual changes are still captured. Click the MCM name to view its pages.",
 
   "Profile.MCM.Count.Registered": "registered",
   "Profile.MCM.Count.Selected": "selected",
@@ -104,6 +104,22 @@
   "Profile.Error.NotCreated": "This profile has not been created yet.",
   "Profile.Error.SelectedNameInvalid": "The selected profile name is invalid.",
   "Profile.Error.SaveSelection": "The selected profile could not be saved.",
+
+  "Profile.Pages.Title": "MCM Pages",
+  "Profile.Pages.Refresh": "Refresh Pages",
+  "Profile.Pages.Refresh.Tooltip": "Refresh the page list. If pages are missing, open or activate the MCM first, then refresh.",
+  "Profile.Pages.Name": "Page",
+  "Profile.Pages.Status": "Status",
+  "Profile.Pages.Mode": "Exclusion",
+  "Profile.Pages.Main": "Main page (unnamed)",
+  "Profile.Pages.Available": "Available",
+  "Profile.Pages.Saved": "Not currently listed",
+  "Profile.Pages.Mode.Include": "Include",
+  "Profile.Pages.Mode.BackupCapture": "Exclude backup/capture",
+  "Profile.Pages.Mode.Restore": "Exclude restore",
+  "Profile.Pages.Mode.All": "Exclude all",
+  "Profile.Pages.Empty": "No pages found. Open or activate the MCM, then refresh.",
+  "Profile.Pages.Apply": "Apply",
 
   /* ============================================================
      ACTIVITY TAB

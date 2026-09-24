@@ -1,9 +1,10 @@
 #pragma once
 
 #include "utils/time.hpp"
-#include "mcm/mcm_support.hpp"
-#include "mcm/mcm_calls.hpp"
 #include "menu/menu.hpp"
+#include "menu/pages.hpp"
+#include "mcm/mcm_calls.hpp"
+#include "mcm/mcm_support.hpp"
 #include "profile/types.hpp"
 #include "profile/profiles.hpp"
 
@@ -110,6 +111,11 @@ namespace MCMMemory::Menu
 
     private:
 
+        inline bool IsEditingProfile() const
+        {
+            return createProfileWindow.open || deleteProfileWindow.open || forgetMCMsWindow.open || pagesWindow.IsOpen();
+        }
+
         void Refresh();
 
         bool NeedsRefresh() const;
@@ -159,6 +165,8 @@ namespace MCMMemory::Menu
         std::vector<ProfileMCMRow> mcms;
 
         std::vector<std::string> profileNames;
+
+        MCMPagesWindow pagesWindow;
 
         CreateProfileWindow createProfileWindow;
 

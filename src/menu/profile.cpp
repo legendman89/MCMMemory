@@ -111,7 +111,7 @@ namespace MCMMemory::Menu
         const auto backupStatus = Backup::GetSingleton()->GetStatus();
         const auto restoreStatus = Restore::GetSingleton()->GetStatus();
         const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
-        const bool profileEditing = createProfileWindow.open || deleteProfileWindow.open || forgetMCMsWindow.open;
+        const bool profileEditing = IsEditingProfile();
         const auto backupLabel = Trans::Tr("Profile.Action.BackUpNow");
         const auto restoreLabel = Trans::Tr("Profile.Action.RestoreNow");
         const auto cancelLabel = Trans::Tr("Profile.Action.CancelNow");
@@ -303,7 +303,7 @@ namespace MCMMemory::Menu
         const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
         const bool journalMenuOpen = IsJournalMenuOpen();
         const bool journalBlocksOperation = !operationRunning && journalMenuOpen;
-        const bool operationAvailable = IsGameLoaded() && !operationRunning && !journalMenuOpen && !createProfileWindow.open && !deleteProfileWindow.open && !forgetMCMsWindow.open;
+        const bool operationAvailable = IsGameLoaded() && !operationRunning && !journalMenuOpen && !IsEditingProfile();
         std::string backupLabel = Trans::Tr("Profile.Action.BackUpNow");
         std::string restoreLabel = Trans::Tr("Profile.Action.RestoreNow");
         uint32_t backupIcon = Icons::kSave;
@@ -695,6 +695,11 @@ namespace MCMMemory::Menu
             else {
                 GUI::TextDisabled("%s", modName.c_str());
             }
+
+            if (!IsEditingProfile() && Backup::GetSingleton()->GetStatus() == OperationStatus::Idle && Restore::GetSingleton()->GetStatus() == OperationStatus::Idle && GUI::IsItemClicked()) {
+                pagesWindow.Open(mcm.identity);
+            }
+            
             if (excluded) {
                 WrappedTooltip(Trans::Tr("Profile.MCM.Tooltip.Excluded").c_str());
             }
@@ -778,7 +783,7 @@ namespace MCMMemory::Menu
         const auto backupStatus = Backup::GetSingleton()->GetStatus();
         const auto restoreStatus = Restore::GetSingleton()->GetStatus();
         const bool journalMenuOpen = IsJournalMenuOpen();
-        const bool operationAvailable = IsGameLoaded() && backupStatus == OperationStatus::Idle && restoreStatus == OperationStatus::Idle && !createProfileWindow.open && !deleteProfileWindow.open && !forgetMCMsWindow.open;
+        const bool operationAvailable = IsGameLoaded() && backupStatus == OperationStatus::Idle && restoreStatus == OperationStatus::Idle && !IsEditingProfile();
         const bool journalBlocksOperation = operationAvailable && journalMenuOpen;
         const auto backupLabel = Trans::Tr("Profile.MCM.BackUpSelected");
         const auto restoreLabel = Trans::Tr("Profile.MCM.RestoreSelected");
@@ -833,7 +838,7 @@ namespace MCMMemory::Menu
         GUI::SameLine(0.0F, 14.0F);
 
         // Only the profile file is touched, so this does not wait for the Journal Menu to close.
-        if (IconCTAButton(forgetLabel.c_str(), !operationRunning && !createProfileWindow.open && !deleteProfileWindow.open && !forgetMCMsWindow.open && !selectedMCMs.forget.empty(), Icons::kDelete, Color::kCancelButtonColors)) {
+        if (IconCTAButton(forgetLabel.c_str(), !operationRunning && !IsEditingProfile() && !selectedMCMs.forget.empty(), Icons::kDelete, Color::kCancelButtonColors)) {
             forgetMCMsWindow = {};
             forgetMCMsWindow.open = true;
             forgetMCMsWindow.profile = GetSettings().activeProfile;
@@ -867,5 +872,7 @@ namespace MCMMemory::Menu
         GUI::Spacing();
 
         RenderMCMs();
+
+        pagesWindow.Render();
     }
 }

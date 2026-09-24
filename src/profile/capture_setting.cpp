@@ -252,8 +252,13 @@ namespace MCMMemory
         if (!page) {
             return false;
         }
+        
         auto activation = MCMActivationSupport::ReadSelectedState(a_script, a_record.selection.identity, page->name, page->index, a_record.selection.optionIndex, *a_record.control);
         if (!activation) {
+            return false;
+        }
+
+        if (ProfileStorage::IsPageCaptureExcluded(a_record.profileName, activation->activation.selection)) {
             return false;
         }
 
@@ -333,7 +338,9 @@ namespace MCMMemory
         if (a_record.profileName != GetSettings().activeProfile) {
             return true;
         }
-        if (MCMCommandSupport::IsExcludedPage(a_record.selection.identity.modID, a_record.selection.pageName, a_record.selection.pageIndex)) {
+
+        if (MCMCommandSupport::IsExcludedPage(a_record.selection.identity.modID, a_record.selection.pageName, a_record.selection.pageIndex) ||
+            ProfileStorage::IsPageCaptureExcluded(a_record.profileName, a_record.selection)) {
             return true;
         }
 
@@ -513,6 +520,11 @@ namespace MCMMemory
     {
         a_record.captureComplete = true;
         a_record.capturePending = false;
+
+        if (ProfileStorage::IsPageCaptureExcluded(a_record.profileName, a_setting.selection)) {
+            return;
+        }
+        
         // Incomplete settings stay in Capture.json but not in the selected profile.
         a_setting.identityComplete = HasControlIdentity(a_setting.selection, a_setting.optionLabel) &&
                                      (a_setting.type != ControlType::Unknown || a_setting.command) && !a_setting.valueSource.empty();

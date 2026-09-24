@@ -96,6 +96,8 @@ namespace MCMMemory
                         page.name = *name;
                         page.index = static_cast<int>(pageIndex);
                         page.mode = mode;
+                        const auto matchIndex = entry.find("matchIndex");
+                        page.matchIndex = matchIndex != entry.end() && matchIndex->is_boolean() && matchIndex->get<bool>();
                         a_profile.pageExclusions[item.key()].push_back(std::move(page));
                     }
                 }
@@ -142,6 +144,9 @@ namespace MCMMemory
             logger::error("Failed to read profile {}: {}", ToUTF8(path), error.what());
             return false;
         }
+
+        pageExclusionCache[std::string(a_name)] = a_profile.pageExclusions;
+
         return true;
     }
 
@@ -235,6 +240,10 @@ namespace MCMMemory
         }
         auto& profile = *pending;
 
+        if (profile.IsPageExcluded(a_setting.selection, PageExclusionMode::BackupCapture)) {
+            return true;
+        }
+
         const auto& modID = a_setting.selection.identity.modID;
         if (GetSettings().recordActions && !profile.IsActionMode(modID)) {
             profile.SetMode(modID, ProfileMode::Action);
@@ -261,6 +270,9 @@ namespace MCMMemory
         }
         auto& profile = *pending;
 
+        if (profile.IsPageExcluded(a_activation.selection, PageExclusionMode::BackupCapture)) {
+            return true;
+        }
         if (a_enabled) {
             profile.SetActivation(a_activation);
         }
@@ -268,6 +280,31 @@ namespace MCMMemory
             profile.RemoveActivation(a_activation.selection.identity.modID);
         }
         return true;
+    }
+
+    bool ProfileStorage::IsPageCaptureExcluded(std::string_view a_name, const MCMSelection& a_selection)
+    {
+        std::scoped_lock lock(profileMutex);
+        const auto pending = pendingProfiles.find(a_name);
+        if (pending != pendingProfiles.end()) {
+            return pending->second.IsPageExcluded(a_selection, PageExclusionMode::BackupCapture);
+        }
+
+        auto cached = pageExclusionCache.find(a_name);
+        if (cached == pageExclusionCache.end()) {
+            Profile profile;
+            if (!LoadFile(a_name, profile)) {
+                // A missing profile has no exclusions.
+                std::error_code error;
+                if (std::filesystem::exists(Path(a_name), error) || error) {
+                    return true;
+                }
+                pageExclusionCache.emplace(std::string(a_name), PageExclusionMap{});
+            }
+            cached = pageExclusionCache.find(a_name);
+        }
+
+        return MCMMemory::IsPageExcluded(cached->second, a_selection.identity.modID, a_selection.pageName, a_selection.pageIndex, PageExclusionMode::BackupCapture);
     }
 
     bool ProfileStorage::SavePageExclusions(std::string_view a_name, std::string_view a_modID, const std::vector<MCMPageExclusion>& a_pages)
@@ -346,6 +383,7 @@ namespace MCMMemory
         if (!JSON::WriteFile(path, ToJson(a_profile))) {
             return false;
         }
+        pageExclusionCache[std::string(a_name)] = a_profile.pageExclusions;
         logger::info("Saved {} persistent profile settings to {}", a_profile.settings.size(), ToUTF8(path));
         return true;
     }
@@ -426,7 +464,11 @@ namespace MCMMemory
                     if (page.mode == PageExclusionMode::Include || ToIndex(page.mode) >= pageExclusionModeNames.size()) {
                         continue;
                     }
-                    exclusions[modID].push_back({ { "pageName", page.name }, { "pageIndex", page.index }, { "mode", pageExclusionModeNames[ToIndex(page.mode)] } });
+                    nlohmann::json entry{ { "pageName", page.name }, { "pageIndex", page.index }, { "mode", pageExclusionModeNames[ToIndex(page.mode)] } };
+                    if (page.matchIndex) {
+                        entry["matchIndex"] = true;
+                    }
+                    exclusions[modID].push_back(std::move(entry));
                 }
             }
             if (!exclusions.empty()) {
@@ -455,7 +497,7 @@ namespace MCMMemory
         for (const auto& setting : a_profile.settings) {
             document["settings"].push_back(JSON::ToJson(setting, false));
         }
-        
+
         return document;
     }
 }

@@ -228,7 +228,9 @@ namespace MCMMemory
         }
 
         SyncOpeningPage(*record);
-        if (MCMCommandSupport::IsExcludedPage(record->selection.identity.modID, record->selection.pageName, record->selection.pageIndex)) {
+        
+        if (MCMCommandSupport::IsExcludedPage(record->selection.identity.modID, record->selection.pageName, record->selection.pageIndex) ||
+            ProfileStorage::IsPageCaptureExcluded(record->profileName, record->selection)) {
             return;
         }
         

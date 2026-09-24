@@ -430,6 +430,11 @@ namespace MCMMemory
         }
 
         const auto& page = pages[pageIndex];
+        if (profile.IsPageExcluded(registeredMCMs[mcmIndex].identity.modID, page, PageExclusionMode::BackupCapture)) {
+            AdvancePage();
+            return;
+        }
+
         MCMScript script(registeredMCMs[mcmIndex].mcmScript);
         if (!CallAndContinue(script, "SetPage", RE::MakeFunctionArguments(std::string{ page.name }, int{ page.index }), BackupStep::ReadPage)) {
             logger::error("Full MCM backup could not read page '{}' from '{}'", page.name, registeredMCMs[mcmIndex].identity.modID);
@@ -445,6 +450,11 @@ namespace MCMMemory
     void Backup::ReadPage()
     {
         const auto& page = pages[pageIndex];
+        if (profile.IsPageExcluded(registeredMCMs[mcmIndex].identity.modID, page, PageExclusionMode::BackupCapture)) {
+            AdvancePage();
+            return;
+        }
+
         pageSettings.clear();
         menuSettings.clear();
         menuIndex = 0;
@@ -591,6 +601,9 @@ namespace MCMMemory
         if (!mcmFailed && !actionMode) {
             if (!mcmActivation) {
                 mcmActivation = Capture::GetSingleton()->FindDetectedActivation(modID);
+                if (mcmActivation && profile.IsPageExcluded(mcmActivation->activation.selection, PageExclusionMode::BackupCapture)) {
+                    mcmActivation.reset();
+                }
                 if (mcmActivation) {
                     logger::info("Full MCM backup reused the detected activation state for '{}' ({})", modID, mcmActivation->enabled ? "enabled" : "disabled");
                 }
@@ -598,25 +611,40 @@ namespace MCMMemory
             if (!mcmActivation || mcmActivation->enabled) {
                 // Fresh scan values win. Older captures only fill controls hidden from this scan.
                 Capture::GetSingleton()->MergeSettings(mcmSettings, modID);
+
+                // Remove settings from excluded pages before saving the new backup results.
+                auto captured = mcmSettings.begin();
+                while (captured != mcmSettings.end()) {
+                    if (profile.IsPageExcluded(captured->selection, PageExclusionMode::BackupCapture)) {
+                        captured = mcmSettings.erase(captured);
+                    }
+                    else {
+                        ++captured;
+                    }
+                }
+
                 auto setting = profile.settings.begin();
                 while (setting != profile.settings.end()) {
-                    if (setting->selection.identity.modID == modID) {
+                    if (setting->selection.identity.modID == modID && !profile.IsPageExcluded(setting->selection, PageExclusionMode::BackupCapture)) {
                         setting = profile.settings.erase(setting);
                     }
                     else {
                         ++setting;
                     }
                 }
+
                 for (auto& backedUpSetting : mcmSettings) {
                     profile.settings.push_back(std::move(backedUpSetting));
                 }
             }
+
             if (mcmActivation && mcmActivation->enabled) {
                 profile.SetActivation(mcmActivation->activation);
             }
             else if (mcmActivation) {
                 profile.RemoveActivation(modID);
             }
+            
             mcmStats.MCMCount = 1;
             mcmStats.settingCount = mcmActivation && !mcmActivation->enabled ? 0 : static_cast<uint32_t>(mcmSettings.size());
             if (mcmActivation && !mcmActivation->enabled) {

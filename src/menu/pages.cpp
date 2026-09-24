@@ -37,7 +37,7 @@ namespace MCMMemory::Menu
 
         // Unique MCM names are stable in reordering.
         // unnamed pages can use their index.
-        if (!a_name.empty() && nameMatches == 1 && (a_uniqueName || (!a_available && namedPage->available))) {
+        if (!a_name.empty() && nameMatches == 1 && !namedPage->matchIndex && (a_uniqueName || (!a_available && namedPage->available))) {
             if (a_available) {
                 namedPage->index = a_index;
                 namedPage->available = true;
@@ -128,7 +128,14 @@ namespace MCMMemory::Menu
         std::vector<MCMPageExclusion> exclusions;
         exclusions.reserve(pages.size());
         for (const auto& page : pages) {
-            exclusions.push_back(page);
+            // Check for duplicate names and mark them to match their index.
+            MCMPageExclusion exclusion = page;
+            size_t sameNameCount{};
+            for (const auto& other : pages) {
+                sameNameCount += other.name == page.name ? 1 : 0;
+            }
+            exclusion.matchIndex = page.matchIndex || page.name.empty() || sameNameCount > 1;
+            exclusions.push_back(std::move(exclusion));
         }
 
         if (ProfileStorage::SavePageExclusions(profile, identity.modID, exclusions)) {

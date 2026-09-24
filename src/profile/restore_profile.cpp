@@ -235,10 +235,33 @@ namespace MCMMemory
             logger::error("Restore could not save pending profile changes");
             return false;
         }
+
         Profile profile;
         if (!ProfileStorage::Load(profile)) {
             logger::info("No readable persistent profile is available at {}; automatic restoration is inactive", ToUTF8(ProfileStorage::Path()));
             return false;
+        }
+
+        size_t excludedSettingCount{};
+        MCMFilter pendingReopens;
+        auto setting = profile.settings.begin();
+        while (setting != profile.settings.end()) {
+            const auto& modID = setting->selection.identity.modID;
+            if (profile.IsPageExcluded(setting->selection, PageExclusionMode::Restore)) {
+                if (setting->recorded && setting->reopensConfig && !ContainsMCMID(pendingReopens, modID)) {
+                    pendingReopens.push_back(modID);
+                }
+                setting = profile.settings.erase(setting);
+                ++excludedSettingCount;
+            }
+            else {
+                // Carry the excluded action close/reopen step to the next included recorded action.
+                if (setting->recorded && ContainsMCMID(pendingReopens, modID)) {
+                    setting->reopensConfig = true;
+                    std::erase(pendingReopens, modID);
+                }
+                ++setting;
+            }
         }
 
         MCMFilter recordedMCMs;
@@ -257,7 +280,6 @@ namespace MCMMemory
         // A recorded order already describes these dependencies and must not be sorted again.
         VioLensSupport::OrderSettings(profile.settings, recordedMCMs);
         size_t supportedSettingCount{};
-        size_t excludedSettingCount{};
         MCMFilter loggedExclusions;
 
         // Recorded settings first, since only they entail a real order. Scanned ones follow,
@@ -302,6 +324,10 @@ namespace MCMMemory
         size_t activationCount{};
         for (const auto& activation : profile.activations) {
             const auto& modID = activation.selection.identity.modID;
+            if (profile.IsPageExcluded(activation.selection, PageExclusionMode::Restore) ||
+                MCMCommandSupport::IsExcludedPage(modID, activation.selection.pageName, activation.selection.pageIndex)) {
+                continue;
+            }
             if (!AllowsMCM(mcmFilter, modID) || (operationMode == OperationMode::Automatic && !GetSettings().IsAutoRestoreEnabled(modID))) {
                 continue;
             }

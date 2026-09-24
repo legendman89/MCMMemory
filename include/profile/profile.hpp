@@ -27,6 +27,16 @@ namespace MCMMemory
             pageExclusions.clear();
         }
 
+        inline bool IsPageExcluded(const MCMSelection& a_selection, PageExclusionMode a_operation) const
+        {
+            return MCMMemory::IsPageExcluded(pageExclusions, a_selection.identity.modID, a_selection.pageName, a_selection.pageIndex, a_operation);
+        }
+
+        inline bool IsPageExcluded(std::string_view a_modID, const MCMPage& a_page, PageExclusionMode a_operation) const
+        {
+            return MCMMemory::IsPageExcluded(pageExclusions, a_modID, a_page.name, a_page.index, a_operation);
+        }
+
         // Value or Action per mod?
         inline ProfileMode ModeFor(std::string_view a_modID) const
         {
@@ -104,6 +114,8 @@ namespace MCMMemory
         // Remembers whether the player allowed a staged MCM to start automatically.
         static bool UpdateActivation(std::string_view a_name, const MCMActivation& a_activation, bool a_enabled);
 
+        static bool IsPageCaptureExcluded(std::string_view a_name, const MCMSelection& a_selection);
+
         // Saves page choices without replacing settings captured since the pages window opened.
         static bool SavePageExclusions(std::string_view a_name, std::string_view a_modID, const std::vector<MCMPageExclusion>& a_pages);
 
@@ -137,6 +149,8 @@ namespace MCMMemory
         static nlohmann::ordered_json ToJson(const Profile& a_profile);
 
         inline static std::mutex profileMutex;
+
+        inline static std::unordered_map<std::string, PageExclusionMap, StringHash, std::equal_to<>> pageExclusionCache;
 
         // Holds profiles that have been changed in memory but not yet saved to disk.
         inline static std::unordered_map<std::string, Profile, StringHash, std::equal_to<>> pendingProfiles;

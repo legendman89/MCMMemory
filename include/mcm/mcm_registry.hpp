@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "profile/types.hpp"
 #include "utils/time.hpp"
 
@@ -88,6 +90,15 @@ namespace MCMMemory
 
     private:
 
+        enum class ManagerReadFailure
+        {
+            Quest,
+            VirtualMachine,
+            HandlePolicy,
+            EmptyHandle,
+            BoundScript
+        };
+
         // Allows the MCM Menu Redone registry to use the private CreateRegistryEntry helper.
         friend class MCMMenuRedoneRegistry;
 
@@ -96,6 +107,17 @@ namespace MCMMemory
 
         // Keeps the unreadable marker error log to one line per game session.
         static inline bool reportedMissingMarkers{};
+
+        // Report each manager lookup failure once per game session.
+        inline static std::atomic<uint32_t> reportedManagerFailures{};
+
+        static void ReportManagerReadFailure(ManagerReadFailure a_failure, std::string_view a_reason)
+        {
+            const uint32_t flag = uint32_t{ 1 } << ToIndex(a_failure);
+            if (!(reportedManagerFailures.fetch_or(flag, std::memory_order_relaxed) & flag)) {
+                logger::warn("SkyUI manager script lookup failed: {}", a_reason);
+            }
+        }
 
         static const char* ReadScriptName(const RE::BSTSmartPointer<RE::BSScript::Object>& a_mcmScript)
         {

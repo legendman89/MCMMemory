@@ -866,6 +866,7 @@ namespace MCMMemory
     void MCMRegistry::Reset()
     {
         reportedMissingMarkers = false;
+        reportedManagerFailures.store(0, std::memory_order_relaxed);
         MCMKickerSupport::GetSingleton()->Reset();
         if (IsMCMMenuRedoneAvailable()) {
             MCMMenuRedoneRegistry::GetSingleton()->Reset();

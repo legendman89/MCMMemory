@@ -68,17 +68,41 @@ namespace MCMMemory
     {
         // SkyUI stores its MCM manager on this quest.
         auto* quest = RE::TESForm::LookupByEditorID<RE::TESQuest>("SKI_ConfigManagerInstance");
+        if (!quest) {
+            ReportManagerReadFailure(ManagerReadFailure::Quest, "SKI_ConfigManagerInstance quest is unavailable");
+            return {};
+        }
+
         auto* vm = RE::BSScript::Internal::VirtualMachine::GetSingleton();
-        auto* policy = vm ? vm->GetObjectHandlePolicy() : nullptr;
-        if (!quest || !vm || !policy) {
+        if (!vm) {
+            ReportManagerReadFailure(ManagerReadFailure::VirtualMachine, "Papyrus virtual machine is unavailable");
+            return {};
+        }
+
+        auto* policy = vm->GetObjectHandlePolicy();
+        if (!policy) {
+            ReportManagerReadFailure(ManagerReadFailure::HandlePolicy, "Papyrus object handle policy is unavailable");
             return {};
         }
 
         auto handle = policy->GetHandleForObject(quest->GetFormType(), quest);
         RE::BSTSmartPointer<RE::BSScript::Object> managerScript;
-        if (handle == policy->EmptyHandle() || !vm->FindBoundObject(handle, "SKI_ConfigManager", managerScript)) {
+        if (handle == policy->EmptyHandle()) {
+            ReportManagerReadFailure(ManagerReadFailure::EmptyHandle, "SKI_ConfigManagerInstance quest has an empty Papyrus handle");
             return {};
         }
+
+        if (!vm->FindBoundObject(handle, "SKI_ConfigManager", managerScript)) {
+            ReportManagerReadFailure(ManagerReadFailure::BoundScript, "SKI_ConfigManager script could not be found on its quest");
+            return {};
+        }
+
+        if (!managerScript) {
+            ReportManagerReadFailure(ManagerReadFailure::BoundScript, "SKI_ConfigManager lookup succeeded but returned an empty script object");
+            return {};
+        }
+        
+        // All good! return the script instance.
         return managerScript;
     }
 

@@ -150,12 +150,13 @@ namespace MCMMemory::Menu
             return;
         }
 
-        GUI::SetNextWindowSize(GUI::ImVec2{ 770.0F, 460.0F }, GUI::ImGuiCond_FirstUseEver);
+        GUI::SetNextWindowSize(GUI::ImVec2{ 780.0F, 460.0F }, GUI::ImGuiCond_FirstUseEver);
 
         CenterNextWindow();
 
         const auto title = std::format("{} - {}###MCM Pages", Trans::Tr("Profile.Pages.Title"), GetDisplayModName(identity.modName));
-        if (GUI::Begin(title.c_str(), std::addressof(open), GUI::ImGuiWindowFlags_NoCollapse)) {
+        
+        if (BeginOpaqueWindow(title.c_str(), std::addressof(open))) {
             const bool busy = Backup::GetSingleton()->GetStatus() != OperationStatus::Idle || Restore::GetSingleton()->GetStatus() != OperationStatus::Idle;
            
             GUI::BeginDisabled(busy);
@@ -172,8 +173,8 @@ namespace MCMMemory::Menu
             const auto flags = GUI::ImGuiTableFlags_RowBg | GUI::ImGuiTableFlags_BordersInnerH | GUI::ImGuiTableFlags_ScrollY;
             if (GUI::BeginTable("MCM Pages", 3, flags, GUI::ImVec2{ 0.0F, height })) {
 
-                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Name").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 300.0F);
-                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Status").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 150.0F);
+                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Name").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 340.0F);
+                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Status").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 170.0F);
                 GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Mode").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 260.0F);
 
                 GUI::TableSetupScrollFreeze(0, 1);

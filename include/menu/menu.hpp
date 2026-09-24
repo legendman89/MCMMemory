@@ -32,6 +32,15 @@ namespace MCMMemory::Menu
         GUI::SetCursorPosX(GUI::GetCursorPosX() + std::max(0.0F, (GUI::GetContentRegionAvail().x - a_width) * 0.5F));
     }
 
+    // We still need to use GUI::End() ourselves.
+    inline bool BeginOpaqueWindow(const char* a_title, bool* a_open, GUI::ImGuiWindowFlags a_flags = GUI::ImGuiWindowFlags_NoCollapse)
+    {
+        GUI::PushStyleColor(GUI::ImGuiCol_WindowBg, Color::kOpaqueBackground);
+        const bool visible = GUI::Begin(a_title, a_open, a_flags);
+        GUI::PopStyleColor();
+        return visible;
+    }
+
     inline bool BeginOpaqueCombo(const char* a_label, const char* a_preview)
     {
         GUI::PushStyleColor(GUI::ImGuiCol_PopupBg, Color::kOpaqueBackground);

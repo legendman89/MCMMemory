@@ -156,9 +156,7 @@ namespace MCMMemory::Menu
         GUI::SetNextWindowSize(GUI::ImVec2(780.0F, 430.0F), GUI::ImGuiCond_FirstUseEver);
         CenterNextWindow();
         const auto windowTitle = std::format("{}###MCM Memory Activity Details", Trans::Tr("Activity.Details.Title"));
-        GUI::PushStyleColor(GUI::ImGuiCol_WindowBg, Color::kOpaqueBackground);
-        const bool windowOpen = GUI::Begin(windowTitle.c_str(), std::addressof(detailsOpen), GUI::ImGuiWindowFlags_NoCollapse);
-        GUI::PopStyleColor();
+        const bool windowOpen = BeginOpaqueWindow(windowTitle.c_str(), std::addressof(detailsOpen));
         if (windowOpen) {
             const auto summary = FormatSummary(*selected);
             const auto exactTime = FormatExactTime(*selected);

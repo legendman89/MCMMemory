@@ -2,6 +2,7 @@
 
 #include "profile/types.hpp"
 #include "profile/mode.hpp"
+#include "profile/page_exclusions.hpp"
 
 namespace MCMMemory
 {
@@ -16,11 +17,14 @@ namespace MCMMemory
         // a missing mod implies ProfileMode::Value.
         ProfileModeMap mods;
 
+        PageExclusionMap pageExclusions;
+
         inline void Clear()
         {
+            mods.clear();
             settings.clear();
             activations.clear();
-            mods.clear();
+            pageExclusions.clear();
         }
 
         // Value or Action per mod?
@@ -100,10 +104,13 @@ namespace MCMMemory
         // Remembers whether the player allowed a staged MCM to start automatically.
         static bool UpdateActivation(std::string_view a_name, const MCMActivation& a_activation, bool a_enabled);
 
+        // Saves page choices without replacing settings captured since the pages window opened.
+        static bool SavePageExclusions(std::string_view a_name, std::string_view a_modID, const std::vector<MCMPageExclusion>& a_pages);
+
         // Saves pending profiles. Failed writes remain in memory for retry.
         static bool FlushPending();
 
-        // Removes every saved setting, activation and mode for these MCMs from the named profile.
+        // Removes every saved setting, activation, mode and page exclusion for these MCMs from the named profile.
         static bool ForgetMCMs(std::string_view a_name, const MCMFilter& a_modIDs, size_t& a_settingCount);
 
         // Writes the complete profile to disk.

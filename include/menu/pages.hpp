@@ -1,46 +1,21 @@
 #pragma once
 
 #include "menu/menu.hpp"
-#include "profile/types.hpp"
+#include "profile/page_exclusions.hpp"
 
 namespace MCMMemory::Menu
 {
     
-#define FOREACH_PAGE_EXCLUSION_MODE(X) \
-    X(Include) \
-    X(BackupCapture) \
-    X(Restore) \
-    X(All)
-
-#define DECLARE_PAGE_EXCLUSION_MODE(name) name,
-#define DECLARE_PAGE_EXCLUSION_LABEL(name) "Profile.Pages.Mode." #name,
-
-    enum class PageExclusionMode
-    {
-        FOREACH_PAGE_EXCLUSION_MODE(DECLARE_PAGE_EXCLUSION_MODE)
-        Count
-    };
-
     inline constexpr std::array<std::string_view, ToIndex(PageExclusionMode::Count)> pageExclusionLabels
     {
+#define DECLARE_PAGE_EXCLUSION_LABEL(name, text) "Profile.Pages.Mode." #name,
         FOREACH_PAGE_EXCLUSION_MODE(DECLARE_PAGE_EXCLUSION_LABEL)
-    };
-
-#undef DECLARE_PAGE_EXCLUSION_MODE
 #undef DECLARE_PAGE_EXCLUSION_LABEL
-#undef FOREACH_PAGE_EXCLUSION_MODE
-
-    struct MCMPageRow : MCMPage
-    {
-        PageExclusionMode mode{};
-        bool available{};
     };
 
-    struct MCMPageChoices
+    struct MCMPageRow : MCMPageExclusion
     {
-        std::string profile;
-        std::string modID;
-        std::vector<MCMPageRow> pages;
+        bool available{};
     };
 
     class MCMPagesWindow
@@ -55,18 +30,16 @@ namespace MCMMemory::Menu
 
     private:
 
-        void Refresh();
+        void Refresh(bool a_loadChoices = false);
 
         void AddPage(std::string_view a_name, int a_index, bool a_available, bool a_uniqueName = false);
 
         void Apply();
 
-        MCMPageChoices* FindChoices();
-
         MCMIdentity identity;
         std::string profile;
         std::vector<MCMPageRow> pages;
-        std::vector<MCMPageChoices> choices;
+        std::string error;
         bool open{};
     };
 }

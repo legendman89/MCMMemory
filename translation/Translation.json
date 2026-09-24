@@ -120,6 +120,7 @@
   "Profile.Pages.Mode.All": "Exclude all",
   "Profile.Pages.Empty": "No pages found. Open or activate the MCM, then refresh.",
   "Profile.Pages.Apply": "Apply",
+  "Profile.Pages.SaveFailed": "Could not save page exclusions. Your changes remain in this window; click Apply to retry.",
 
   /* ============================================================
      ACTIVITY TAB

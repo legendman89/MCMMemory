@@ -9,6 +9,8 @@
 
 #include "settings.hpp"
 
+#include <climits>
+
 namespace MCMMemory
 {
 
@@ -57,6 +59,47 @@ namespace MCMMemory
                     }
                     a_profile.SetMode(item.key(), parsed);
                 }
+            }
+
+            const auto exclusions = document.find("pageExclusions");
+            if (exclusions != document.end() && exclusions->is_object()) {
+
+                for (const auto& item : exclusions->items()) {
+
+                    if (item.key().empty() || !item.value().is_array()) {
+                        continue;
+                    }
+
+                    for (const auto& entry : item.value()) {
+                        // Invalid optional page entries must not prevent settings from loading.
+                        if (!entry.is_object()) {
+                            continue;
+                        }
+
+                        const auto name = JSON::ReadString(entry, "pageName");
+                        const auto index = entry.find("pageIndex");
+                        const auto mode = ParsePageExclusionMode(JSON::ReadString(entry, "mode").value_or(""));
+                        
+                        // Validate the page index and mode.
+                        if (!name || index == entry.end() || !index->is_number_integer() || mode == PageExclusionMode::Include) {
+                            continue;
+                        }
+                        if (index->is_number_unsigned() && index->get<uint64_t>() > INT_MAX) {
+                            continue;
+                        }
+                        const auto pageIndex = index->get<int64_t>();
+                        if (pageIndex < -1 || pageIndex > INT_MAX) {
+                            continue;
+                        }
+
+                        MCMPageExclusion page;
+                        page.name = *name;
+                        page.index = static_cast<int>(pageIndex);
+                        page.mode = mode;
+                        a_profile.pageExclusions[item.key()].push_back(std::move(page));
+                    }
+                }
+
             }
 
             auto settings = document.find("settings");
@@ -144,6 +187,7 @@ namespace MCMMemory
         // A forgotten MCM goes back to the default mode, so recording starts over if it is used again.
         for (const auto& modID : a_modIDs) {
             profile.mods.erase(modID);
+            profile.pageExclusions.erase(modID);
         }
 
         if (!SaveFile(a_name, profile)) {
@@ -223,6 +267,40 @@ namespace MCMMemory
         else {
             profile.RemoveActivation(a_activation.selection.identity.modID);
         }
+        return true;
+    }
+
+    bool ProfileStorage::SavePageExclusions(std::string_view a_name, std::string_view a_modID, const std::vector<MCMPageExclusion>& a_pages)
+    {
+        if (a_modID.empty()) {
+            return false;
+        }
+
+        std::scoped_lock lock(profileMutex);
+        auto* pending = GetPendingProfile(a_name);
+        if (!pending) {
+            return false;
+        }
+
+        Profile profile = *pending;
+        auto& exclusions = profile.pageExclusions[std::string(a_modID)];
+        exclusions.clear();
+        for (const auto& page : a_pages) {
+            if (page.mode != PageExclusionMode::Include && ToIndex(page.mode) < pageExclusionModeNames.size()) {
+                exclusions.push_back(page);
+            }
+        }
+
+        if (exclusions.empty()) {
+            profile.pageExclusions.erase(std::string(a_modID));
+        }
+
+        if (!SaveFile(a_name, profile)) {
+            return false;
+        }
+
+        pendingProfiles.erase(std::string(a_name));
+        
         return true;
     }
 
@@ -324,6 +402,7 @@ namespace MCMMemory
         nlohmann::ordered_json document;
         document["formatVersion"] = 2;
         document["purpose"] = "Persistent MCM settings profile";
+
         // Value is the default, so only mods that record actions are written here.
         nlohmann::json mods = nlohmann::json::object();
         for (const auto& [modID, mode] : a_profile.mods) {
@@ -334,9 +413,28 @@ namespace MCMMemory
             modDocument["mode"] = std::string(ProfileModeName(mode));
             mods[modID] = std::move(modDocument);
         }
+
         if (!mods.empty()) {
             document["mods"] = std::move(mods);
         }
+
+        // Save page exclusions for mods that have them, but skip any that are Include or invalid.
+        if (!a_profile.pageExclusions.empty()) {
+            nlohmann::json exclusions = nlohmann::json::object();
+            for (const auto& [modID, pages] : a_profile.pageExclusions) {
+                for (const auto& page : pages) {
+                    if (page.mode == PageExclusionMode::Include || ToIndex(page.mode) >= pageExclusionModeNames.size()) {
+                        continue;
+                    }
+                    exclusions[modID].push_back({ { "pageName", page.name }, { "pageIndex", page.index }, { "mode", pageExclusionModeNames[ToIndex(page.mode)] } });
+                }
+            }
+            if (!exclusions.empty()) {
+                document["pageExclusions"] = std::move(exclusions);
+            }
+        }
+
+        // Save activations.
         if (!a_profile.activations.empty()) {
             document["activations"] = nlohmann::json::array();
             for (const auto& activation : a_profile.activations) {
@@ -351,10 +449,13 @@ namespace MCMMemory
                 document["activations"].push_back(std::move(activationDocument));
             }
         }
+
+        // Save settings.
         document["settings"] = nlohmann::json::array();
         for (const auto& setting : a_profile.settings) {
             document["settings"].push_back(JSON::ToJson(setting, false));
         }
+        
         return document;
     }
 }

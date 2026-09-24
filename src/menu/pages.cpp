@@ -14,11 +14,9 @@ namespace MCMMemory::Menu
         identity = a_identity;
         profile = GetSettings().activeProfile;
         pages.clear();
-        if (const auto* saved = FindChoices()) {
-            pages = saved->pages;
-        }
+        error.clear();
         open = true;
-        Refresh();
+        Refresh(true);
     }
 
     void MCMPagesWindow::AddPage(std::string_view a_name, int a_index, bool a_available, bool a_uniqueName)
@@ -61,8 +59,22 @@ namespace MCMMemory::Menu
         pages.push_back(std::move(page));
     }
 
-    void MCMPagesWindow::Refresh()
+    void MCMPagesWindow::Refresh(bool a_loadChoices)
     {
+        // Read saved pages. Exclusion choices are only loaded when opening the window.
+        Profile saved;
+        const bool profileLoaded = ProfileStorage::Load(profile, saved);
+        if (a_loadChoices && profileLoaded) {
+            const auto found = saved.pageExclusions.find(identity.modID);
+            if (found != saved.pageExclusions.end()) {
+                for (const auto& exclusion : found->second) {
+                    MCMPageRow page;
+                    static_cast<MCMPageExclusion&>(page) = exclusion;
+                    pages.push_back(std::move(page));
+                }
+            }
+        }
+
         for (auto& page : pages) {
             page.available = false;
         }
@@ -96,8 +108,7 @@ namespace MCMMemory::Menu
             }
         }
 
-        Profile saved;
-        if (ProfileStorage::Load(profile, saved)) {
+        if (profileLoaded) {
             for (const auto& setting : saved.settings) {
                 if (setting.selection.identity.modID == identity.modID) {
                     AddPage(setting.selection.pageName, setting.selection.pageIndex, false);
@@ -112,31 +123,21 @@ namespace MCMMemory::Menu
         }
     }
 
-    MCMPageChoices* MCMPagesWindow::FindChoices()
-    {
-        for (auto& saved : choices) {
-            if (saved.profile == profile && saved.modID == identity.modID) {
-                return std::addressof(saved);
-            }
-        }
-
-        return nullptr;
-    }
-
     void MCMPagesWindow::Apply()
     {
-        if (auto* saved = FindChoices()) {
-            saved->pages = pages;
-            open = false;
-            return;
+        std::vector<MCMPageExclusion> exclusions;
+        exclusions.reserve(pages.size());
+        for (const auto& page : pages) {
+            exclusions.push_back(page);
         }
 
-        MCMPageChoices saved;
-        saved.profile = profile;
-        saved.modID = identity.modID;
-        saved.pages = pages;
-        choices.push_back(std::move(saved));
-        open = false;
+        if (ProfileStorage::SavePageExclusions(profile, identity.modID, exclusions)) {
+            error.clear();
+            open = false;
+        }
+        else {
+            error = "Profile.Pages.SaveFailed";
+        }
     }
 
     void MCMPagesWindow::Render()
@@ -150,7 +151,7 @@ namespace MCMMemory::Menu
             return;
         }
 
-        GUI::SetNextWindowSize(GUI::ImVec2{ 780.0F, 460.0F }, GUI::ImGuiCond_FirstUseEver);
+        GUI::SetNextWindowSize(GUI::ImVec2{ 780.0F, 470.0F }, GUI::ImGuiCond_FirstUseEver);
 
         CenterNextWindow();
 
@@ -169,7 +170,7 @@ namespace MCMMemory::Menu
             
             GUI::Spacing();
             
-            const float height = std::max(GUI::GetFrameHeight() * 3.0F, GUI::GetContentRegionAvail().y - GUI::GetFrameHeightWithSpacing() * 2.0F);
+            const float height = std::max(GUI::GetFrameHeight() * 3.0F, GUI::GetContentRegionAvail().y - GUI::GetFrameHeightWithSpacing() * (error.empty() ? 2.0F : 4.0F));
             const auto flags = GUI::ImGuiTableFlags_RowBg | GUI::ImGuiTableFlags_BordersInnerH | GUI::ImGuiTableFlags_ScrollY;
             if (GUI::BeginTable("MCM Pages", 3, flags, GUI::ImVec2{ 0.0F, height })) {
 
@@ -229,6 +230,10 @@ namespace MCMMemory::Menu
                 }
 
                 GUI::EndTable();
+            }
+
+            if (!error.empty()) {
+                GUI::TextWrapped("%s", Trans::Tr(error).c_str());
             }
 
             if (CTAButton(Trans::Tr("Profile.Pages.Apply").c_str(), !busy, Color::kCreateButtonColors)) {

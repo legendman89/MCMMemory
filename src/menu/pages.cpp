@@ -23,6 +23,11 @@ namespace MCMMemory::Menu
 
     void MCMPagesWindow::AddPage(std::string_view a_name, int a_index, bool a_available, bool a_uniqueName)
     {
+        // Skip blank pages but keep unnamed pages (indexed as -1).
+        if (a_index >= 0 && GetDisplayText(a_name).find_first_not_of(" \t\r\n\f\v") == std::string::npos) {
+            return;
+        }
+
         size_t nameMatches{};
         MCMPageRow* namedPage{};
         for (auto& page : pages) {

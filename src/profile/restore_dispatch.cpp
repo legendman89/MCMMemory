@@ -27,8 +27,7 @@ namespace MCMMemory
         }
 
         MCMScript script(restoreMCMs[a_action.mcmIndex].mcmScript);
-        auto page = script.ReadCurrentPage();
-        if (!page || !page->Matches(a_action.pageName, a_action.pageIndex) || !script.IsPageReady(a_action.pageIndex)) {
+        if (!script.IsPageLoaded(a_action.pageName, a_action.pageIndex)) {
             return false;
         }
 
@@ -70,7 +69,7 @@ namespace MCMMemory
             const auto& modID = restoreMCMs[a_action.mcmIndex].identity.modID;
             // Older profiles may not contain the state name. Check the current row as well.
             const bool savedCommand = MCMCommandSupport::IsIgnored(modID, a_action.pageName, a_action.pageIndex, a_action.controlType, a_action.stateName, a_action.optionLabel);
-            const bool liveCommand = MCMCommandSupport::IsIgnored(modID, page->name, page->index, a_action.controlType, liveState.value_or(""), liveLabel.value_or(""));
+            const bool liveCommand = MCMCommandSupport::IsIgnored(modID, a_action.pageName, a_action.pageIndex, a_action.controlType, liveState.value_or(""), liveLabel.value_or(""));
             if (savedCommand || liveCommand) {
                 return false;
             }
@@ -84,8 +83,7 @@ namespace MCMMemory
         }
 
         // A rebuilt page can put another control of the same type at this index.
-        auto label = script.ReadOptionLabel(a_action.optionIndex);
-        return label && !a_action.optionLabel.empty() && *label == a_action.optionLabel;
+        return script.MatchesLabel(a_action.optionIndex, a_action.optionLabel, a_action.rowLabel);
     }
 
     bool Restore::IsActionPageReady(const RestoreAction& a_action) const
@@ -120,7 +118,7 @@ namespace MCMMemory
         // SkyUI fills its value buffers one page at a time. Reading them while the page is still
         // building would risk matching an "already matches" state.
         if (!script.IsPageReady(a_action.pageIndex)) {
-            logger::debug("Page {} of '{}' is unsettled; restoring '{}' without comparing its current value", a_action.pageIndex, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.optionLabel);
+            logger::debug("Page {} of '{}' is unsettled; restoring '{}' without comparing its current value", a_action.pageIndex, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.DisplayName());
             return true;
         }
 
@@ -178,7 +176,7 @@ namespace MCMMemory
         }
         // An MCM that keeps the key only in its own variable never refreshes the row, 
         // so this is the place a lost remap can be checked in log.
-        logger::warn("Keymap '{}' in '{}' does not show key {} after the remap", a_action.optionLabel, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.integerValue);
+        logger::warn("Keymap '{}' in '{}' does not show key {} after the remap", a_action.DisplayName(), restoreMCMs[a_action.mcmIndex].identity.modID, a_action.integerValue);
     }
 
     void Restore::CompleteClicksAction(RestoreAction& a_action, bool a_continue)
@@ -305,7 +303,7 @@ namespace MCMMemory
             logger::debug("Profile restore calls '{}' on '{}' for setting '{}' (key {})", functionName, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.stringValue, a_action.integerValue);
         }
         else if (a_action.controlType == ControlType::Keymap && IsRestoreApplyAction(a_action.type)) {
-            logger::debug("Profile restore calls '{}' on '{}' for '{}' (option {}, key {})", functionName, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.optionLabel, a_action.optionIndex, a_action.integerValue);
+            logger::debug("Profile restore calls '{}' on '{}' for '{}' (option {}, key {})", functionName, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.DisplayName(), a_action.optionIndex, a_action.integerValue);
         }
 
         // Build the argument list expected by this script call.

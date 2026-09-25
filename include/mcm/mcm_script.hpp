@@ -15,6 +15,9 @@ namespace MCMMemory
 
 #undef DECLARE_SKYUI_CONTROL_TYPE
 
+    // SkyUI organizes options in two columns, so the option above another is shifted by 2.
+    inline constexpr int skyUIColumnCount{ 2 };
+
     class MCMScript
     {
     public:
@@ -66,6 +69,13 @@ namespace MCMMemory
 
         bool IsPageReady(int a_pageIndex) const;
 
+        // Finds the nearest labeled option above this one in the same column.
+        // Some MCMs like Smart Harvest puts the label and control in separate rows.
+        MCMRowLabel ReadRowLabel(int a_optionIndex) const;
+
+        // An unlabeled control matches only when it is still unlabeled and at the same distance under the same label.
+        bool MatchesLabel(int a_optionIndex, std::string_view a_optionLabel, const MCMRowLabel& a_rowLabel) const;
+
         bool IsMenuReady(int a_optionIndex) const;
 
         inline std::optional<std::string> ReadOptionLabel(int a_optionIndex) const
@@ -76,6 +86,13 @@ namespace MCMMemory
         inline std::optional<std::string> ReadOptionText(int a_optionIndex) const
         {
             return a_optionIndex >= 0 ? ReadString("_strValueBuf", static_cast<size_t>(a_optionIndex)) : std::nullopt;
+        }
+
+        // Is the page currently shown and SkyUI finished filling its buffers?
+        inline bool IsPageLoaded(std::string_view a_pageName, int a_pageIndex) const
+        {
+            auto page = ReadCurrentPage();
+            return page && page->Matches(a_pageName, a_pageIndex) && IsPageReady(a_pageIndex);
         }
 
     private:

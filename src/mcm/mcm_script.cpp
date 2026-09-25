@@ -172,7 +172,13 @@ namespace MCMMemory
             if (!label) {
                 continue;
             }
-            if (label->empty() && (skyUIType != SkyUIOptionType::Text || !SkyUICycleSupport::Find(*this, static_cast<int>(optionIndex)))) {
+
+            const auto controlType = skyUIControlTypes[ToIndex(skyUIType)];
+            MCMRowLabel rowLabel;
+            if (label->empty() && CanUseRowLabel(controlType)) {
+                rowLabel = ReadRowLabel(static_cast<int>(optionIndex));
+            }
+            if (label->empty() && rowLabel.label.empty() && (skyUIType != SkyUIOptionType::Text || !SkyUICycleSupport::Find(*this, static_cast<int>(optionIndex)))) {
                 continue;
             }
 
@@ -183,7 +189,8 @@ namespace MCMMemory
             setting.selection.pageIndex = a_pageIndex;
             setting.selection.optionIndex = static_cast<int>(optionIndex);
             setting.optionLabel = std::move(*label);
-            setting.type = skyUIControlTypes[ToIndex(skyUIType)];
+            setting.rowLabel = std::move(rowLabel);
+            setting.type = controlType;
             if (setting.type == ControlType::Unknown && skyUIType != SkyUIOptionType::Text) {
                 continue;
             }
@@ -372,6 +379,40 @@ namespace MCMMemory
             return stateName && *stateName == a_stateName;
         }
         return true;
+    }
+
+    MCMRowLabel MCMScript::ReadRowLabel(int a_optionIndex) const
+    {
+        auto labels = ReadArray("_textBuf");
+        if (!labels || a_optionIndex < 0 || static_cast<uint32_t>(a_optionIndex) >= labels->size()) {
+            return {};
+        }
+
+        int distance = 1;
+        for (int index = a_optionIndex - skyUIColumnCount; index >= 0; index -= skyUIColumnCount) {
+            const auto& label = (*labels)[static_cast<uint32_t>(index)];
+            if (label.IsString() && !label.GetString().empty()) {
+                return MCMRowLabel{ std::string(label.GetString()), distance };
+            }
+            ++distance;
+        }
+
+        return {};
+    }
+
+    bool MCMScript::MatchesLabel(int a_optionIndex, std::string_view a_optionLabel, const MCMRowLabel& a_rowLabel) const
+    {
+        auto label = ReadOptionLabel(a_optionIndex);
+
+        if (!label) {
+            return false;
+        }
+
+        if (!a_optionLabel.empty()) {
+            return *label == a_optionLabel;
+        }
+
+        return label->empty() && !a_rowLabel.label.empty() && ReadRowLabel(a_optionIndex) == a_rowLabel;
     }
 
     std::optional<MCMControl> MCMScript::ReadControl(int a_optionIndex) const

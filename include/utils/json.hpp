@@ -217,6 +217,10 @@ namespace MCMMemory
             document["sourceEventID"] = a_setting.sourceEventID;
             document["controlType"] = std::string(ControlTypeName(a_setting.type));
             document["optionLabel"] = a_setting.optionLabel;
+            if (!a_setting.rowLabel.label.empty()) {
+                document["rowLabel"] = a_setting.rowLabel.label;
+                document["rowDistance"] = a_setting.rowLabel.distance;
+            }
             if (!a_setting.settingID.empty()) {
                 document["settingID"] = a_setting.settingID;
             }

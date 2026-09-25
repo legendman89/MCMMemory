@@ -596,7 +596,7 @@ namespace MCMMemory
                     }
                     else if (confirmationDeclined) {
                         ++mcmStats.skippedSettingCount;
-                        logger::warn("Restore of '{}' in '{}' needs user confirmation and was skipped", completedAction.optionLabel, restoreMCMs[completedAction.mcmIndex].identity.modID);
+                        logger::warn("Restore of '{}' in '{}' needs user confirmation and was skipped", completedAction.DisplayName(), restoreMCMs[completedAction.mcmIndex].identity.modID);
                     }
                     else {
                         ++mcmStats.appliedSettingCount;
@@ -750,13 +750,13 @@ namespace MCMMemory
             runAction = false;
             requestFailed = false;
             ++mcmStats.skippedSettingCount;
-            logger::warn("Skipping '{}' because its data request failed", action.optionLabel);
+            logger::warn("Skipping '{}' because its data request failed", action.DisplayName());
         }
         else if (!IsActionValid(action)) {
             // A page still being rebuilt reports the wrong control, so wait before giving up.
             if (action.settleChecks < maximumSettleChecks && !IsActionPageReady(action)) {
                 ++action.settleChecks;
-                logger::debug("Waiting for page {} of '{}' before restoring '{}' (check {})", action.pageIndex, restoreMCMs[action.mcmIndex].identity.modID, action.optionLabel, action.settleChecks);
+                logger::debug("Waiting for page {} of '{}' before restoring '{}' (check {})", action.pageIndex, restoreMCMs[action.mcmIndex].identity.modID, action.DisplayName(), action.settleChecks);
                 QueueNextAction(GetSettings().actionTrialDelaySeconds);
                 return;
             }
@@ -767,14 +767,14 @@ namespace MCMMemory
             }
             if (applyAction) {
                 ++mcmStats.skippedSettingCount;
-                logger::warn("Skipping changed or missing control '{}' in '{}'", action.optionLabel, restoreMCMs[action.mcmIndex].identity.modID);
+                logger::warn("Skipping changed or missing control '{}' in '{}'", action.DisplayName(), restoreMCMs[action.mcmIndex].identity.modID);
             }
         }
         else if (applyAction && !IsActionNeeded(action)) {
             // Avoid triggering the MCM callback when the saved value is up to date.
             runAction = false;
             ++mcmStats.unchangedSettingCount;
-            logger::debug("Profile setting '{}' already matches", action.optionLabel);
+            logger::debug("Profile setting '{}' already matches", action.DisplayName());
         }
 
         bool dispatched{};

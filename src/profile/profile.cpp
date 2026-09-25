@@ -413,6 +413,8 @@ namespace MCMMemory
         FOREACH_PROFILE_SELECTION_FIELD(READ_SELECTION_FIELD, a_setting.selection)
 #undef READ_SELECTION_FIELD
         JSON::ReadValue(a_document, "optionLabel", a_setting.optionLabel);
+        JSON::ReadValue(a_document, "rowLabel", a_setting.rowLabel.label);
+        JSON::ReadValue(a_document, "rowDistance", a_setting.rowLabel.distance);
         JSON::ReadValue(a_document, "settingID", a_setting.settingID);
         JSON::ReadValue(a_document, "stateName", a_setting.stateName);
 #define READ_SETTING_FLAG(object, key, member) JSON::ReadValue(a_document, key, object.member);

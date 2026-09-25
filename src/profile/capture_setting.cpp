@@ -401,6 +401,8 @@ namespace MCMMemory
             logger::debug("Stopped NL_MCM capture {} after navigation or a newer change", a_record.eventID);
             return true;
         }
+
+        bool unlabeledControl{};
         if (setting.type == ControlType::Option) {
             RememberControl(a_record);
             // Only known cycling text settings may be saved; ordinary text buttons are commands.
@@ -422,6 +424,14 @@ namespace MCMMemory
             auto optionLabel = mcmScript.ReadOptionLabel(setting.selection.optionIndex);
             if (optionLabel) {
                 setting.optionLabel = std::move(*optionLabel);
+                unlabeledControl = setting.optionLabel.empty();
+            }
+            if (unlabeledControl && CanUseRowLabel(setting.type)) {
+                // The row label comes from the page structure, so wait until a rebuilt page is filled again.
+                if (!mcmScript.IsPageLoaded(setting.selection.pageName, setting.selection.pageIndex)) {
+                    return false;
+                }
+                setting.rowLabel = mcmScript.ReadRowLabel(setting.selection.optionIndex);
             }
 
             auto stateName = mcmScript.ReadStateName(setting.selection.optionIndex);
@@ -440,7 +450,9 @@ namespace MCMMemory
             return true;
         }
 
-        if (setting.optionLabel.empty()) {
+        // Don't use to the dialog title for a control without a label. The title still
+        // shows the last slider we opened, that's how Smart Harvest ended up with wrong names.
+        if (setting.optionLabel.empty() && !unlabeledControl) {
             setting.optionLabel = ReadOptionLabel(a_record);
         }
 
@@ -503,7 +515,7 @@ namespace MCMMemory
                     // SkyUI does not put the new key in its value buffer; the MCM has to do that from
                     // its own handler and many mods never do. Reading the buffer here would save the key
                     // before this change, so the old binding is kept instead of a wrong one.
-                    logger::warn("Could not read the new key for '{}' in '{}'; its saved binding is left unchanged", setting.optionLabel, setting.selection.identity.modID);
+                    logger::warn("Could not read the new key for '{}' in '{}'; its saved binding is left unchanged", setting.DisplayName(), setting.selection.identity.modID);
                 }
                 break;
             }
@@ -526,7 +538,7 @@ namespace MCMMemory
         }
         
         // Incomplete settings stay in Capture.json but not in the selected profile.
-        a_setting.identityComplete = HasControlIdentity(a_setting.selection, a_setting.optionLabel) &&
+        a_setting.identityComplete = HasControlIdentity(a_setting.selection, a_setting.DisplayName()) &&
                                      (a_setting.type != ControlType::Unknown || a_setting.command) && !a_setting.valueSource.empty();
 
         if (a_setting.identityComplete && GetSettings().autoBackup) {
@@ -538,7 +550,7 @@ namespace MCMMemory
                 DelayProfileSave();
             }
             else {
-                logger::error("Failed to update captured setting '{}' in the persistent profile", a_setting.optionLabel);
+                logger::error("Failed to update captured setting '{}' in the persistent profile", a_setting.DisplayName());
             }
         }
 

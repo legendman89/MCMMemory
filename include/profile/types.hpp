@@ -9,6 +9,9 @@
 
 namespace MCMMemory
 {
+
+    using MCMFilter = std::vector<std::string>;
+
     enum class ControlType
     {
         FOREACH_CONTROL_TYPE(DECLARE_CONTROL_TYPE)
@@ -49,7 +52,30 @@ namespace MCMMemory
         return eventControlTypes[ToIndex(a_type)];
     }
 
-    using MCMFilter = std::vector<std::string>;
+    // Controls can be id'ed by the labeled row above them when unlabeled.
+    inline bool CanUseRowLabel(ControlType a_type)
+    {
+        return a_type == ControlType::Option || a_type == ControlType::Slider || a_type == ControlType::Color || a_type == ControlType::Keymap || a_type == ControlType::Input;
+    }
+
+    // Id's an unlabeled control by the nearest labeled option above it in the same column.
+    struct MCMRowLabel
+    {
+        std::string label;
+
+        // Rows between the labeled option and the control.
+        int distance{};
+
+        bool operator==(const MCMRowLabel&) const = default;
+    };
+
+    inline std::string ControlName(std::string_view a_optionLabel, const MCMRowLabel& a_rowLabel)
+    {
+        if (!a_optionLabel.empty() || a_rowLabel.label.empty()) {
+            return std::string(a_optionLabel);
+        }
+        return std::format("{} (unlabeled, {} below)", a_rowLabel.label, a_rowLabel.distance);
+    }
 
     inline bool ContainsMCMID(const MCMFilter& a_filter, std::string_view a_modID)
     {
@@ -128,6 +154,9 @@ namespace MCMMemory
 
         std::string optionLabel;
 
+        // Set only when optionLabel is empty.
+        MCMRowLabel rowLabel;
+
         // MCM Helper setting name, or a known cycling control ID supplied by compatibility support.
         std::string settingID;
 
@@ -179,9 +208,11 @@ namespace MCMMemory
         // Keep its recorded position even when the page hash did not catch that redraw.
         bool RequiresOrderedReplay() const { return command || type == ControlType::Menu || rebuildsPage || reopensConfig; }
 
+        inline std::string DisplayName() const { return ControlName(optionLabel, rowLabel); }
+
         // Checks whether another captured setting refers to the same MCM option.
         // This avoids duplicate profile settings.
-        bool IsSameSetting(const CapturedSetting& a_other) const
+        inline bool IsSameSetting(const CapturedSetting& a_other) const
         {
             if (type != a_other.type || selection.identity.modID != a_other.selection.identity.modID) {
                 return false;

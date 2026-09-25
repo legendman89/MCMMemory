@@ -86,6 +86,9 @@ namespace MCMMemory
         // Visible label used to verify the current control before changing it.
         std::string optionLabel;
 
+        // Labeled row above an unlabeled control, used to verify it instead of its empty label.
+        MCMRowLabel rowLabel;
+
         // Stable Papyrus state used to verify state-based controls.
         std::string stateName;
 
@@ -146,6 +149,8 @@ namespace MCMMemory
 
         // Activation actions enable an inactive MCM before its settings are restored.
         bool activationStep{};
+
+        inline std::string DisplayName() const { return ControlName(optionLabel, rowLabel); }
     };
 
     // Creates an action that does not need a value.

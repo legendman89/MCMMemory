@@ -199,6 +199,7 @@ namespace MCMMemory
             action->controlType = a_setting.type;
             action->optionIndex = a_setting.selection.optionIndex;
             action->optionLabel = a_setting.optionLabel;
+            action->rowLabel = a_setting.rowLabel;
             action->stateName = a_setting.stateName;
             action->pageName = a_setting.selection.pageName;
             action->pageIndex = a_setting.selection.pageIndex;

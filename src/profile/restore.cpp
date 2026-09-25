@@ -216,13 +216,20 @@ namespace MCMMemory
         }
 
         const std::string_view menuName{ a_event->menuName.c_str() };
+        const bool mainMenu = menuName == RE::MainMenu::MENU_NAME;
         const bool journalMenu = menuName == RE::JournalMenu::MENU_NAME;
         const bool characterMenu = menuName == RE::RaceSexMenu::MENU_NAME;
+        
+        if (mainMenu && a_event->opening) {
+            GameSession::GetSingleton()->End();
+            return RE::BSEventNotifyControl::kContinue;
+        }
+
         if (!journalMenu && !characterMenu) {
             return RE::BSEventNotifyControl::kContinue;
         }
 
-        if (characterMenu && a_event->opening && REL::Module::IsVR() && !GameSession::GetSingleton()->HasNewGameStarted()) {
+        if (characterMenu && a_event->opening && REL::Module::IsVR() && !IsGameLoaded()) {
             GameSession::GetSingleton()->Start(true, "VR character creation");
             CheckAutomaticRestore();
         }

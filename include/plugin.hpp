@@ -7,27 +7,28 @@
 #undef GetObject
 #endif
 
-#include <algorithm>
 #include <array>
+#include <mutex>
+#include <format>
+#include <memory>
+#include <thread>
+#include <string>
 #include <atomic>
 #include <chrono>
-#include <cstdint>
-#include <filesystem>
-#include <format>
-#include <fstream>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <thread>
-#include <unordered_map>
-#include <utility>
 #include <vector>
-
+#include <cstdint>
+#include <utility>
+#include <fstream>
+#include <optional>
+#include <algorithm>
+#include <functional>
+#include <filesystem>
+#include <string_view>
+#include <unordered_map>
 #include <nlohmann/json.hpp>
+
 using namespace std::literals;
+
 namespace logger = SKSE::log;
 
 namespace MCMMemory

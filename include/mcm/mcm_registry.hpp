@@ -113,7 +113,7 @@ namespace MCMMemory
 
         static void ReportManagerReadFailure(ManagerReadFailure a_failure, std::string_view a_reason)
         {
-            const uint32_t flag = uint32_t{ 1 } << ToIndex(a_failure);
+            const uint32_t flag = uint32_t(1) << ToIndex(a_failure);
             if (!(reportedManagerFailures.fetch_or(flag, std::memory_order_relaxed) & flag)) {
                 logger::warn("SkyUI manager script lookup failed: {}", a_reason);
             }

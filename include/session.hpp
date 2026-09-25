@@ -44,6 +44,18 @@ namespace MCMMemory
             logger::info("Game session started from {}; automatic restore allowed: {}", a_reason, a_autoRestoreAllowed);
         }
 
+        inline void End()
+        {
+            const bool sessionActive = IsGameLoaded();
+            waitingForLoadMessage = false;
+            newGameStarted = false;
+            SetGameLoaded(false);
+            HUD::GetSingleton()->Reset();
+            if (sessionActive) {
+                logger::info("Game session ended at the main menu");
+            }
+        }
+
         inline bool HasNewGameStarted() const
         {
             return newGameStarted;

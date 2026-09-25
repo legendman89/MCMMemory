@@ -65,6 +65,7 @@ namespace MCMMemory
         Backup::GetSingleton()->Install();
         Capture::GetSingleton()->Install();
         Restore::GetSingleton()->Install();
+        GameSession::GetSingleton()->Install();
 
         if (GetSettings().allowCOCForTesting) {
             COCTest::GetSingleton()->Install();

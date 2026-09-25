@@ -12,14 +12,9 @@
 namespace MCMMemory
 {
     // Singleton class that manages the state of the current game session.
-    // The event is used as an alternative if SKSE VR doesn't fire load game signal.
-    class GameSession : public RE::BSTEventSink<RE::TESLoadGameEvent>
+    class GameSession
     {
     public:
-
-        bool Install();
-
-        RE::BSEventNotifyControl ProcessEvent(const RE::TESLoadGameEvent* a_event, RE::BSTEventSource<RE::TESLoadGameEvent>* a_source) override;
 
         static GameSession* GetSingleton()
         {
@@ -29,7 +24,6 @@ namespace MCMMemory
 
         inline void PrepareLoad()
         {
-            loadMessagesReceived = true;
             waitingForLoadMessage = true;
             newGameStarted = false;
             SetGameLoaded(false);
@@ -74,15 +68,9 @@ namespace MCMMemory
 
     private:
 
-        bool installed{};
-
         bool waitingForLoadMessage{};
 
         // For VR workaround.
         bool newGameStarted{};
-
-        // If SKSE sends kPreLoadGame before the game reads the save, 
-        // if it arrives, we don't need the game event.
-        bool loadMessagesReceived{};
     };
 }

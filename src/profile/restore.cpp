@@ -676,6 +676,21 @@ namespace MCMMemory
             }
         }
 
+        // SkyUI may still be closing this MCM from the journal, 
+        // restore the other MCMs first through the final retry,
+        // and wait only if it's still closing by then.
+        if (action.type == RestoreActionType::OpenConfig && MCMCloseWatch::GetSingleton()->IsClosing(restoreMCMs[action.mcmIndex].mcmScript)) {
+            if (!restoreMCMs[action.mcmIndex].retryQueued && !action.activationStep) {
+                logger::info("'{}' is still closing from the Journal Menu; restoring it after the remaining MCMs", restoreMCMs[action.mcmIndex].identity.modID);
+                FailMCM();
+                QueueNextAction(0.0F);
+            }
+            else {
+                QueueNextAction(GetSettings().actionTrialDelaySeconds);
+            }
+            return;
+        }
+
         auto& activeMCM = restoreMCMs[action.mcmIndex];
         if (action.type == RestoreActionType::ActivateMCM && activeMCM.activation) {
             const auto enabled = MCMActivationSupport::IsEnabled(MCMScript(activeMCM.mcmScript), *activeMCM.activation);

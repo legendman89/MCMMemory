@@ -155,7 +155,8 @@ namespace MCMMemory
         // For activation detection. I still working out a way to make this more generic.
         std::optional<MCMActivationState> mcmActivation;
 
-        size_t firstPassCount{};
+        // Retries are appended to registeredMCMs, so elements from this index are the final attempts.
+        size_t retryStartIndex{};
 
         size_t mcmIndex{};
 

@@ -8,6 +8,7 @@
 #include "profile/activity.hpp"
 #include "mcm/mcm_registry.hpp"
 #include "mcm/mcm_messages.hpp"
+#include "mcm/mcm_close_watch.hpp"
 
 #include "debug/coc_test.hpp"
 
@@ -56,6 +57,8 @@ namespace MCMMemory
         MCMRegistry::Install();
 
         MCMMessages::Install();
+
+        MCMCloseWatch::GetSingleton()->Install();
 
         HUD::GetSingleton()->Configure(GetSettings());
         if (!Activity::GetSingleton()->Load()) {

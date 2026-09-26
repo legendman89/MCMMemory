@@ -1,5 +1,6 @@
 #include "menu/hud.hpp"
 #include "mcm/mcm_support.hpp"
+#include "mcm/mcm_close_watch.hpp"
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "utils/helper.hpp"
@@ -63,7 +64,7 @@ namespace MCMMemory
     void Backup::Clear()
     {
         callWatch.Release();
-        firstPassCount = 0;
+        retryStartIndex = 0;
         registeredMCMs.clear();
         pages.clear();
         pageSettings.clear();
@@ -345,7 +346,7 @@ namespace MCMMemory
             }
         }
         registeredMCMs = std::move(currentMCMs);
-        firstPassCount = registeredMCMs.size();
+        retryStartIndex = registeredMCMs.size();
         step = BackupStep::OpenMCM;
         logger::info("Full MCM backup found {} registered MCMs", registeredMCMs.size());
         QueueNext(0.0F);
@@ -356,6 +357,15 @@ namespace MCMMemory
         if (mcmIndex >= registeredMCMs.size()) {
             step = BackupStep::Finish;
             QueueNext(0.0F);
+            return;
+        }
+
+        // SkyUI may still be closing this MCM from the journal, 
+        // back up the other MCMs first through the final retry,
+        // and wait only if it's still closing by then.
+        const bool closing = MCMCloseWatch::GetSingleton()->IsClosing(registeredMCMs[mcmIndex].mcmScript);
+        if (closing && mcmIndex >= retryStartIndex) {
+            QueueNext(GetSettings().actionTrialDelaySeconds);
             return;
         }
 
@@ -370,6 +380,14 @@ namespace MCMMemory
         mcmActivation.reset();
         mcmFailed = false;
         mcmStarted = true;
+
+        if (closing) {
+            logger::info("'{}' is still closing from the Journal Menu; backing it up after the remaining MCMs", registeredMCMs[mcmIndex].identity.modID);
+            mcmFailed = true;
+            step = BackupStep::CommitMCM;
+            QueueNext(0.0F);
+            return;
+        }
 
         MCMScript script(registeredMCMs[mcmIndex].mcmScript);
         if (NLMCMSupport::IsSupported(script)) {
@@ -661,7 +679,8 @@ namespace MCMMemory
 
         const auto& identity = registeredMCMs[mcmIndex].identity;
         UpdateMCMResult(activityMods, ActivityModResult(identity, mcmStats, mcmFailed ? OperationResult::Failed : OperationResult::Completed), &ActivityModResult::backupStats, stats);
-        const bool retry = mcmFailed && mcmIndex < firstPassCount && !MCMCallWatch::IsUnavailable(modID);
+        
+        const bool retry = mcmFailed && mcmIndex < retryStartIndex && !MCMCallWatch::IsUnavailable(modID);
         if (!retry) {
             HUD::GetSingleton()->ShowBackupMCM(identity.modName, mcmStats, OperationMode::Manual);
         }
@@ -670,6 +689,7 @@ namespace MCMMemory
             const auto entry = registeredMCMs[mcmIndex];
             registeredMCMs.push_back(entry);
         }
+        
         callWatch.EndRecovery();
 
         mcmStarted = false;

@@ -5,6 +5,7 @@
 #include "menu/hud.hpp"
 #include "mcm/mcm_calls.hpp"
 #include "mcm/mcm_support.hpp"
+#include "mcm/mcm_close_watch.hpp"
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
 #include "profile/restore.hpp"
@@ -40,6 +41,7 @@ namespace MCMMemory
             Capture::GetSingleton()->Reset();
             Restore::GetSingleton()->Reset(a_autoRestoreAllowed);
             MCMCallWatch::ResetSession();
+            MCMCloseWatch::GetSingleton()->Reset();
             SetGameLoaded(true);
             logger::info("Game session started from {}; automatic restore allowed: {}", a_reason, a_autoRestoreAllowed);
         }
@@ -51,6 +53,7 @@ namespace MCMMemory
             newGameStarted = false;
             SetGameLoaded(false);
             HUD::GetSingleton()->Reset();
+            MCMCloseWatch::GetSingleton()->Reset();
             if (sessionActive) {
                 logger::info("Game session ended at the main menu");
             }

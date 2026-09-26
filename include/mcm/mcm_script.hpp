@@ -95,6 +95,14 @@ namespace MCMMemory
             return page && page->Matches(a_pageName, a_pageIndex) && IsPageReady(a_pageIndex);
         }
 
+        // CloseConfig frees buffers in order, so _stateOptionMap si freed last.
+        // If that buffer is fully allocated, we know its close has not finished.
+        inline bool HasOpenBuffers() const
+        {
+            auto states = ReadArray("_stateOptionMap");
+            return states && states->size() >= 128;
+        }
+
     private:
 
         friend struct SkyUICycleSupport;

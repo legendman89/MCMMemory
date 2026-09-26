@@ -34,7 +34,7 @@ namespace MCMMemory
         }
 
         const float elapsedSeconds = SecondsSince(journalClosedAt, std::chrono::steady_clock::now());
-        if (!MCMScript(closingMCM->mcmScript).IsConfigOpen()) {
+        if (!MCMScript(closingMCM->mcmScript).HasOpenBuffers()) {
             logger::debug("'{}' finished closing in {:.1f} seconds after the Journal Menu closed", closingMCM->identity.modID, elapsedSeconds);
             closingMCM.reset();
             return false;
@@ -56,7 +56,7 @@ namespace MCMMemory
         }
 
         auto activeMCM = MCMRegistry().ReadActiveMCM();
-        if (!activeMCM || !MCMScript(activeMCM->mcmScript).IsConfigOpen()) {
+        if (!activeMCM || !MCMScript(activeMCM->mcmScript).HasOpenBuffers()) {
             return RE::BSEventNotifyControl::kContinue;
         }
 

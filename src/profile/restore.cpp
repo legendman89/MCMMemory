@@ -600,9 +600,6 @@ namespace MCMMemory
                     }
                     else {
                         ++mcmStats.appliedSettingCount;
-                        if (completedAction.type == RestoreActionType::ChangeKeymap) {
-                            VerifyKeymapAction(completedAction);
-                        }
                     }
                     completedAction.completed = true;
                 }

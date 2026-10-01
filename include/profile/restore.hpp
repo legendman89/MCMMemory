@@ -362,9 +362,6 @@ namespace MCMMemory
         // Checks the displayed value after clicking a control that has no typed value to read.
         void CompleteClicksAction(RestoreAction& a_action, bool a_continue);
 
-        // Reports a remapped key that the MCM row does not show, since nothing else would notice this.
-        void VerifyKeymapAction(const RestoreAction& a_action) const;
-
         // Closes and opens an MCM between two of its settings.
         void AddReopenActions(size_t a_mcmIndex);
 

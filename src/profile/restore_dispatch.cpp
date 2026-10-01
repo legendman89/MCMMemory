@@ -165,20 +165,6 @@ namespace MCMMemory
         }
     }
 
-    void Restore::VerifyKeymapAction(const RestoreAction& a_action) const
-    {
-        if (a_action.mcmIndex >= restoreMCMs.size()) {
-            return;
-        }
-        auto shownKeyCode = MCMScript(restoreMCMs[a_action.mcmIndex].mcmScript).ReadCurrentValue(ControlType::Keymap, a_action.optionIndex);
-        if (shownKeyCode && shownKeyCode->is_number_integer() && shownKeyCode->get<int>() == a_action.integerValue) {
-            return;
-        }
-        // An MCM that keeps the key only in its own variable never refreshes the row, 
-        // so this is the place a lost remap can be checked in log.
-        logger::warn("Keymap '{}' in '{}' does not show key {} after the remap", a_action.DisplayName(), restoreMCMs[a_action.mcmIndex].identity.modID, a_action.integerValue);
-    }
-
     void Restore::CompleteClicksAction(RestoreAction& a_action, bool a_continue)
     {
         if (a_continue && !a_action.refreshingCycle) {

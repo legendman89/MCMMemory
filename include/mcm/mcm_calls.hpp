@@ -43,8 +43,11 @@ namespace MCMMemory
 
         std::atomic<bool> confirmationDeclined{};
 
-        // Known activation commands may accept their own confirmation prompt.
+        // Allow restore to dismiss messages for recorded commands, activation, or key bindings.
         bool acceptConfirmation{};
+
+        // Only key binding restore calls may send native message boxes to oblivion.
+        bool dismissMessageBoxes{};
 
         // Test mode keeps this call waiting even after its real callback arrives.
         bool simulateUnresponsive{};

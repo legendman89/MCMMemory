@@ -68,6 +68,7 @@ namespace MCMMemory
         pending->functionName = a_functionName;
         pending->started = std::chrono::steady_clock::now();
         pending->acceptConfirmation = a_acceptConfirmation;
+        pending->dismissMessageBoxes = a_acceptConfirmation && (a_functionName == "RemapKey" || a_functionName == "SetModSettingInt" || a_functionName == "OnSettingChange");
         // Check for a test mode that simulates an unresponsive MCM call.
         const auto& testMCM = GetSettings().testUnresponsiveMCM;
         if (!testMCM.empty() && testMCM.size() == a_modID.size() && ContainsCaseInsensitive(testMCM, a_modID) && !simulatedUnresponsive.exchange(true)) {

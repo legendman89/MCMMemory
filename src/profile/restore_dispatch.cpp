@@ -306,6 +306,10 @@ namespace MCMMemory
             logger::debug("Profile restore calls '{}' on '{}' for '{}' (option {}, key {})", functionName, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.DisplayName(), a_action.optionIndex, a_action.integerValue);
         }
 
+        // Check which restore message mode is selected.
+        const auto messageMode = static_cast<RestoreMessageMode>(GetSettings().restoreMessageMode);
+        const bool acceptKeyBindingConfirmation = messageMode == RestoreMessageMode::KeyBindings || messageMode == RestoreMessageMode::Both;
+
         // Build the argument list expected by this script call.
         switch (GetRestoreArgumentType(a_action.type)) {
         case RestoreArgumentType::None:
@@ -319,11 +323,11 @@ namespace MCMMemory
         case RestoreArgumentType::FloatValue:
             return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(float{ a_action.floatValue }), std::move(a_result));
         case RestoreArgumentType::StringValue:
-            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(std::string{ a_action.stringValue }), std::move(a_result));
+            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(std::string{ a_action.stringValue }), std::move(a_result), a_action.type == RestoreActionType::NotifySettingChanged && acceptKeyBindingConfirmation);
         case RestoreArgumentType::SettingIntegerValue:
-            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(std::string{ a_action.stringValue }, int{ a_action.integerValue }), std::move(a_result));
+            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(std::string{ a_action.stringValue }, int{ a_action.integerValue }), std::move(a_result), a_action.controlType == ControlType::Keymap && acceptKeyBindingConfirmation);
         case RestoreArgumentType::KeymapValue:
-            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.optionIndex }, int{ a_action.integerValue }, std::string{}, std::string{}), std::move(a_result));
+            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.optionIndex }, int{ a_action.integerValue }, std::string{}, std::string{}), std::move(a_result), acceptKeyBindingConfirmation);
         case RestoreArgumentType::ToggleValue:
             return RestoreToggle(a_action, std::move(a_result));
         }

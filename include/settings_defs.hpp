@@ -2,6 +2,12 @@
 
 #include "menu/hud_defs.hpp"
 
+#define FOREACH_RESTORE_MESSAGE_MODE(MODE) \
+    MODE(Disabled, "Profile.Automation.Messages.Disabled") \
+    MODE(KeyBindings, "Profile.Automation.Messages.KeyBindings") \
+    MODE(Activation, "Profile.Automation.Messages.Activation") \
+    MODE(Both, "Profile.Automation.Messages.Both")
+
 #define FOREACH_NOTIFICATION_TOGGLE_SETTING(SETTING) \
     /* Shows backup and restore notifications through SKSE Menu Framework. */ \
     SETTING(bool, notifications, true) \
@@ -15,6 +21,8 @@
     SETTING(float, actionTrialDelaySeconds, 0.5F) \
     /* Times out each awaited Papyrus call before recovery starts. */ \
     SETTING(float, scriptCallTimeoutSeconds, 30.0F) \
+    /* Selects additional message handling during automatic and manual restore. */ \
+    SETTING(int, restoreMessageMode, static_cast<int>(RestoreMessageMode::Disabled)) \
     FOREACH_HUD_SETTING(SETTING) \
     /* Keeps the profile updated when an MCM setting changes. */ \
     SETTING(bool, autoBackup, true) \

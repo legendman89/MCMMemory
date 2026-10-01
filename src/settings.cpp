@@ -1,6 +1,6 @@
 #include "settings.hpp"
-#include "utils/helper.hpp"
 #include "utils/json.hpp"
+#include "utils/helper.hpp"
 
 namespace MCMMemory
 {
@@ -68,6 +68,10 @@ namespace MCMMemory
         }
         if (!(settings.scriptCallTimeoutSeconds >= 1.0F && settings.scriptCallTimeoutSeconds <= 300.0F)) {
             logger::error("scriptCallTimeoutSeconds must be between 1 and 300 seconds");
+            return false;
+        }
+        if (settings.restoreMessageMode < 0 || settings.restoreMessageMode >= ToIndex(RestoreMessageMode::Count)) {
+            logger::error("restoreMessageMode {} is outside the supported range", settings.restoreMessageMode);
             return false;
         }
 #define VALIDATE_HUD_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \

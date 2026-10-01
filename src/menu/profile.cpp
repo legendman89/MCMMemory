@@ -570,6 +570,7 @@ namespace MCMMemory::Menu
 
         GUI::SameLine(0.0F, 20.0F);
 
+        const float restoreColumnX = GUI::GetCursorPos().x;
         if (GUI::Checkbox(Trans::Tr("Profile.Automation.Restore").c_str(), std::addressof(settings.autoRestore))) {
             changed = true;
         }
@@ -584,6 +585,23 @@ namespace MCMMemory::Menu
         }
         GUI::EndDisabled();
         HelpMarker(Trans::Tr("Profile.Automation.Record.Tooltip").c_str());
+
+        GUI::SameLine(restoreColumnX);
+
+        GUI::SetNextItemWidth(ProfileFieldWidth);
+        const auto messagePreview = Trans::Tr(restoreMessageModeLabels[static_cast<size_t>(settings.restoreMessageMode)]);
+        const bool messageComboOpen = BeginOpaqueCombo(Trans::Tr("Profile.Automation.Messages").c_str(), messagePreview.c_str());
+        WrappedTooltip(Trans::Tr("Profile.Automation.Messages.Tooltip").c_str());
+        if (messageComboOpen) {
+            const int numModes = static_cast<int>(restoreMessageModeLabels.size());
+            for (int mode = 0; mode < numModes; ++mode) {
+                if (GUI::Selectable(Trans::Tr(restoreMessageModeLabels[mode]).c_str(), settings.restoreMessageMode == mode)) {
+                    settings.restoreMessageMode = mode;
+                    changed = true;
+                }
+            }
+            GUI::EndCombo();
+        }
 
         if (changed && !SettingsStorage::Save()) {
             logger::error("MCM Memory menu could not save its automation settings");

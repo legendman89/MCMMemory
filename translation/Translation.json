@@ -59,6 +59,12 @@
   "Profile.Automation.Restore.Tooltip": "Restore the active profile after MCM registration finishes in a new game. This does not run when loading a save.",
   "Profile.Automation.Record": "Record actions",
   "Profile.Automation.Record.Tooltip": "Remember the order you change settings in, so MCMs that must be enabled first restore correctly. Requires automatic backup.",
+  "Profile.Automation.Messages": "Dismiss MCM messages",
+  "Profile.Automation.Messages.Tooltip": "Choose what messages to dismiss during automatic and manual restore.",
+  "Profile.Automation.Messages.Disabled": "Disabled",
+  "Profile.Automation.Messages.KeyBindings": "Key bindings",
+  "Profile.Automation.Messages.Activation": "Mod activation",
+  "Profile.Automation.Messages.Both": "Both",
 
   "Profile.MCM.Header": "MCM Management",
   "Profile.MCM.Waiting": "Waiting for MCM registration...",

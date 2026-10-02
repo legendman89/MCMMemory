@@ -92,14 +92,15 @@ namespace MCMMemory
             return status == OperationStatus::Running;
         }
 
-        const auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
-        if (MCMRegistry::UsesCachedRegistry() && (registeredMCMs.empty() || MCMRegistry::IsRefreshing())) {
+        if (MCMRegistry::UsesCachedRegistry()) {
+            // MCM registration may have been forced by user since the management table was opened.
             MCMRegistry::Refresh();
             QueueRegistryCheck(GetSettings().actionTrialDelaySeconds);
             logger::info("Manual persistent profile restoration is waiting for the external MCM registry");
             return status == OperationStatus::Running;
         }
 
+        const auto registeredMCMs = MCMRegistry().ReadRegisteredMCMs();
         if (registeredMCMs.empty()) {
             HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreFailed", "HUD.Failure.NoRegisteredMCMs");
             logger::warn("Manual persistent profile restoration found no registered MCMs");

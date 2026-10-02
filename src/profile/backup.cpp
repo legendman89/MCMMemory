@@ -54,6 +54,11 @@ namespace MCMMemory
         if (!QueueWatch()) {
             return false;
         }
+        // Refresh once before reading, even when an older registry is already cached.
+        // Helps if someone forced a registry refresh before starting the backup, but the cache was still used.
+        if (MCMRegistry::UsesCachedRegistry()) {
+            MCMRegistry::Refresh();
+        }
         QueueNext(0.0F);
         if (status == OperationStatus::Running) {
             HUD::GetSingleton()->ShowBackupStarted();
@@ -301,6 +306,7 @@ namespace MCMMemory
                 QueueNext(GetSettings().actionTrialDelaySeconds);
                 return;
             }
+            logger::warn("Full MCM backup registry wait expired. Using the cached list of {} MCMs, which may not include latest registration changes", currentMCMs.size());
         }
 
         auto mcm = currentMCMs.begin();

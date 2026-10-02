@@ -80,13 +80,13 @@ namespace MCMMemory
 
         GetSettings() = settings;
 
-#define LOG_FORMATTER(type, name, defaultValue, ...) " {:<30s} : {}\n"
+#define LOG_FORMATTER(type, name, defaultValue, ...) " {:<35s} : {}\n"
 #define LOG_SETTING(type, name, defaultValue, ...) , #name, settings.name
         logger::info(
             "Loaded Settings:\n"
             FOREACH_SETTING(LOG_FORMATTER)
-            " {:<30s} : {}\n"
-            " {:<30s} : {}\n"
+            " {:<35s} : {}\n"
+            " {:<35s} : {}\n"
             FOREACH_SETTING(LOG_SETTING)
             , "Auto restore exclusions", settings.autoRestoreExcludedMCMs.size()
             , "Active profile", settings.activeProfile

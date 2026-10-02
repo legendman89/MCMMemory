@@ -89,7 +89,6 @@ namespace MCMMemory
     void MCMMessages::SetRestoreActive(bool a_restoring)
     {
         dismissRestoreMessages.store(a_restoring && GetSettings().dismissRestoreMessages);
-        restoring.store(a_restoring);
     }
 
     RE::UI_MESSAGE_RESULTS MCMMessages::ProcessMessage(RE::MessageBoxMenu* a_menu, RE::UIMessage& a_message)
@@ -150,10 +149,7 @@ namespace MCMMemory
             return false;
         }
 
-        if (!withCancel.GetBool() && restoring.load() && !dismissRestoreMessages.load()) {
-            return false;
-        }
-
+        // Always acknowledge SkyUI single-button dialogs as the Journal menu is kept closed during restore.
         auto script = caller->self.GetObject();
         auto* waiting = script ? script->GetVariable(RE::BSFixedString("_waitForMessage")) : nullptr;
         auto* result = script ? script->GetVariable(RE::BSFixedString("_messageResult")) : nullptr;

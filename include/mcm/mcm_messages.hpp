@@ -53,6 +53,6 @@ namespace MCMMemory
 
         static inline std::atomic<std::shared_ptr<MCMCallState>> activeCall;
 
-        static inline std::atomic<bool> restoring{}, dismissRestoreMessages{};
+        static inline std::atomic<bool> dismissRestoreMessages{};
     };
 }

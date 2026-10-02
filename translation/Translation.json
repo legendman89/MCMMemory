@@ -59,8 +59,8 @@
   "Profile.Automation.Restore.Tooltip": "Restore the active profile after MCM registration finishes in a new game. This does not run when loading a save.",
   "Profile.Automation.Record": "Record actions",
   "Profile.Automation.Record.Tooltip": "Remember the order you change settings in, so MCMs that must be enabled first restore correctly. Requires automatic backup.",
-  "Profile.Automation.Messages": "Dismiss single-button messages",
-  "Profile.Automation.Messages.Tooltip": "Automatically acknowledge single-button message boxes during automatic and manual restore. Multiple-choice boxes are excluded. Dismissed messages are written to the log.",
+  "Profile.Automation.Messages": "Dismiss single-button game messages",
+  "Profile.Automation.Messages.Tooltip": "Automatically acknowledge single-button game message boxes during automatic and manual restore. Multiple-choice boxes are excluded. Single-button SkyUI dialogs are always acknowledged because the MCM menu is closed during restore. Dismissed messages are written to the log.",
 
   "Profile.MCM.Header": "MCM Management",
   "Profile.MCM.Waiting": "Waiting for MCM registration...",

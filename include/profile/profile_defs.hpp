@@ -15,6 +15,7 @@
 
 // These flags are excluded from JSON when false.
 #define FOREACH_SETTING_FLAG(FIELD, object) \
+    FIELD(object, "confirmationAccepted", confirmationAccepted) \
     FIELD(object, "pageScopedState", pageScopedState) \
     FIELD(object, "textControl", textControl) \
     FIELD(object, "recorded", recorded) \

@@ -188,6 +188,9 @@ namespace MCMMemory
 
         bool confirmedCommand{};
 
+        // The player approved a SkyUI confirmation while recording this setting change.
+        bool confirmationAccepted{};
+
         // Flag if player was seen doing recording.
         // Scanned settings (captured values) have no position and can be restored at once afterwards.
         bool recorded{};

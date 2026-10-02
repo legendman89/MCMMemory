@@ -530,6 +530,8 @@ namespace MCMMemory
 
     void Capture::StoreCapturedSetting(CaptureRecord& a_record, CapturedSetting a_setting)
     {
+        // Commands use their existing approval field for compatibility with older profiles.
+        a_setting.confirmationAccepted = !a_setting.command && GetSettings().recordActions && a_record.confirmationAccepted && !a_record.confirmationCancelled;
         a_record.captureComplete = true;
         a_record.capturePending = false;
 

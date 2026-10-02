@@ -144,6 +144,8 @@ namespace MCMMemory
 
         bool confirmedCommand{};
 
+        bool confirmationAccepted{};
+
         // A final retry must not repeat a setting or follow-up that already finished.
         bool completed{};
 

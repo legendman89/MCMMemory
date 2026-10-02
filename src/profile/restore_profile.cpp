@@ -194,6 +194,7 @@ namespace MCMMemory
         // Add the page call first, then the control specific calls.
         size_t mcmIndex = GetOrAddMCM(a_setting.selection.identity);
         settingChangedAction.mcmIndex = mcmIndex;
+        settingChangedAction.confirmationAccepted = a_setting.confirmationAccepted;
         for (auto* action : { &requestAction, &applyAction }) {
             action->mcmIndex = mcmIndex;
             action->controlType = a_setting.type;
@@ -205,6 +206,7 @@ namespace MCMMemory
             action->pageIndex = a_setting.selection.pageIndex;
             action->command = a_setting.command;
             action->confirmedCommand = a_setting.confirmedCommand;
+            action->confirmationAccepted = a_setting.confirmationAccepted;
         }
         if (a_setting.reopensConfig && !restoreMCMs[mcmIndex].settingActions.empty()) {
             // The user left this MCM and came back before making this change, so its handler ran

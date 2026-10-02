@@ -17,7 +17,7 @@ namespace MCMMemory
 
     bool Restore::RestoreToggle(const RestoreAction& a_action, std::function<void()> a_result)
     {
-        return CallMCMFunction(a_action.mcmIndex, RestoreActionFunctionName(a_action.type), RE::MakeFunctionArguments(int{ a_action.optionIndex }), std::move(a_result));
+        return CallMCMFunction(a_action.mcmIndex, RestoreActionFunctionName(a_action.type), RE::MakeFunctionArguments(int{ a_action.optionIndex }), std::move(a_result), a_action.confirmationAccepted, a_action.confirmationAccepted);
     }
 
     bool Restore::IsActionValid(const RestoreAction& a_action) const
@@ -250,7 +250,9 @@ namespace MCMMemory
             }
             a_action.previousCycleText = *text;
             ++a_action.cycleClicks;
-            return CallMCMFunction(a_action.mcmIndex, "SelectOption", RE::MakeFunctionArguments(int{ a_action.optionIndex }), std::move(a_result));
+            // Approval is due to the recorded click only.
+            const bool acceptConfirmation = a_action.confirmationAccepted && a_action.cycleClicks == 1;
+            return CallMCMFunction(a_action.mcmIndex, "SelectOption", RE::MakeFunctionArguments(int{ a_action.optionIndex }), std::move(a_result), acceptConfirmation, acceptConfirmation);
         }
 
         if (a_action.type == RestoreActionType::ApplyCycle) {
@@ -267,7 +269,8 @@ namespace MCMMemory
             }
             a_action.previousCycleValue = *value;
             ++a_action.cycleClicks;
-            return CallMCMFunction(a_action.mcmIndex, "SelectOption", RE::MakeFunctionArguments(int{ *index }), std::move(a_result));
+            const bool acceptConfirmation = a_action.confirmationAccepted && a_action.cycleClicks == 1;
+            return CallMCMFunction(a_action.mcmIndex, "SelectOption", RE::MakeFunctionArguments(int{ *index }), std::move(a_result), acceptConfirmation, acceptConfirmation);
         }
 
         // The MCM activation control is not a setting, so it is handled separately.
@@ -292,6 +295,7 @@ namespace MCMMemory
             logger::debug("Profile restore calls '{}' on '{}' for '{}' (option {}, key {})", functionName, restoreMCMs[a_action.mcmIndex].identity.modID, a_action.DisplayName(), a_action.optionIndex, a_action.integerValue);
         }
 
+        const bool acceptConfirmation = a_action.confirmationAccepted && (IsRestoreApplyAction(a_action.type) || a_action.type == RestoreActionType::NotifySettingChanged);
         // Build the argument list expected by this script call.
         switch (GetRestoreArgumentType(a_action.type)) {
         case RestoreArgumentType::None:
@@ -301,15 +305,15 @@ namespace MCMMemory
         case RestoreArgumentType::OptionIndex:
             return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.optionIndex }), std::move(a_result));
         case RestoreArgumentType::IntegerValue:
-            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.integerValue }), std::move(a_result), a_action.command && a_action.confirmedCommand, a_action.command);
+            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.integerValue }), std::move(a_result), acceptConfirmation || (a_action.command && a_action.confirmedCommand), a_action.command || acceptConfirmation);
         case RestoreArgumentType::FloatValue:
-            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(float{ a_action.floatValue }), std::move(a_result));
+            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(float{ a_action.floatValue }), std::move(a_result), acceptConfirmation, acceptConfirmation);
         case RestoreArgumentType::StringValue:
-            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(std::string{ a_action.stringValue }), std::move(a_result));
+            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(std::string{ a_action.stringValue }), std::move(a_result), acceptConfirmation, acceptConfirmation);
         case RestoreArgumentType::SettingIntegerValue:
-            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(std::string{ a_action.stringValue }, int{ a_action.integerValue }), std::move(a_result));
+            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(std::string{ a_action.stringValue }, int{ a_action.integerValue }), std::move(a_result), acceptConfirmation, acceptConfirmation);
         case RestoreArgumentType::KeymapValue:
-            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.optionIndex }, int{ a_action.integerValue }, std::string{}, std::string{}), std::move(a_result));
+            return CallMCMFunction(a_action.mcmIndex, functionName, RE::MakeFunctionArguments(int{ a_action.optionIndex }, int{ a_action.integerValue }, std::string{}, std::string{}), std::move(a_result), acceptConfirmation, acceptConfirmation);
         case RestoreArgumentType::ToggleValue:
             return RestoreToggle(a_action, std::move(a_result));
         }

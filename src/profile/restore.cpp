@@ -3,6 +3,7 @@
 #include "session.hpp"
 
 #include "mcm/mcm_support.hpp"
+#include "mcm/mcm_messages.hpp"
 #include "utils/helper.hpp"
 #include "utils/time.hpp"
 
@@ -40,6 +41,7 @@ namespace MCMMemory
         configValid = false;
         started = false;
         restoring = false;
+        MCMMessages::SetRestoreActive(false);
         waitingForCharacterCreation = false;
         registryCheckQueued = false;
         currentActionIndex = 0;
@@ -122,6 +124,7 @@ namespace MCMMemory
         }
 
         status = OperationStatus::Stopping;
+        MCMMessages::SetRestoreActive(false);
         started = true;
         callWatch.Cancel();
         if (!restoring) {
@@ -415,6 +418,7 @@ namespace MCMMemory
         }
 
         restoring = true;
+        MCMMessages::SetRestoreActive(true);
 
         if (operationMode == OperationMode::Automatic) {
             HUD::GetSingleton()->ShowRestoreStarted();
@@ -434,6 +438,7 @@ namespace MCMMemory
 
     void Restore::FinishRestore()
     {
+        MCMMessages::SetRestoreActive(false);
         callWatch.Release();
         restoring = false;
         status = OperationStatus::Idle;
@@ -855,6 +860,7 @@ namespace MCMMemory
 
     void Restore::FinishCancellation(OperationResult a_result, bool a_unsafe)
     {
+        MCMMessages::SetRestoreActive(false);
         // Values already applied remain changed, so record the interrupted result.
         if (mcmStarted && !mcmStatsRecorded) {
             FinishMCMStats(activeMCMIndex, a_result);

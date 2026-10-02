@@ -588,20 +588,10 @@ namespace MCMMemory::Menu
 
         GUI::SameLine(restoreColumnX);
 
-        GUI::SetNextItemWidth(ProfileFieldWidth);
-        const auto messagePreview = Trans::Tr(restoreMessageModeLabels[static_cast<size_t>(settings.restoreMessageMode)]);
-        const bool messageComboOpen = BeginOpaqueCombo(Trans::Tr("Profile.Automation.Messages").c_str(), messagePreview.c_str());
-        WrappedTooltip(Trans::Tr("Profile.Automation.Messages.Tooltip").c_str());
-        if (messageComboOpen) {
-            const int numModes = static_cast<int>(restoreMessageModeLabels.size());
-            for (int mode = 0; mode < numModes; ++mode) {
-                if (GUI::Selectable(Trans::Tr(restoreMessageModeLabels[mode]).c_str(), settings.restoreMessageMode == mode)) {
-                    settings.restoreMessageMode = mode;
-                    changed = true;
-                }
-            }
-            GUI::EndCombo();
+        if (GUI::Checkbox(Trans::Tr("Profile.Automation.Messages").c_str(), std::addressof(settings.dismissRestoreMessages))) {
+            changed = true;
         }
+        HelpMarker(Trans::Tr("Profile.Automation.Messages.Tooltip").c_str());
 
         if (changed && !SettingsStorage::Save()) {
             logger::error("MCM Memory menu could not save its automation settings");

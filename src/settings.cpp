@@ -70,10 +70,6 @@ namespace MCMMemory
             logger::error("scriptCallTimeoutSeconds must be between 1 and 300 seconds");
             return false;
         }
-        if (settings.restoreMessageMode < 0 || settings.restoreMessageMode >= ToIndex(RestoreMessageMode::Count)) {
-            logger::error("restoreMessageMode {} is outside the supported range", settings.restoreMessageMode);
-            return false;
-        }
 #define VALIDATE_HUD_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, format) \
         if (settings.settingName < minimum || settings.settingName > maximum) { \
             logger::error(#settingName " {} is outside the supported range {} through {}", settings.settingName, minimum, maximum); \

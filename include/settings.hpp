@@ -6,21 +6,6 @@
 
 namespace MCMMemory
 {
-    enum class RestoreMessageMode : int
-    {
-#define DECLARE_RESTORE_MESSAGE_MODE(name, label) name,
-        FOREACH_RESTORE_MESSAGE_MODE(DECLARE_RESTORE_MESSAGE_MODE)
-#undef DECLARE_RESTORE_MESSAGE_MODE
-        Count
-    };
-
-    inline constexpr std::array<std::string_view, ToIndex(RestoreMessageMode::Count)> restoreMessageModeLabels
-    {
-#define DECLARE_RESTORE_MESSAGE_LABEL(name, label) label,
-        FOREACH_RESTORE_MESSAGE_MODE(DECLARE_RESTORE_MESSAGE_LABEL)
-#undef DECLARE_RESTORE_MESSAGE_LABEL
-    };
-
     struct Settings
     {
         // Chooses the profile file used by capture, backup and restore.

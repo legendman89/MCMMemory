@@ -11,7 +11,6 @@ namespace MCMMemory
     using MCMMessageDispatch = bool (*)(const RE::BSScript::NF_util::NativeFunctionBase*, RE::BSScript::Variable&, RE::BSScript::Internal::VirtualMachine&, RE::VMStackID, RE::BSScript::Variable&, const RE::BSScript::StackFrame&);
 
     // Each native function gets its own vtable so irrelevant Papyrus functions are untouched.
-    // Grouped what I need in a struct to reuse with Debug and SkyUI dialogs.
     // SkyUI Community via SKI_ConfigBase.ShowMessage uses UI.InvokeStringA to open SkyUI dialogs.
     struct MCMMessageFunction
     {
@@ -26,10 +25,12 @@ namespace MCMMemory
         static constexpr size_t dispatchIndex{ 0x16 };
     };
 
-    // Handles dialogs only when they belong to our current backup/restore call.
+    // Handles watched SkyUI dialogs and single-button native boxes during restore.
     struct MCMMessages
     {
         static bool Install();
+
+        static void SetRestoreActive(bool a_restoring);
 
         static inline void Track(std::shared_ptr<MCMCallState> a_call) { activeCall.store(std::move(a_call)); }
 
@@ -44,10 +45,14 @@ namespace MCMMemory
 
         static bool HandleMessage(const RE::BSScript::StackFrame& a_frame);
 
-        static bool HandleMessageBox(const RE::BSScript::StackFrame& a_frame);
+        static RE::UI_MESSAGE_RESULTS ProcessMessage(RE::MessageBoxMenu* a_menu, RE::UIMessage& a_message);
 
-        static inline MCMMessageFunction skyUIMessage, debugMessageBox;
+        static inline MCMMessageFunction skyUIMessage;
+
+        static inline REL::Relocation<decltype(&ProcessMessage)> originalProcessMessage;
 
         static inline std::atomic<std::shared_ptr<MCMCallState>> activeCall;
+
+        static inline std::atomic<bool> restoring{}, dismissRestoreMessages{};
     };
 }

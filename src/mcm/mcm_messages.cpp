@@ -1,5 +1,6 @@
 #include "mcm/mcm_messages.hpp"
 #include "mcm/mcm_calls.hpp"
+#include "settings.hpp"
 
 namespace MCMMemory
 {
@@ -58,17 +59,17 @@ namespace MCMMemory
 
             const auto* replacementTable = replacementVTable.data() + 1;
             if (!REL::safe_write(reinterpret_cast<uintptr_t>(candidate.get()), &replacementTable, sizeof(replacementTable), &originalTable, sizeof(originalTable))) {
-                logger::error("MCM message handling could not install its {}.{} hook", a_scriptName, a_functionName);
+                logger::error("SkyUI message handling could not install its {}.{} hook", a_scriptName, a_functionName);
                 return false;
             }
             function = std::move(candidate);
             
-            logger::info("MCM message handling installed for {}.{} during watched calls", a_scriptName, a_functionName);
+            logger::info("SkyUI message hook installed for {}.{} during watched calls", a_scriptName, a_functionName);
 
             return true;
         }
 
-        logger::error("MCM message handling could not find {}.{}; the watchdog remains active", a_scriptName, a_functionName);
+        logger::error("SkyUI message handling could not find {}.{}; the watchdog remains active", a_scriptName, a_functionName);
 
         return false;
     }
@@ -76,39 +77,45 @@ namespace MCMMemory
     bool MCMMessages::Install()
     {
         constexpr std::array skyUIParameters{ RawType::kString, RawType::kString, RawType::kStringArray };
-        constexpr std::array messageBoxParameters{ RawType::kString };
-        const bool skyUIInstalled = skyUIMessage.Install("UI", "InvokeStringA", skyUIParameters, &Dispatch);
-        const bool messageBoxInstalled = debugMessageBox.Install("Debug", "MessageBox", messageBoxParameters, &Dispatch);
-        return skyUIInstalled && messageBoxInstalled;
+        if (!originalProcessMessage.address()) {
+            REL::Relocation<uintptr_t> vtable{ RE::MessageBoxMenu::VTABLE[0] };
+            originalProcessMessage = vtable.write_vfunc(0x04, &ProcessMessage);
+            logger::info("Native message hook installed for single-button message boxes");
+        }
+
+        return skyUIMessage.Install("UI", "InvokeStringA", skyUIParameters, &Dispatch);
+    }
+
+    void MCMMessages::SetRestoreActive(bool a_restoring)
+    {
+        dismissRestoreMessages.store(a_restoring && GetSettings().dismissRestoreMessages);
+        restoring.store(a_restoring);
+    }
+
+    RE::UI_MESSAGE_RESULTS MCMMessages::ProcessMessage(RE::MessageBoxMenu* a_menu, RE::UIMessage& a_message)
+    {
+        const auto result = originalProcessMessage(a_menu, a_message);
+        if (!dismissRestoreMessages.load() || !a_message.type.any(RE::UI_MESSAGE_TYPE::kShow, RE::UI_MESSAGE_TYPE::kReshow)) {
+            return result;
+        }
+
+        const auto* data = RE::MessageBoxMenu::GetCurrentMessageBoxData();
+        if (data && data->buttonText.size() == 1) {
+            logger::info("Dismissed single-button message box during restore: \n '{}'", data->bodyText.c_str());
+            // Use the normal response so native callbacks receive their answer.
+            RE::MessageBoxMenu::SelectOption(0);
+        }
+        return result;
     }
 
     bool MCMMessages::Dispatch(const RE::BSScript::NF_util::NativeFunctionBase* a_function, RE::BSScript::Variable& a_base, RE::BSScript::Internal::VirtualMachine& a_vm, RE::VMStackID a_stackID, RE::BSScript::Variable& a_result, const RE::BSScript::StackFrame& a_frame)
     {
-        const bool nativeMessageBox = a_function == debugMessageBox.function.get();
-        if (nativeMessageBox ? HandleMessageBox(a_frame) : HandleMessage(a_frame)) {
+        if (HandleMessage(a_frame)) {
             a_result.SetNone();
             return true;
         }
 
-        const auto originalDispatch = nativeMessageBox ? debugMessageBox.originalDispatch : skyUIMessage.originalDispatch;
-        return originalDispatch(a_function, a_base, a_vm, a_stackID, a_result, a_frame);
-    }
-
-    bool MCMMessages::HandleMessageBox(const RE::BSScript::StackFrame& a_frame)
-    {
-        const auto call = activeCall.load();
-        if (!call || !call->dismissMessageBoxes || call->completed.load(std::memory_order_acquire) || !a_frame.parent || a_frame.parent->callback.get() != call->callback) {
-            return false;
-        }
-
-        const auto& message = a_frame.GetStackFrameVariable(0, a_frame.GetPageForFrame());
-        if (!message.IsString()) {
-            return false;
-        }
-
-        logger::info("Dismissed Debug.MessageBox '{}' during '{}' on '{}'", message.GetString(), call->functionName, call->modID);
-       
-        return true;
+        return skyUIMessage.originalDispatch(a_function, a_base, a_vm, a_stackID, a_result, a_frame);
     }
 
     bool MCMMessages::HandleMessage(const RE::BSScript::StackFrame& a_frame)
@@ -140,6 +147,10 @@ namespace MCMMemory
 
         const auto& withCancel = caller->GetStackFrameVariable(1, caller->GetPageForFrame());
         if (!withCancel.IsBool()) {
+            return false;
+        }
+
+        if (!withCancel.GetBool() && restoring.load() && !dismissRestoreMessages.load()) {
             return false;
         }
 

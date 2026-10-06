@@ -24,8 +24,8 @@ set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory("$ENV{COMMONLIB_SSE_FOLDER}" ${CMAKE_CURRENT_BINARY_DIR}/_deps/clib-build)
 get_target_property(COMMONLIB_SRC_DIR CommonLibSSE SOURCE_DIR)
 
-file(GLOB_RECURSE headers CONFIGURE_DEPENDS include/*.h include/*.hpp)
-file(GLOB_RECURSE sources CONFIGURE_DEPENDS src/*.cpp)
+file(GLOB_RECURSE headers CONFIGURE_DEPENDS include/*.h include/*.hpp bridge/*.h bridge/*.hpp)
+file(GLOB_RECURSE sources CONFIGURE_DEPENDS src/*.cpp bridge/*.cpp)
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${headers} ${sources})
 
@@ -50,7 +50,7 @@ target_compile_definitions(
         WIN32_LEAN_AND_MEAN
 )
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:Release>:/Zi>")

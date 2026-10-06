@@ -7,19 +7,6 @@
 
 namespace MCMMemory
 {
-    struct HostBridge::PendingCall
-    {
-        std::shared_ptr<Context> context;
-        std::string modID;
-        std::string function;
-        std::vector<std::string> strings;
-        std::vector<MCMHostArgument> arguments;
-        std::function<void(MCMHostResult, bool)> completion;
-        std::chrono::steady_clock::time_point deadline;
-        uint32_t timeout{};
-        bool acceptConfirmation{};
-    };
-
     bool HostBridge::Acquire(bool)
     {
         const auto module = GetModuleHandleW(L"MCMBridge.dll");
@@ -54,15 +41,33 @@ namespace MCMMemory
     {
         if (auto current = std::exchange(context, {})) {
             current->released = true;
-            current->api->end_context(current->token);
+            if (current->token) {
+                current->api->end_context(current->token);
+            }
         }
     }
 
     void HostBridge::Cancel()
     {
         if (context) {
-            context->api->cancel_context(context->token);
+            context->cancelled = true;
+            if (context->token) {
+                context->api->cancel_context(context->token);
+            }
         }
+    }
+
+    void HostBridge::Recover()
+    {
+        if (!context) {
+            return;
+        }
+
+        auto next = std::make_shared<Context>();
+        next->api = context->api;
+        // End the failed MCM context before opening another one.
+        Release();
+        context = std::move(next);
     }
 
     bool HostBridge::Call(std::string_view a_modID, std::string_view a_function, RE::BSScript::IFunctionArguments* a_arguments,
@@ -115,9 +120,26 @@ namespace MCMMemory
         return true;
     }
 
+    void HostBridge::RetryTask::operator()() const
+    {
+        Attempt(call);
+    }
+
+    void MCM_HOST_CALL HostBridge::Complete(void* a_user, MCMHostResult a_result, uint32_t a_declined)
+    {
+        std::unique_ptr<std::shared_ptr<PendingCall>> pending(static_cast<std::shared_ptr<PendingCall>*>(a_user));
+        (*pending)->completion(a_result, a_declined != 0);
+    }
+
+    bool HostBridge::Retry(const std::shared_ptr<PendingCall>& a_call)
+    {
+        // Let Bridge finish closing or applying its pause before retrying.
+        return Scheduler::GetSingleton()->ScheduleAfterFrames(RetryTask{ a_call }, 1);
+    }
+
     void HostBridge::Attempt(const std::shared_ptr<PendingCall>& a_call)
     {
-        if (a_call->context->released) {
+        if (a_call->context->released || a_call->context->cancelled) {
             a_call->completion(MCM_HOST_CANCELLED, false);
             return;
         }
@@ -126,17 +148,27 @@ namespace MCMMemory
             a_call->completion(MCM_HOST_TIMED_OUT, false);
             return;
         }
-        
+
+        if (!a_call->context->token) {
+            // Closing may be asynchronous. Wait for a fresh context before sending the next call.
+            MCMHostContext token{};
+            const auto result = a_call->context->api->begin_context("MCMMemory", 0, &token);
+            if (result == MCM_HOST_BUSY && Retry(a_call)) {
+                return;
+            }
+            if (result != MCM_HOST_OK || !token) {
+                a_call->completion(result == MCM_HOST_OK ? MCM_HOST_UNAVAILABLE : result, false);
+                return;
+            }
+            a_call->context->token = token;
+        }
+
         const MCMHostCall request{ a_call->modID.c_str(), a_call->function.c_str(), a_call->arguments.data(), static_cast<uint32_t>(a_call->arguments.size()), a_call->timeout, a_call->acceptConfirmation ? 1U : 0U };
 
         // Keep the call alive until completion, even if its context is released.
         // Bridge may call back immediately; rejected calls need cleanup below.
         auto* receiver = new std::shared_ptr<PendingCall>(a_call);
-        const auto result = a_call->context->api->invoke(a_call->context->token, &request,
-            [](void* a_user, MCMHostResult a_result, uint32_t a_declined) {
-                std::unique_ptr<std::shared_ptr<PendingCall>> pending(static_cast<std::shared_ptr<PendingCall>*>(a_user));
-                (*pending)->completion(a_result, a_declined != 0);
-            }, receiver);
+        const auto result = a_call->context->api->invoke(a_call->context->token, &request, Complete, receiver);
 
         if (result == MCM_HOST_OK) {
             return;
@@ -145,11 +177,8 @@ namespace MCMMemory
         delete receiver;
 
         // Busy means no script call started, so it is safe to retry.
-        if (result == MCM_HOST_BUSY) {
-            // Give the UI a frame to apply the pause before retrying.
-            if (Scheduler::GetSingleton()->ScheduleAfterFrames([a_call] { Attempt(a_call); }, 1)) {
-                return;
-            }
+        if (result == MCM_HOST_BUSY && Retry(a_call)) {
+            return;
         }
 
         a_call->completion(result, false);

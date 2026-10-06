@@ -191,6 +191,7 @@ namespace MCMMemory
         logger::error("MCM '{}' did not finish safely and will be skipped by scripted operations for this game session", modID);
         Consume();
         EndRecovery();
+        host.Recover();
     }
 
     bool MCMCallWatch::IsUnavailable(std::string_view a_modID)

@@ -244,6 +244,7 @@
   "HUD.Failure.RestoreStopped": "Restore stopped",
   "HUD.Failure.ExistingProfileUnreadable": "Existing profile could not be read",
   "HUD.Failure.NoSelectedMCMs": "No selected MCMs were available",
+  "HUD.Failure.RecordedMCMsSkipped": "Recorded MCMs are skipped by manual backup; record changes to update them",
   "HUD.Failure.ProfileUnchanged": "Existing profile was not changed",
   "HUD.Failure.ProfileSavePending": "Changes remain unsaved; reopen and close the pause menu to retry saving",
   "HUD.Failure.ProfileLoadFailed": "Profile could not be loaded",

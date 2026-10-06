@@ -51,7 +51,8 @@ namespace MCMMemory
 
     RE::BSEventNotifyControl MCMCloseWatch::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
     {
-        if (!a_event || a_event->opening || std::string_view(a_event->menuName.c_str()) != RE::JournalMenu::MENU_NAME) {
+        // Bridge CloseConfig completion independently of the Journal.
+        if (GetModuleHandleW(L"MCMBridge.dll") || !a_event || a_event->opening || std::string_view(a_event->menuName.c_str()) != RE::JournalMenu::MENU_NAME) {
             return RE::BSEventNotifyControl::kContinue;
         }
 

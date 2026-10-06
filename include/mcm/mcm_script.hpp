@@ -53,6 +53,9 @@ namespace MCMMemory
 
         bool CanSelectOption(int a_optionIndex) const;
 
+        // This is used by the bridge to wait for a disabled text control to refresh.
+        std::optional<bool> IsOptionDisabled(int a_optionIndex) const;
+
         // SkyUI stores text controls as type 2. 
         // Some MCM pages have no typed value, only displayed text.
         bool IsTextControl(int a_optionIndex) const;

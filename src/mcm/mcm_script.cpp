@@ -449,6 +449,17 @@ namespace MCMMemory
         return (flagsOnly & 2) == 0;
     }
 
+    std::optional<bool> MCMScript::IsOptionDisabled(int a_optionIndex) const
+    {
+        auto flag = a_optionIndex >= 0 ? ReadNumber("_optionFlagsBuf", static_cast<size_t>(a_optionIndex)) : std::nullopt;
+        if (!flag || *flag < 0) {
+            return std::nullopt;
+        }
+
+        // SkyUI stores the disabled flag in the high byte.
+        return (GET_FLAGS_ONLY(static_cast<uint32_t>(*flag)) & 1U) != 0;
+    }
+
     std::optional<int> MCMScript::FindControlIndex(const MCMControl& a_control, int a_previousIndex) const
     {
         if (a_control.stateName.empty()) {

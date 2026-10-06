@@ -21,6 +21,10 @@ namespace MCMMemory
             return true;
         }
 
+        if (GetModuleHandleW(L"MCMBridge.dll")) {
+            return InstallHostCapture();
+        }
+
         auto modEvents = SKSE::GetModCallbackEventSource();
 
         auto ui = RE::UI::GetSingleton();
@@ -47,6 +51,8 @@ namespace MCMMemory
     {
         std::scoped_lock lock(captureMutex);
         CancelProfileSaveTask();
+        hostCaptures.clear();
+        hostSession = 0;
         // Old scheduled tasks will stop when they see a different loaded game session.
         ++loadedGameSession;
         // To distinguish between MCMs opened in the same game session.
@@ -133,6 +139,7 @@ namespace MCMMemory
         }
         menuOpenedEventID = eventCount;
         detectedActivations.clear();
+        hostCaptures.clear();
         settings.clear();
         return true;
     }
@@ -166,7 +173,7 @@ namespace MCMMemory
 
     RE::BSEventNotifyControl Capture::ProcessEvent(const SKSE::ModCallbackEvent* a_event, RE::BSTEventSource<SKSE::ModCallbackEvent>*)
     {
-        if (!a_event || MCMCallWatch::IsBusy()) {
+        if (hostPresent || !a_event || MCMCallWatch::IsBusy()) {
             return RE::BSEventNotifyControl::kContinue;
         }
 
@@ -308,7 +315,7 @@ namespace MCMMemory
 
     RE::BSEventNotifyControl Capture::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
     {
-        if (!a_event || std::string_view(a_event->menuName.c_str()) != RE::JournalMenu::MENU_NAME) {
+        if (hostPresent || !a_event || std::string_view(a_event->menuName.c_str()) != RE::JournalMenu::MENU_NAME) {
             return RE::BSEventNotifyControl::kContinue;
         }
 

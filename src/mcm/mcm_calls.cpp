@@ -23,7 +23,7 @@ namespace MCMMemory
         }
     }
 
-    bool MCMCallWatch::Acquire()
+    bool MCMCallWatch::Acquire(bool a_restore)
     {
         MCMCallWatch* expected{};
         if (!owner.compare_exchange_strong(expected, this)) {
@@ -32,11 +32,16 @@ namespace MCMMemory
         Consume();
         EndRecovery();
         configuredTimeoutSeconds = GetSettings().scriptCallTimeoutSeconds;
+        if (!host.Acquire(a_restore)) {
+            owner.store(nullptr);
+            return false;
+        }
         return true;
     }
 
     void MCMCallWatch::Release(bool a_abandonPending)
     {
+        host.Release();
         if (a_abandonPending) {
             Abandon();
         }
@@ -77,6 +82,23 @@ namespace MCMMemory
         }
         RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> result(new MCMCallResult(std::move(a_task), pending));
         pending->callback = result.get();
+        // If the host bridge is present, use it to call the MCM function. Otherwise, call it directly through the Papyrus VM.
+        if (host.Active()) {
+            const auto state = pending;
+            const bool submitted = host.Call(a_modID, a_functionName, a_arguments, timeoutSeconds, a_acceptConfirmation,
+                [state, result](MCMHostResult a_status, bool a_declined) {
+                    state->confirmationDeclined.store(a_declined, std::memory_order_release);
+                    if (a_status != MCM_HOST_OK) {
+                        logger::error("Native host call '{}' on '{}' failed (result {})", state->functionName, state->modID, a_status);
+                        state->hostFailed.store(true, std::memory_order_release);
+                    }
+                    (*result)(RE::BSScript::Variable{});
+                });
+            if (!submitted) {
+                Consume();
+            }
+            return submitted;
+        }
         MCMMessages::Track(pending);
         logger::debug("Watching MCM call '{}' on '{}' (timeout {}s)", a_functionName, a_modID, timeoutSeconds);
         if (!a_script.Call(a_functionName, a_arguments, std::move(result))) {
@@ -88,6 +110,7 @@ namespace MCMMemory
 
     void MCMCallWatch::Cancel()
     {
+        host.Cancel();
         // Cancellation and timeout recovery share the same waiting period, including CloseConfig.
         if (!recovering) {
             recovering = true;
@@ -97,6 +120,10 @@ namespace MCMMemory
 
     MCMCallStatus MCMCallWatch::Check()
     {
+        if (pending && pending->hostFailed.load(std::memory_order_acquire)) {
+            // No successful VM result exists. Use the existing failure branch.
+            return MCMCallStatus::Expired;
+        }
         const auto now = std::chrono::steady_clock::now();
         if (!pending) {
             return recovering && now >= recoveryWaitEndsAt ? MCMCallStatus::Expired : MCMCallStatus::None;

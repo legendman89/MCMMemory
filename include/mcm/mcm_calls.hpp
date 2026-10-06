@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mcm/mcm_script.hpp"
+#include "bridge/host_bridge.hpp"
 #include "utils/time.hpp"
 
 namespace MCMMemory
@@ -41,6 +42,8 @@ namespace MCMMemory
 
         std::atomic<bool> completed{};
 
+        std::atomic<bool> hostFailed{};
+
         std::atomic<bool> confirmationDeclined{};
 
         // Accept confirmations for recorded commands or activation actions.
@@ -70,7 +73,7 @@ namespace MCMMemory
 
         // Returns true if this thread acquired ownership of the MCM call watch.
         // Only one operation can watch MCM calls at a time.
-        bool Acquire();
+        bool Acquire(bool a_restore = false);
 
         // Releases ownership of the MCM call watch.
         // If a_abandonPending is true, the pending call is abandoned and will not be recovered.
@@ -105,6 +108,8 @@ namespace MCMMemory
         
         inline bool HasCall() const { return pending != nullptr; }
 
+        inline bool UsesHost() const { return host.Active(); }
+
         inline bool TimedOut() const { return timedOut; }
 
         inline bool IsClosing() const { return pending && pending->functionName == "CloseConfig"; }
@@ -118,6 +123,8 @@ namespace MCMMemory
         }
 
     private:
+
+        HostBridge host;
 
         std::shared_ptr<MCMCallState> pending;
 

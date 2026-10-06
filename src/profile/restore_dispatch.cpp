@@ -177,6 +177,38 @@ namespace MCMMemory
         a_action.refreshingCycle = false;
         MCMScript script(restoreMCMs[a_action.mcmIndex].mcmScript);
         auto text = script.ReadOptionText(a_action.optionIndex);
+        if (callWatch.UsesHost()) {
+            // A refresh can replace the row. Never confirm or click the new row.
+            a_continue = a_continue && IsActionValid(a_action) && IsActionPageReady(a_action);
+            if (a_continue && text && *text != a_action.stringValue) {
+                // Option disabled means it's updating, so force bridge to refresh.
+                const auto disabled = script.IsOptionDisabled(a_action.optionIndex);
+                if (!disabled) {
+                    a_continue = false;
+                }
+                else if (*disabled) {
+                    const auto now = std::chrono::steady_clock::now();
+                    if (a_action.hostControlWaitEndsAt == TimePoint{}) {
+                        a_action.hostControlWaitEndsAt = TimeAfter(now, GetSettings().scriptCallTimeoutSeconds);
+                    }
+                    if (now < a_action.hostControlWaitEndsAt) {
+                        a_action.hostControlNextCheck = TimeAfter(now, std::max(0.1F, GetSettings().actionTrialDelaySeconds));
+                        a_action.refreshingCycle = true;
+                        currentActionIndex = pendingActionIndex;
+                        return;
+                    }
+                    logger::warn("MCM Bridge control '{}' remained disabled until its verification timeout", a_action.optionLabel);
+                    a_continue = false;
+                }
+                else if (!script.CanSelectOption(a_action.optionIndex)) {
+                    a_continue = false;
+                }
+            }
+        }
+
+        a_action.hostControlWaitEndsAt = {};
+        a_action.hostControlNextCheck = {};
+
         if (a_continue && text && *text == a_action.stringValue) {
             ++mcmStats.appliedSettingCount;
             logger::info("Restored text setting '{}' in {} clicks (value '{}')", a_action.optionLabel, a_action.cycleClicks, *text);

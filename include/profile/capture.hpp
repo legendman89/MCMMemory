@@ -11,6 +11,7 @@
 #include "utils/scheduler.hpp"
 
 #include "settings.hpp"
+#include "bridge/MCMBridgeHost.h"
 
 namespace MCMMemory
 {
@@ -108,6 +109,14 @@ namespace MCMMemory
         RE::BSEventNotifyControl ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>* a_source) override;
 
     private:
+
+        struct HostCapture
+        {
+            CaptureRecord record;
+            CapturedSetting setting;
+            RE::BSTSmartPointer<RE::BSScript::Object> script;
+            std::optional<MCMActivationState> activation;
+        };
 
         friend struct ReadCaptureTask;
 
@@ -268,6 +277,14 @@ namespace MCMMemory
         // Saves the callback as a raw record before its menu reads are queued.
         uint64_t RecordEvent(EventType a_type, const SKSE::ModCallbackEvent& a_event);
 
+        bool InstallHostCapture();
+
+        void HostEvent(const MCMHostEvent& a_event);
+
+        void BeginHostCapture(const MCMHostEvent& a_event);
+
+        void FinishHostCapture(const MCMHostEvent& a_event);
+
         // Stops capture events and delayed tasks from changing data at the same time.
         std::mutex captureMutex;
 
@@ -292,6 +309,8 @@ namespace MCMMemory
         // Last recorded config session per profile and MCM. Reset on game load.
         std::unordered_map<std::string, std::unordered_map<std::string, uint32_t>> recordedConfigSessions;
 
+        std::unordered_map<uint64_t, HostCapture> hostCaptures;
+
         TimePoint profileSaveAt{};
 
         // Gives each new callback its eventID.
@@ -306,6 +325,10 @@ namespace MCMMemory
         // Invalidates older inactivity tasks after a save or session change.
         uint64_t profileSaveTaskID{};
 
+        uint64_t hostSubscription{};
+
+        uint64_t hostSession{};
+
         // Counts how many times an MCM config was opened. Settings recorded under different
         // counts are separated by an OnConfigClose that the restore has to replay.
         uint32_t configSession{ 1 };
@@ -318,6 +341,8 @@ namespace MCMMemory
 
         // Keeps inactivity saves on one queued task.
         bool profileSaveTaskQueued{};
+
+        bool hostPresent{};
 
     };
 

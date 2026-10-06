@@ -221,7 +221,7 @@ namespace MCMMemory
 
         const std::string_view menuName{ a_event->menuName.c_str() };
         const bool mainMenu = menuName == RE::MainMenu::MENU_NAME;
-        const bool journalMenu = menuName == RE::JournalMenu::MENU_NAME;
+        const bool journalMenu = !HostBridge::Present() && menuName == RE::JournalMenu::MENU_NAME;
         const bool characterMenu = menuName == RE::RaceSexMenu::MENU_NAME;
         
         if (mainMenu && a_event->opening) {
@@ -334,7 +334,7 @@ namespace MCMMemory
             logger::error("Persistent profile restoration stopped because MCM Kicker registration was not confirmed");
             return;
         }
-        if (kickerStatus == MCMKickerSupport::Status::Ready && ui && ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
+        if (!HostBridge::Present() && kickerStatus == MCMKickerSupport::Status::Ready && ui && ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
             // A registration window belongs to the other mod, not to our operation.
             QueueRegistryCheck(registryCheckDelaySeconds);
             return;
@@ -397,7 +397,7 @@ namespace MCMMemory
 
     void Restore::StartRestore()
     {
-        if (!callWatch.Acquire()) {
+        if (!callWatch.Acquire(true)) {
             started = true;
             status = OperationStatus::Idle;
             HUD::GetSingleton()->ShowFailure("HUD.Failure.RestoreStopped", "HUD.Failure.ScriptBusy");
@@ -424,7 +424,7 @@ namespace MCMMemory
             HUD::GetSingleton()->ShowRestoreStarted();
         }
         if (auto* ui = RE::UI::GetSingleton()) {
-            journalMenuOpen = ui->IsMenuOpen(RE::JournalMenu::MENU_NAME);
+            journalMenuOpen = !HostBridge::Present() && ui->IsMenuOpen(RE::JournalMenu::MENU_NAME);
         }
         if (journalMenuOpen) {
             CloseJournalMenu();
@@ -650,7 +650,7 @@ namespace MCMMemory
             return;
         }
         if (auto* ui = RE::UI::GetSingleton()) {
-            journalMenuOpen = ui->IsMenuOpen(RE::JournalMenu::MENU_NAME);
+            journalMenuOpen = !HostBridge::Present() && ui->IsMenuOpen(RE::JournalMenu::MENU_NAME);
             characterCreationOpen = ui->IsMenuOpen(RE::RaceSexMenu::MENU_NAME);
         }
         if (characterCreationOpen) {
@@ -664,6 +664,15 @@ namespace MCMMemory
         }
 
         auto& action = actions[currentActionIndex];
+        // During Bridge restores, wait until the next refresh of a disabled text control.
+        if (callWatch.UsesHost() && action.type == RestoreActionType::ApplyClicks && action.refreshingCycle && action.hostControlNextCheck != TimePoint{}) {
+            const auto remaining = std::chrono::duration<float>(action.hostControlNextCheck - std::chrono::steady_clock::now()).count();
+            if (remaining > 0.0F) {
+                QueueNextAction(remaining);
+                return;
+            }
+            action.hostControlNextCheck = {};
+        }
         if (action.type == RestoreActionType::OpenConfig && !action.reopenStep) {
             auto& mcm = restoreMCMs[action.mcmIndex];
             // Each MCM gets its own applied, unchanged and skipped counts.

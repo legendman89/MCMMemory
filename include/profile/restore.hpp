@@ -104,6 +104,11 @@ namespace MCMMemory
         // Index of the RestoreMCM that should receive this call.
         size_t mcmIndex{};
 
+        // Timer while a clicked text control is disabled (only for the bridge).
+        // Memory itself (without bridge) doesn't use these timers.
+        TimePoint hostControlWaitEndsAt{};
+        TimePoint hostControlNextCheck{};
+
         // Says which MCM script function should be called.
         RestoreActionType type{ RestoreActionType::OpenConfig };
 

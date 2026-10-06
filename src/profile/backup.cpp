@@ -124,7 +124,8 @@ namespace MCMMemory
 
     RE::BSEventNotifyControl Backup::ProcessEvent(const RE::MenuOpenCloseEvent* a_event, RE::BSTEventSource<RE::MenuOpenCloseEvent>*)
     {
-        if (!a_event || !a_event->opening || std::string_view(a_event->menuName.c_str()) != RE::JournalMenu::MENU_NAME) {
+        // The host context protects native controls without closing the Journal.
+        if (HostBridge::Present() || !a_event || !a_event->opening || std::string_view(a_event->menuName.c_str()) != RE::JournalMenu::MENU_NAME) {
             return RE::BSEventNotifyControl::kContinue;
         }
 
@@ -291,7 +292,7 @@ namespace MCMMemory
         }
         if (kickerStatus == MCMKickerSupport::Status::Ready) {
             auto* ui = RE::UI::GetSingleton();
-            if (ui && ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
+            if (!HostBridge::Present() && ui && ui->IsMenuOpen(RE::JournalMenu::MENU_NAME)) {
                 QueueNext(registryCheckDelaySeconds);
                 return;
             }
@@ -309,6 +310,7 @@ namespace MCMMemory
             logger::warn("Full MCM backup registry wait expired. Using the cached list of {} MCMs, which may not include latest registration changes", currentMCMs.size());
         }
 
+        bool skippedRecordedMCM{};
         auto mcm = currentMCMs.begin();
         while (mcm != currentMCMs.end()) {
             if (!AllowsMCM(mcmFilter, mcm->identity.modID)) {
@@ -317,6 +319,7 @@ namespace MCMMemory
             else if (profile.IsActionMode(mcm->identity.modID)) {
                 // Recorded actions have priority over a scan, so there is no reason to read this MCM at all.
                 logger::info("Full MCM backup skipped '{}' because it is in action mode", mcm->identity.modID);
+                skippedRecordedMCM = true;
                 mcm = currentMCMs.erase(mcm);
             }
             else if (const auto reason = GetMCMExclusionReason(mcm->identity.modID); !reason.empty()) {
@@ -331,9 +334,10 @@ namespace MCMMemory
                 ++mcm;
             }
         }
+        
         if (currentMCMs.empty()) {
-            logger::warn("Full MCM backup found none of the selected MCMs in the active registry");
-            HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupStopped", "HUD.Failure.NoSelectedMCMs");
+            logger::warn("Full MCM backup has no valid MCMs after filtering; recorded MCMs skipped: {}", skippedRecordedMCM);
+            HUD::GetSingleton()->ShowFailure("HUD.Failure.BackupStopped", skippedRecordedMCM ? "HUD.Failure.RecordedMCMsSkipped" : "HUD.Failure.NoSelectedMCMs");
             status = OperationStatus::Idle;
             callWatch.Release();
             return;

@@ -190,7 +190,14 @@ namespace MCMMemory
             stream.close();
 
             if (!MoveFileExW(temporaryPath.c_str(), a_path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-                const auto windowsError = GetLastError();
+                auto windowsError = GetLastError();
+                if (windowsError == ERROR_NOT_SAME_DEVICE) {
+                    logger::warn("JSON file {} likely requires a move to a different volume; retrying with a copy", ToUTF8(a_path));
+                    if (MoveFileExW(temporaryPath.c_str(), a_path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH | MOVEFILE_COPY_ALLOWED)) {
+                        return true;
+                    }
+                    windowsError = GetLastError();
+                }
                 logger::error("Failed to replace JSON file {} with Windows error {}", ToUTF8(a_path), windowsError);
                 std::filesystem::remove(temporaryPath, error);
                 return false;

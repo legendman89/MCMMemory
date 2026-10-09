@@ -1,7 +1,7 @@
 #pragma once
 
 #include "plugin.hpp"
-#include "SKSEMenuFramework.h"
+#include "menu/API/SKSEMenuFramework.h"
 
 namespace MCMMemory
 {

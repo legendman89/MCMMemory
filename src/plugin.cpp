@@ -1,5 +1,5 @@
 #include "menu/hud.hpp"
-#include "menu/menu.hpp"
+#include "menu/frameworks.hpp"
 #include "utils/logger.hpp"
 #include "profile/backup.hpp"
 #include "profile/capture.hpp"
@@ -21,7 +21,7 @@ namespace MCMMemory
 
     inline void OnPostLoad()
     {
-        Menu::Register();
+        Menu::Frameworks::GetSingleton()->Register();
     }
 
     inline void OnPreLoadGame()
@@ -68,6 +68,8 @@ namespace MCMMemory
         Backup::GetSingleton()->Install();
         Capture::GetSingleton()->Install();
         Restore::GetSingleton()->Install();
+
+        Menu::Frameworks::GetSingleton()->RegisterAfterDataLoaded();
 
         if (GetSettings().allowCOCForTesting) {
             COCTest::GetSingleton()->Install();

@@ -7,7 +7,7 @@ endif()
 set(AUTHOR_NAME "Legendman")
 set(PRODUCT_NAME "MCMMemory")
 set(BEAUTIFUL_NAME "MCM Memory")
-set(CURR_VERSION "1.5.6.0")
+set(CURR_VERSION "1.5.7.0")
 
 project(${PRODUCT_NAME} VERSION ${CURR_VERSION} LANGUAGES CXX)
 
@@ -23,6 +23,8 @@ set(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 
 add_subdirectory("$ENV{COMMONLIB_SSE_FOLDER}" ${CMAKE_CURRENT_BINARY_DIR}/_deps/clib-build)
 get_target_property(COMMONLIB_SRC_DIR CommonLibSSE SOURCE_DIR)
+
+find_package(imgui CONFIG REQUIRED)
 
 file(GLOB_RECURSE headers CONFIGURE_DEPENDS include/*.h include/*.hpp bridge/*.h bridge/*.hpp)
 file(GLOB_RECURSE sources CONFIGURE_DEPENDS src/*.cpp bridge/*.cpp)
@@ -51,6 +53,7 @@ target_compile_definitions(
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${PROJECT_NAME} SYSTEM PRIVATE $<TARGET_PROPERTY:imgui::imgui,INTERFACE_INCLUDE_DIRECTORIES>)
 
 if(MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE "$<$<CONFIG:Release>:/Zi>")

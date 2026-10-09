@@ -194,5 +194,4 @@ namespace MCMMemory::Menu
         return RenderIconButton(a_label, a_icon, a_colors, true, "IconButton");
     }
 
-    void Register();
 }

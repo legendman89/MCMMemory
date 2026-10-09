@@ -1,12 +1,70 @@
 #include "menu/frameworks.hpp"
-#include "menu/API/SKSEMenuFramework.h"
+
+#include "menu/hud.hpp"
+#include "menu/profile.hpp"
+#include "menu/activity.hpp"
+#include "menu/translate.hpp"
+#include "menu/notifications.hpp"
 
 #include <cstring>
 
 namespace MCMMemory::Menu
 {
+    void Frameworks::Register()
+    {
+        if (registered) {
+            return;
+        }
+
+        if (!detected) {
+            Detect();
+        }
+
+        if (HasSKSEMenuFramework()) {
+            if (HasFLICK()) {
+                logger::info("Both menu frameworks detected; using SKSE Menu Framework for the in-game menu");
+            }
+            RegisterSKSEMenuFramework();
+        }
+        else if (flickLoaded) {
+            logger::info("FLICK detected; MCM Memory will connect after game data loads");
+        }
+        else {
+            logger::info("No available menu framework detected; the in-game menu is disabled");
+        }
+    }
+
+    void Frameworks::RegisterAfterDataLoaded()
+    {
+        if (registered) {
+            return;
+        }
+
+        if (!detected) {
+            Register();
+        }
+
+        if (!registered && flickLoaded) {
+            registered = RegisterFLICK();
+        }
+    }
+
+    void Frameworks::RegisterSKSEMenuFramework()
+    {
+        Trans::GetTranslator().Load();
+        SKSEMenuFramework::SetSection(BEAUTIFUL_NAME);
+        SKSEMenuFramework::AddSectionItem(Trans::Tr("Menu.Tab.Profile").c_str(), RenderProfile);
+        SKSEMenuFramework::AddSectionItem(Trans::Tr("Menu.Tab.Activity").c_str(), RenderActivity);
+        SKSEMenuFramework::AddSectionItem(Trans::Tr("Menu.Tab.Notifications").c_str(), RenderNotifications);
+        SKSEMenuFramework::AddHudElement(RenderHUD);
+        registered = true;
+        logger::info("MCM Memory menu registered with SKSE Menu Framework {}", skseVersion);
+    }
+
     void Frameworks::Detect()
     {
+        detected = true;
+
         skseVersion = SKSEMenuFramework::GetMenuFrameworkVersion();
 
         flickVersion = 0;
@@ -16,8 +74,9 @@ namespace MCMMemory::Menu
         }
 
         const auto module = GetModuleHandleW(L"FUCK.dll");
-        if (!module) {
-            logger::info("FLICK is not loaded");
+        flickLoaded = module != nullptr;
+
+        if (!flickLoaded) {
             return;
         }
 

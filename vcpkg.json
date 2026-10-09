@@ -6,6 +6,7 @@
     "directxmath",
     "directxtk",
     "fmt",
+    "imgui",
     "nlohmann-json",
     "rapidcsv",
     "simpleini",

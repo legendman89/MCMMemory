@@ -15,7 +15,7 @@ namespace MCMMemory::Menu
         // Detects available frameworks and registers SKSE Menu Framework at post-load.
         void Register();
 
-        // FLICK connects after game data loads, following its demo's integration flow.
+        // FLICK connects after game data loads.
         void RegisterAfterDataLoaded();
 
         bool HasSKSEMenuFramework() const { return skseVersion > 0.0F; }
@@ -37,7 +37,9 @@ namespace MCMMemory::Menu
         uint32_t flickVersion{};
 
         bool detected{};
+
         bool registered{};
+        
         bool flickLoaded{};
     };
 }

@@ -1,6 +1,8 @@
 #include "menu/flick.hpp"
 #include "menu/backend.hpp"
 #include "menu/frameworks.hpp"
+#include "menu/automation.hpp"
+#include "menu/translate.hpp"
 
 namespace MCMMemory::Menu
 {
@@ -15,6 +17,7 @@ namespace MCMMemory::Menu
         FOREACH_GUI_FUNCTIONS(GUI_REGISTER_FLICK)
 #undef GUI_REGISTER_FLICK
 
+        Trans::GetTranslator().Load();
         static FLICKTool tool;
         FUCK::RegisterTool(&tool);
         flickVersion = FUCK::GetInterface()->version;
@@ -24,8 +27,7 @@ namespace MCMMemory::Menu
 
     void FLICKTool::Draw()
     {
-        FUCK::TextUnformatted("MCM Memory is connected to FLICK.");
-        FUCK::Spacing();
-        FUCK::TextWrapped("Test test test.");
+        GUI::Spacing();
+        RenderAutomation();
     }
 }

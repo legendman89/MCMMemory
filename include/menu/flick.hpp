@@ -26,6 +26,12 @@ namespace MCMMemory::GUI::FLICK
         FUCK::Spacing();
     }
 
+    inline void HelpMarker(const char* a_text)
+    {
+        FUCK::SameLine(0.0F, 6.0F);
+        FUCK::HelpMarker(a_text);
+    }
+
     inline float GetCursorPosX()
     {
         return FUCK::GetCursorPos().x;

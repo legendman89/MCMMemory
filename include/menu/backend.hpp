@@ -8,6 +8,7 @@
     F(Spacing, void, ()) \
     F(SameLine, void, (float, float)) \
     F(SeparatorText, void, (const char*)) \
+    F(HelpMarker, void, (const char*)) \
     F(AlignTextToFramePadding, void, ()) \
     F(SetNextItemWidth, void, (float)) \
     F(SetCursorPosX, void, (float)) \
@@ -113,6 +114,14 @@ namespace MCMMemory::GUI
         const auto separatorText = GetBE().memSeparatorText;
         if (separatorText) {
             separatorText(a_label);
+        }
+    }
+
+    inline void HelpMarker(const char* a_text)
+    {
+        const auto helpMarker = GetBE().memHelpMarker;
+        if (helpMarker) {
+            helpMarker(a_text);
         }
     }
 

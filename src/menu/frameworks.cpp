@@ -1,5 +1,6 @@
 #include "menu/hud.hpp"
 #include "menu/backend.hpp"
+#include "menu/smf.hpp"
 #include "menu/profile.hpp"
 #include "menu/activity.hpp"
 #include "menu/translate.hpp"

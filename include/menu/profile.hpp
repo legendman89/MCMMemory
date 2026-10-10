@@ -136,8 +136,6 @@ namespace MCMMemory::Menu
 
         void RenderForgetMCMsWindow();
 
-        void RenderAutomation();
-
         void RenderMCMs();
 
         void RenderMCMTable(bool a_operationAvailable);

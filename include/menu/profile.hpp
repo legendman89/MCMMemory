@@ -10,7 +10,7 @@
 
 namespace MCMMemory::Menu
 {
-    inline constexpr float ProfileFieldWidth{ 240.0F };
+    inline constexpr float ProfileFieldWidth{ 260.0F };
 
     struct ProfileMCMRow
     {
@@ -118,6 +118,8 @@ namespace MCMMemory::Menu
 
         void RenderProfileSelector();
 
+        void RenderOperationButtons(float a_backupWidth = 0.0F, float a_restoreWidth = 0.0F);
+
         void RenderCreateProfileWindow();
 
         void RenderDeleteProfileWindow();
@@ -134,8 +136,6 @@ namespace MCMMemory::Menu
         bool NeedsRefresh() const;
 
         void RenderProfileControls();
-
-        void RenderOperationButtons(float a_backupWidth, float a_restoreWidth);
 
         // Draws the prompt and reports whether the player accepted. The caller runs the action
         // and puts any failure key in the window error.

@@ -210,7 +210,7 @@ namespace MCMMemory::GUI
         }
     }
 
-    inline void WrappedTooltip(const char* a_text, float a_width = 420.0F)
+    inline void WrappedTooltip(const char* a_text, const float a_width = 500.0F)
     {
         const auto wrappedTooltip = GetBE().memWrappedTooltip;
         if (wrappedTooltip) {

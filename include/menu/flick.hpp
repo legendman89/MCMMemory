@@ -25,7 +25,7 @@ namespace MCMMemory::GUI::FLICK
     inline bool BeginWindow(const char* a_title, bool* a_open, float a_width, float a_height)
     {
         const auto displaySize = FUCK::GetDisplaySize();
-        FUCK::SetNextWindowSize(ImVec2{ a_width, a_height }, ImGuiCond_FirstUseEver);
+        FUCK::SetNextWindowSize(ImVec2{ a_width, a_height }, ImGuiCond_Appearing);
         FUCK::SetNextWindowPos(ImVec2{ displaySize.x * 0.5F, displaySize.y * 0.5F }, ImGuiCond_Appearing, ImVec2{ 0.5F, 0.5F });
         return FUCK::BeginWindow(a_title, a_open, ImGuiWindowFlags_NoCollapse);
     }
@@ -70,10 +70,10 @@ namespace MCMMemory::GUI::FLICK
         GUI::WrappedTooltip(a_text);
     }
 
-    inline void WrappedTooltip(const char* a_text, float a_width)
+    inline void WrappedTooltip(const char* a_text, const float a_width)
     {
         if (FUCK::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled) && FUCK::BeginTooltip()) {
-            FUCK::PushTextWrapPos(FUCK::GetCursorPos().x + a_width);
+            FUCK::PushTextWrapPos(FUCK::GetCursorPos().x + a_width + 50.0F);
             FUCK::TextUnformatted(a_text);
             FUCK::PopTextWrapPos();
             FUCK::EndTooltip();
@@ -85,9 +85,30 @@ namespace MCMMemory::GUI::FLICK
         return FUCK::GetCursorPos().x;
     }
 
+    inline std::string InlineFieldLabel(const char* a_label)
+    {
+        const std::string_view label{ a_label };
+        const auto visibleLabel = label.substr(0, label.find("##"));
+
+        if (visibleLabel.empty()) {
+            return std::string(label);
+        }
+
+        const float width = FUCK::CalcItemWidth();
+
+        FUCK::AlignTextToFramePadding();
+        FUCK::TextUnformatted(visibleLabel.data(), visibleLabel.data() + visibleLabel.size());
+
+        FUCK::SameLine(0.0F, 10.0F);
+
+        FUCK::SetNextItemWidth(std::max(1.0F, std::min(width, FUCK::GetContentRegionAvail().x)));
+        return std::format("##{}", a_label);
+    }
+
     inline bool Combo(const char* a_label, int* a_selected, const char* const* a_items, int a_count)
     {
-        return FUCK::Combo(a_label, a_selected, a_items, a_count);
+        const auto id = InlineFieldLabel(a_label);
+        return FUCK::Combo(id.c_str(), a_selected, a_items, a_count);
     }
 
     inline ImVec4 ToColor(const Color4& a_color)
@@ -125,18 +146,7 @@ namespace MCMMemory::GUI::FLICK
 
     inline bool InputText(const char* a_label, char* a_buffer, size_t a_size)
     {
-        const std::string_view label{ a_label };
-        const auto visibleLabel = label.substr(0, label.find("##"));
-        if (visibleLabel.empty()) {
-            return FUCK::InputText(a_label, a_buffer, a_size);
-        }
-
-        const float width = FUCK::CalcItemWidth();
-        FUCK::AlignTextToFramePadding();
-        FUCK::TextUnformatted(visibleLabel.data(), visibleLabel.data() + visibleLabel.size());
-        FUCK::SameLine(0.0F, 10.0F);
-        FUCK::SetNextItemWidth(std::max(1.0F, std::min(width, FUCK::GetContentRegionAvail().x)));
-        const auto id = std::format("##{}", a_label);
+        const auto id = InlineFieldLabel(a_label);
         return FUCK::InputText(id.c_str(), a_buffer, a_size);
     }
 }

@@ -384,7 +384,7 @@ namespace MCMMemory::Menu
         }
 
         const auto title = std::format("{}###Create MCM Memory Profile", Trans::Tr("Profile.Create.Title"));
-        if (GUI::BeginWindow(title.c_str(), std::addressof(window.open), 440.0F, 300.0F)) {
+        if (GUI::BeginWindow(title.c_str(), std::addressof(window.open), 540.0F, 320.0F)) {
 
             GUI::SetNextItemWidth(ProfileFieldWidth);
             if (GUI::InputText(Trans::Tr("Profile.Create.Name").c_str(), window.name.data(), window.name.size())) {

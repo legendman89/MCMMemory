@@ -43,7 +43,7 @@ namespace MCMMemory::Menu
         if (IconButton(Trans::Tr("Notifications.Appearance.Preview").c_str(), Icons::kPreview, Color::kPreviewButtonColors)) {
             HUD::GetSingleton()->Preview();
         }
-        WrappedTooltip(Trans::Tr("Notifications.Appearance.Preview.Tooltip").c_str());
+        GUI::WrappedTooltip(Trans::Tr("Notifications.Appearance.Preview.Tooltip").c_str());
 
         GUI::Spacing();
 
@@ -113,7 +113,7 @@ namespace MCMMemory::Menu
             settingsSaveRequested = true;
             appearanceSettingActive = true;
         }
-        WrappedTooltip(Trans::Tr("Notifications.Action.Defaults.Tooltip").c_str());
+        GUI::WrappedTooltip(Trans::Tr("Notifications.Action.Defaults.Tooltip").c_str());
 
         if (settingsChanged) {
             HUD::GetSingleton()->Configure(settings);

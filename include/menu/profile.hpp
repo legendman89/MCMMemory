@@ -1,7 +1,7 @@
 #pragma once
 
 #include "utils/time.hpp"
-#include "menu/menu.hpp"
+#include "plugin.hpp"
 #include "menu/pages.hpp"
 #include "mcm/mcm_calls.hpp"
 #include "mcm/mcm_support.hpp"
@@ -10,6 +10,8 @@
 
 namespace MCMMemory::Menu
 {
+    inline constexpr float ProfileFieldWidth{ 240.0F };
+
     struct ProfileMCMRow
     {
         inline bool CanSelect() const
@@ -107,7 +109,18 @@ namespace MCMMemory::Menu
             return std::addressof(singleton);
         }
 
+        inline void RefreshProfileNames()
+        {
+            profileNames = Profiles::ReadNames();
+        }
+
         void Render();
+
+        void RenderProfileSelector();
+
+        void RenderCreateProfileWindow();
+
+        void RenderDeleteProfileWindow();
 
     private:
 
@@ -122,17 +135,11 @@ namespace MCMMemory::Menu
 
         void RenderProfileControls();
 
-        void RenderProfileSelector(bool a_operationRunning);
-
         void RenderOperationButtons(float a_backupWidth, float a_restoreWidth);
-
-        void RenderCreateProfileWindow();
 
         // Draws the prompt and reports whether the player accepted. The caller runs the action
         // and puts any failure key in the window error.
         bool RenderConfirmWindow(ConfirmWindow& a_window, std::string_view a_id, std::string_view a_titleKey, const std::string& a_message);
-
-        void RenderDeleteProfileWindow();
 
         void RenderForgetMCMsWindow();
 
@@ -153,11 +160,6 @@ namespace MCMMemory::Menu
         inline bool IsVisible(const ProfileMCMRow& a_mcm) const
         {
             return MatchesSearch(a_mcm) && (!hideUnavailable || a_mcm.available);
-        }
-
-        inline void RefreshProfileNames()
-        {
-            profileNames = Profiles::ReadNames();
         }
 
         std::vector<ProfileMCMRow> mcms;

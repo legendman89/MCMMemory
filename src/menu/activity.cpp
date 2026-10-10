@@ -121,7 +121,7 @@ namespace MCMMemory::Menu
                     selectedID = entry.id;
                     detailsOpen = true;
                 }
-                WrappedTooltip(Trans::Tr("Activity.Entry.Tooltip").c_str());
+                GUI::WrappedTooltip(Trans::Tr("Activity.Entry.Tooltip").c_str());
                 GUI::PopID();
 
                 GUI::TableSetColumnIndex(1);

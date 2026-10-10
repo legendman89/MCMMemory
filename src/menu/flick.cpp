@@ -2,6 +2,7 @@
 #include "menu/backend.hpp"
 #include "menu/frameworks.hpp"
 #include "menu/automation.hpp"
+#include "menu/profile.hpp"
 #include "menu/translate.hpp"
 
 namespace MCMMemory::Menu
@@ -25,8 +26,19 @@ namespace MCMMemory::Menu
         return true;
     }
 
+    void FLICKTool::OnOpen()
+    {
+        ProfileMenu::GetSingleton()->RefreshProfileNames();
+    }
+
     void FLICKTool::Draw()
     {
+        GUI::Spacing();
+        auto* profileMenu = ProfileMenu::GetSingleton();
+        profileMenu->RenderProfileSelector();
+        profileMenu->RenderCreateProfileWindow();
+        profileMenu->RenderDeleteProfileWindow();
+        GUI::Spacing();
         GUI::Spacing();
         RenderAutomation();
     }

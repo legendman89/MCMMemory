@@ -1,10 +1,12 @@
+#include "menu/menu.hpp"
 #include "menu/pages.hpp"
 #include "menu/translate.hpp"
-#include "mcm/mcm_registry.hpp"
 #include "mcm/mcm_script.hpp"
-#include "profile/profile.hpp"
+#include "mcm/mcm_registry.hpp"
 #include "profile/backup.hpp"
 #include "profile/restore.hpp"
+#include "profile/profile.hpp"
+
 #include "settings.hpp"
 
 namespace MCMMemory::Menu
@@ -173,7 +175,7 @@ namespace MCMMemory::Menu
             }
             GUI::EndDisabled();
             
-            WrappedTooltip(Trans::Tr("Profile.Pages.Refresh.Tooltip").c_str());
+            GUI::WrappedTooltip(Trans::Tr("Profile.Pages.Refresh.Tooltip").c_str());
             
             GUI::Spacing();
             

@@ -49,24 +49,11 @@ namespace MCMMemory::Menu
         return open;
     }
 
-    inline void WrappedTooltip(const char* a_text, const float& a_width = 420.0F)
-    {
-        if (GUI::IsItemHovered(GUI::ImGuiHoveredFlags_AllowWhenDisabled)) {
-            GUI::PushStyleColor(GUI::ImGuiCol_PopupBg, Color::kOpaqueBackground);
-            GUI::BeginTooltip();
-            GUI::PushTextWrapPos(a_width);
-            GUI::TextUnformatted(a_text);
-            GUI::PopTextWrapPos();
-            GUI::EndTooltip();
-            GUI::PopStyleColor();
-        }
-    }
-
     inline void HelpMarker(const char* a_text)
     {
         GUI::SameLine(0.0F, 6.0F);
         GUI::TextDisabled("(?)");
-        WrappedTooltip(a_text);
+        GUI::WrappedTooltip(a_text);
     }
 
     inline void BoldTextColored(const GUI::ImVec4& a_color, const char* a_text)
@@ -107,8 +94,8 @@ namespace MCMMemory::Menu
 
     inline GUI::ImVec2 MeasureCTAButton(const char* a_label)
     {
-        const auto labelSize = GUI::CalcTextSize(a_label);
-        return GUI::ImVec2{ labelSize.x + CTAButtonHorizontalPadding * 2.0F, labelSize.y + CTAButtonVerticalPadding * 2.0F };
+        const auto size = GUI::MeasureButton(a_label);
+        return GUI::ImVec2{ size.width, size.height };
     }
 
     template <class Colors>
@@ -161,37 +148,32 @@ namespace MCMMemory::Menu
         return clicked && a_enabled;
     }
 
+    template <class Colors>
+    inline GUI::ButtonColors ToButtonColors(const Colors& a_colors)
+    {
+        return {
+            { a_colors.background.x, a_colors.background.y, a_colors.background.z, a_colors.background.w },
+            { a_colors.hover.x, a_colors.hover.y, a_colors.hover.z, a_colors.hover.w },
+            { a_colors.active.x, a_colors.active.y, a_colors.active.z, a_colors.active.w },
+            { a_colors.text.x, a_colors.text.y, a_colors.text.z, a_colors.text.w }
+        };
+    }
+
     inline bool CTAButton(const char* a_label, const bool a_enabled, const Color::CTAColors& a_colors, const GUI::ImVec2& a_size = {})
     {
         const auto& colors = a_enabled ? a_colors : Color::kDisabledButtonColors;
-        GUI::PushStyleVar(GUI::ImGuiStyleVar_FrameRounding, 6.0F);
-        GUI::PushStyleVar(GUI::ImGuiStyleVar_FramePadding, GUI::ImVec2{ CTAButtonHorizontalPadding, CTAButtonVerticalPadding });
-        PushButtonColors(colors);
-
-        if (!a_enabled) {
-            GUI::BeginDisabled();
-        }
-
-        const bool clicked = GUI::Button(a_label, a_size);
-
-        if (!a_enabled) {
-            GUI::EndDisabled();
-        }
-
-        GUI::PopStyleColor(4);
-        GUI::PopStyleVar(2);
-        return clicked && a_enabled;
+        return GUI::ColoredButton(a_label, ToButtonColors(colors), a_enabled, a_size.x, a_size.y);
     }
 
     inline bool IconCTAButton(const char* a_label, const bool a_enabled, const uint32_t a_icon, const Color::CTAColors& a_colors, const GUI::ImVec2& a_size = {})
     {
         const auto& colors = a_enabled ? a_colors : Color::kDisabledButtonColors;
-        return RenderIconButton(a_label, a_icon, colors, a_enabled, "CTAButton", a_size);
+        return GUI::IconButton(a_label, a_icon, ToButtonColors(colors), a_enabled, "CTAButton", a_size.x, a_size.y);
     }
 
     inline bool IconButton(const char* a_label, const uint32_t a_icon, const Color::ButtonColors& a_colors)
     {
-        return RenderIconButton(a_label, a_icon, a_colors, true, "IconButton");
+        return GUI::IconButton(a_label, a_icon, ToButtonColors(a_colors), true, "IconButton");
     }
 
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "menu/menu.hpp"
+#include "plugin.hpp"
 #include "profile/page_exclusions.hpp"
 
 namespace MCMMemory::Menu

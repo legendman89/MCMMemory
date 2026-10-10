@@ -1,14 +1,26 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 
 #define FOREACH_GUI_FUNCTIONS(F) \
     F(Checkbox, bool, (const char*, bool*)) \
+    F(RadioButton, bool, (const char*, bool)) \
+    F(BeginWindow, bool, (const char*, bool*, float, float)) \
+    F(EndWindow, void, ()) \
+    F(MeasureText, TextSize, (const char*)) \
+    F(MeasureButton, TextSize, (const char*, float, float)) \
+    F(CenterNextItem, void, (float)) \
     F(Button, bool, (const char*, float, float)) \
+    F(Combo, bool, (const char*, int*, const char* const*, int)) \
+    F(ColoredButton, bool, (const char*, const ButtonColors&, bool, float, float)) \
+    F(IconButton, bool, (const char*, uint32_t, const ButtonColors&, bool, const char*, float, float)) \
     F(Spacing, void, ()) \
     F(SameLine, void, (float, float)) \
     F(SeparatorText, void, (const char*)) \
     F(HelpMarker, void, (const char*)) \
+    F(WrappedTooltip, void, (const char*, float)) \
+    F(BoldTextColored, void, (const Color4&, const char*)) \
     F(AlignTextToFramePadding, void, ()) \
     F(SetNextItemWidth, void, (float)) \
     F(SetCursorPosX, void, (float)) \
@@ -49,6 +61,21 @@
 
 namespace MCMMemory::GUI
 {
+    struct TextSize
+    {
+        float width, height;
+    };
+
+    struct Color4
+    {
+        float r, g, b, a;
+    };
+
+    struct ButtonColors
+    {
+        Color4 background, hover, active, text;
+    };
+
     enum class Function
     {
         FOREACH_GUI_FUNCTIONS(GUI_DECLARE_ID)
@@ -87,10 +114,68 @@ namespace MCMMemory::GUI
         return checkbox && checkbox(a_label, a_value);
     }
 
+    inline bool RadioButton(const char* a_label, bool a_selected)
+    {
+        const auto radioButton = GetBE().memRadioButton;
+        return radioButton && radioButton(a_label, a_selected);
+    }
+
+    inline bool BeginWindow(const char* a_title, bool* a_open, float a_width, float a_height)
+    {
+        const auto beginWindow = GetBE().memBeginWindow;
+        return beginWindow && beginWindow(a_title, a_open, a_width, a_height);
+    }
+
+    inline void EndWindow()
+    {
+        const auto endWindow = GetBE().memEndWindow;
+        if (endWindow) {
+            endWindow();
+        }
+    }
+
+    inline TextSize MeasureText(const char* a_text)
+    {
+        const auto measureText = GetBE().memMeasureText;
+        return measureText ? measureText(a_text) : TextSize{};
+    }
+
+    inline TextSize MeasureButton(const char* a_label, float a_width = 0.0F, float a_height = 0.0F)
+    {
+        const auto measureButton = GetBE().memMeasureButton;
+        return measureButton ? measureButton(a_label, a_width, a_height) : TextSize{};
+    }
+
+    inline void CenterNextItem(float a_width)
+    {
+        const auto centerNextItem = GetBE().memCenterNextItem;
+        if (centerNextItem) {
+            centerNextItem(a_width);
+        }
+    }
+
     inline bool Button(const char* a_label, float a_width = 0.0F, float a_height = 0.0F)
     {
         const auto button = GetBE().memButton;
         return button && button(a_label, a_width, a_height);
+    }
+
+    inline bool Combo(const char* a_label, int* a_selected, const char* const* a_items, int a_count)
+    {
+        const auto combo = GetBE().memCombo;
+        return combo && combo(a_label, a_selected, a_items, a_count);
+    }
+
+    inline bool ColoredButton(const char* a_label, const ButtonColors& a_colors, bool a_enabled = true, float a_width = 0.0F, float a_height = 0.0F)
+    {
+        const auto coloredButton = GetBE().memColoredButton;
+        return coloredButton && coloredButton(a_label, a_colors, a_enabled, a_width, a_height);
+    }
+
+    inline bool IconButton(const char* a_label, uint32_t a_icon, const ButtonColors& a_colors, bool a_enabled, const char* a_id, float a_width = 0.0F, float a_height = 0.0F)
+    {
+        const auto iconButton = GetBE().memIconButton;
+        return iconButton && iconButton(a_label, a_icon, a_colors, a_enabled, a_id, a_width, a_height);
     }
 
     inline void Spacing()
@@ -122,6 +207,22 @@ namespace MCMMemory::GUI
         const auto helpMarker = GetBE().memHelpMarker;
         if (helpMarker) {
             helpMarker(a_text);
+        }
+    }
+
+    inline void WrappedTooltip(const char* a_text, float a_width = 420.0F)
+    {
+        const auto wrappedTooltip = GetBE().memWrappedTooltip;
+        if (wrappedTooltip) {
+            wrappedTooltip(a_text, a_width);
+        }
+    }
+
+    inline void BoldTextColored(const Color4& a_color, const char* a_text)
+    {
+        const auto boldTextColored = GetBE().memBoldTextColored;
+        if (boldTextColored) {
+            boldTextColored(a_color, a_text);
         }
     }
 

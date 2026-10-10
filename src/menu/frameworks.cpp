@@ -1,9 +1,9 @@
-#include "menu/frameworks.hpp"
-
 #include "menu/hud.hpp"
+#include "menu/backend.hpp"
 #include "menu/profile.hpp"
 #include "menu/activity.hpp"
 #include "menu/translate.hpp"
+#include "menu/frameworks.hpp"
 #include "menu/notifications.hpp"
 
 #include <cstring>
@@ -51,6 +51,10 @@ namespace MCMMemory::Menu
 
     void Frameworks::RegisterSKSEMenuFramework()
     {
+#define GUI_REGISTER_SMF(name, result, args) GUI::RegisterFunction<GUI::Function::name>(GUI::SMF::name);
+        FOREACH_GUI_FUNCTIONS(GUI_REGISTER_SMF)
+#undef GUI_REGISTER_SMF
+
         Trans::GetTranslator().Load();
         SKSEMenuFramework::SetSection(BEAUTIFUL_NAME);
         SKSEMenuFramework::AddSectionItem(Trans::Tr("Menu.Tab.Profile").c_str(), RenderProfile);

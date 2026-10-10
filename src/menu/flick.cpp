@@ -7,9 +7,9 @@
 
 namespace MCMMemory::Menu
 {
-     bool Frameworks::RegisterFLICK()
+    bool Frameworks::RegisterFLICK()
     {
-        if (!FUCK::Connect(PRODUCT_NAME)) {
+        if (!FLK::Connect(PRODUCT_NAME)) {
             logger::error("FLICK connection failed; MCM Memory requires FLICK API version {} or newer", FUCK_API_VERSION);
             return false;
         }
@@ -20,8 +20,8 @@ namespace MCMMemory::Menu
 
         Trans::GetTranslator().Load();
         static FLICKTool tool;
-        FUCK::RegisterTool(&tool);
-        flickVersion = FUCK::GetInterface()->version;
+        FLK::RegisterTool(&tool);
+        flickVersion = FLK::GetInterface()->version;
         logger::info("MCM Memory registered with FLICK {}", flickVersion);
         return true;
     }
@@ -33,26 +33,38 @@ namespace MCMMemory::Menu
 
     void FLICKTool::Draw()
     {
-        FUCK::PushStyleColor(ImGuiCol_TextShadow, ImVec4{ 0.0F, 0.0F, 0.0F, 0.0F });
-        FUCK::PushStyleColor(ImGuiCol_TextShadowDisabled, ImVec4{ 0.0F, 0.0F, 0.0F, 0.0F });
+        FLK::PushStyleColor(ImGuiCol_TextShadow, ImVec4{ 0.0F, 0.0F, 0.0F, 0.0F });
+        FLK::PushStyleColor(ImGuiCol_TextShadowDisabled, ImVec4{ 0.0F, 0.0F, 0.0F, 0.0F });
+
         GUI::Spacing();
+
         auto* profileMenu = ProfileMenu::GetSingleton();
-        if (FUCK::BeginTable("##ProfileControls", 3, FUCK::TableFlags::kSizingFixedFit | FUCK::TableFlags::kNoSavedSettings)) {
-            FUCK::TableSetupColumn("Profile", FUCK::TableColumnFlags::kWidthFixed);
-            FUCK::TableSetupColumn("Spacing", FUCK::TableColumnFlags::kWidthStretch);
-            FUCK::TableSetupColumn("Operations", FUCK::TableColumnFlags::kWidthFixed);
-            FUCK::TableNextRow();
-            FUCK::TableSetColumnIndex(0);
+        if (FLK::BeginTable("##ProfileControls", 3, FLK::TableFlags::kSizingFixedFit | FLK::TableFlags::kNoSavedSettings)) {
+            FLK::TableSetupColumn("Profile", FLK::TableColumnFlags::kWidthFixed);
+            FLK::TableSetupColumn("Spacing", FLK::TableColumnFlags::kWidthStretch);
+            FLK::TableSetupColumn("Operations", FLK::TableColumnFlags::kWidthFixed);
+            FLK::TableNextRow();
+            FLK::TableSetColumnIndex(0);
             profileMenu->RenderProfileSelector();
-            FUCK::TableSetColumnIndex(2);
+            FLK::TableSetColumnIndex(2);
             profileMenu->RenderOperationButtons();
-            FUCK::EndTable();
+            FLK::EndTable();
         }
+
         profileMenu->RenderCreateProfileWindow();
         profileMenu->RenderDeleteProfileWindow();
+
         GUI::Spacing();
         GUI::Spacing();
+
         RenderAutomation();
-        FUCK::PopStyleColor(2);
+
+        GUI::Spacing();
+        GUI::Spacing();
+
+        profileMenu->RenderMCMs();
+        profileMenu->RenderMCMWindows();
+        
+        FLK::PopStyleColor(2);
     }
 }

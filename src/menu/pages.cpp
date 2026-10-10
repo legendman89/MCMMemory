@@ -160,13 +160,9 @@ namespace MCMMemory::Menu
             return;
         }
 
-        GUI::SetNextWindowSize(GUI::ImVec2{ 810.0F, 470.0F }, GUI::ImGuiCond_FirstUseEver);
-
-        CenterNextWindow();
-
         const auto title = std::format("{} - {}###MCM Pages", Trans::Tr("Profile.Pages.Title"), GetDisplayModName(identity.modName));
         
-        if (BeginOpaqueWindow(title.c_str(), std::addressof(open))) {
+        if (GUI::BeginWindow(title.c_str(), std::addressof(open), 810.0F, 470.0F)) {
             const bool busy = Backup::GetSingleton()->GetStatus() != OperationStatus::Idle || Restore::GetSingleton()->GetStatus() != OperationStatus::Idle;
            
             GUI::BeginDisabled(busy);
@@ -179,11 +175,18 @@ namespace MCMMemory::Menu
             
             GUI::Spacing();
             
-            const float height = std::max(GUI::GetFrameHeight() * 3.0F, GUI::GetContentRegionAvail().y - GUI::GetFrameHeightWithSpacing() * (error.empty() ? 2.0F : 4.0F));
+            std::array<std::string, pageExclusionLabels.size()> modeLabels;
+            std::array<const char*, pageExclusionLabels.size()> modeItems;
+            for (size_t mode = 0; mode < modeLabels.size(); ++mode) {
+                modeLabels[mode] = Trans::Tr(pageExclusionLabels[mode]);
+                modeItems[mode] = modeLabels[mode].c_str();
+            }
+
+            const float height = std::max(GUI::GetFrameHeight() * 3.0F, GUI::GetAvailableHeight() - GUI::GetFrameHeightWithSpacing() * (error.empty() ? 2.0F : 4.0F));
             const auto flags = GUI::ImGuiTableFlags_RowBg | GUI::ImGuiTableFlags_BordersInnerH | GUI::ImGuiTableFlags_ScrollY;
             if (GUI::BeginTable("MCM Pages", 3, flags, GUI::ImVec2{ 0.0F, height })) {
 
-                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Name").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 340.0F);
+                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Name").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
                 GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Status").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 170.0F);
                 GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Mode").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 290.0F);
 
@@ -219,14 +222,9 @@ namespace MCMMemory::Menu
 
                     GUI::SetNextItemWidth(-1.0F);
 
-                    const auto preview = Trans::Tr(pageExclusionLabels[ToIndex(page.mode)]);
-                    if (BeginOpaqueCombo("##Mode", preview.c_str())) {
-                        for (size_t mode = 0; mode < pageExclusionLabels.size(); ++mode) {
-                            if (GUI::Selectable(Trans::Tr(pageExclusionLabels[mode]).c_str(), ToIndex(page.mode) == mode)) {
-                                page.mode = static_cast<PageExclusionMode>(mode);
-                            }
-                        }
-                        GUI::EndCombo();
+                    int mode = static_cast<int>(ToIndex(page.mode));
+                    if (GUI::Combo("##Mode", std::addressof(mode), modeItems.data(), static_cast<int>(modeItems.size()))) {
+                        page.mode = static_cast<PageExclusionMode>(mode);
                     }
 
                     GUI::PopID();
@@ -256,7 +254,7 @@ namespace MCMMemory::Menu
             }
         }
 
-        GUI::End();
+        GUI::EndWindow();
     }
 }
 

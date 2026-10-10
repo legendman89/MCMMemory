@@ -584,46 +584,22 @@ namespace MCMMemory::Menu
         }
 
         const auto selectedLabel = Trans::Tr("Profile.MCM.Column.Selected");
-        const auto* style = GUI::GetStyle();
-        const float headerPadding = style ? style->FramePadding.x + 2.0F * style->CellPadding.x : 12.0F;
-        const float selectedWidth = std::max(GUI::GetFrameHeight(), GUI::CalcTextSize(selectedLabel.c_str()).x + GUI::GetFontSize() + headerPadding);
+        const float selectedWidth = std::max(GUI::GetFrameHeight(), GUI::MeasureTableHeader(selectedLabel.c_str()));
         GUI::TableSetupColumn(selectedLabel.c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, selectedWidth);
-        GUI::TableSetupColumn(Trans::Tr("Common.MCM").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 600.0F);
+        GUI::TableSetupColumn(Trans::Tr("Common.MCM").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
         GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.SavedSettings").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, 160.0F);
         GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.AutoRestore").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_NoSort, 105.0F);
-        GUI::TableNextRow(GUI::ImGuiTableRowFlags_Headers);
-        GUI::TableSetColumnIndex(0);
+        GUI::TableSetupScrollFreeze(0, 1);
+        GUI::TableHeadersRow();
 
-        std::string paddedSelectedLabel = "  ";
-        paddedSelectedLabel += selectedLabel;
-        GUI::TableHeader(paddedSelectedLabel.c_str());
-        GUI::WrappedTooltip(Trans::Tr("Profile.MCM.Column.Header.Tooltip").c_str());
-
-        GUI::TableSetColumnIndex(1);
-        GUI::TableHeader(Trans::Tr("Common.MCM").c_str());
-        GUI::WrappedTooltip(Trans::Tr("Profile.MCM.Column.Header.Tooltip").c_str());
-
-        GUI::TableSetColumnIndex(2);
-        GUI::TableHeader(Trans::Tr("Profile.MCM.Column.SavedSettings").c_str());
-        GUI::WrappedTooltip(Trans::Tr("Profile.MCM.Column.Header.Tooltip").c_str());
-
-        GUI::TableSetColumnIndex(3);
-        const auto autoRestoreLabel = Trans::Tr("Profile.MCM.Column.AutoRestore");
-        CenterNextItem(GUI::CalcTextSize(autoRestoreLabel.c_str()).x);
-        GUI::TextUnformatted(autoRestoreLabel.c_str());
-
-        auto* sortSpecs = GUI::TableGetSortSpecs();
-        if (sortSpecs && (sortSpecs->SpecsDirty || sortPending)) {
+        GUI::TableSort sort;
+        if (GUI::ReadTableSort(sort, sortPending)) {
             ProfileMCMRowOrder order;
-            order.originalOrder = sortSpecs->SpecsCount == 0;
-            if (!order.originalOrder) {
-                const auto& column = sortSpecs->Specs[0];
-                order.bySelected = column.ColumnIndex == 0;
-                order.bySettingCount = column.ColumnIndex == 2;
-                order.descending = column.SortDirection == GUI::ImGuiSortDirection_Descending;
-            }
+            order.originalOrder = sort.column < 0;
+            order.bySelected = sort.column == 0;
+            order.bySettingCount = sort.column == 2;
+            order.descending = sort.descending;
             std::sort(mcms.begin(), mcms.end(), order);
-            sortSpecs->SpecsDirty = false;
             sortPending = false;
         }
 
@@ -643,7 +619,7 @@ namespace MCMMemory::Menu
             GUI::TableSetColumnIndex(0);
             GUI::BeginDisabled((!mcm.CanSelect() && !mcm.CanForget()) || !a_operationAvailable);
 
-            CenterNextItem(GUI::GetFrameHeight());
+            GUI::CenterNextItem(GUI::GetFrameHeight());
             if (GUI::Checkbox("##Selected", std::addressof(mcm.selected))) {
                 sortPending = true;
             }
@@ -660,7 +636,7 @@ namespace MCMMemory::Menu
                 GUI::TextDisabled("%s (%s)", modName.c_str(), Trans::Tr("Profile.MCM.Unresponsive").c_str());
             }
             else if (mcm.selected) {
-                GUI::TextColored(Color::kCountNumber, "%s", modName.c_str());
+                ColoredText(Color::kCountNumber, modName.c_str());
             }
             else if (mcm.available) {
                 GUI::TextUnformatted(modName.c_str());
@@ -692,7 +668,7 @@ namespace MCMMemory::Menu
             GUI::TableSetColumnIndex(2);
             if (mcm.settingCount > 0) {
                 if (mcm.selected) {
-                    GUI::TextColored(Color::kCountNumber, "%u", mcm.settingCount);
+                    ColoredText(Color::kCountNumber, std::to_string(mcm.settingCount).c_str());
                 }
                 else {
                     GUI::Text("%u", mcm.settingCount);
@@ -700,7 +676,7 @@ namespace MCMMemory::Menu
             }
             else {
                 if (mcm.selected) {
-                    GUI::TextColored(Color::kCountNumber, "%s", Trans::Tr("Common.None").c_str());
+                    ColoredText(Color::kCountNumber, Trans::Tr("Common.None").c_str());
                 }
                 else {
                     GUI::TextDisabled("%s", Trans::Tr("Common.None").c_str());
@@ -710,7 +686,7 @@ namespace MCMMemory::Menu
             GUI::TableSetColumnIndex(3);
             bool autoRestore = !excluded && !unresponsive && settings.IsAutoRestoreEnabled(mcm.identity.modID);
             GUI::BeginDisabled(excluded || unresponsive);
-            CenterNextItem(GUI::GetFrameHeight());
+            GUI::CenterNextItem(GUI::GetFrameHeight());
             if (GUI::Checkbox("##AutoRestore", std::addressof(autoRestore))) {
                 settings.SetAutoRestoreEnabled(mcm.identity.modID, autoRestore);
                 settingsChanged = true;
@@ -728,15 +704,15 @@ namespace MCMMemory::Menu
 
     void ProfileMenu::RenderMCMCounts(size_t a_registeredMCMCount, size_t a_selectedMCMCount) const
     {
-        GUI::TextColored(Color::kCountText, "(");
+        ColoredText(Color::kCountText, "(");
         GUI::SameLine(0.0F, 0.0F);
-        GUI::TextColored(Color::kCountNumber, "%zu", a_registeredMCMCount);
+        ColoredText(Color::kCountNumber, std::to_string(a_registeredMCMCount).c_str());
         GUI::SameLine(0.0F, 0.0F);
-        GUI::TextColored(Color::kCountText, " %s, ", Trans::Tr("Profile.MCM.Count.Registered").c_str());
+        ColoredText(Color::kCountText, std::format(" {}, ", Trans::Tr("Profile.MCM.Count.Registered")).c_str());
         GUI::SameLine(0.0F, 0.0F);
-        GUI::TextColored(Color::kCountNumber, "%zu", a_selectedMCMCount);
+        ColoredText(Color::kCountNumber, std::to_string(a_selectedMCMCount).c_str());
         GUI::SameLine(0.0F, 0.0F);
-        GUI::TextColored(Color::kCountText, " %s)", Trans::Tr("Profile.MCM.Count.Selected").c_str());
+        ColoredText(Color::kCountText, std::format(" {})", Trans::Tr("Profile.MCM.Count.Selected")).c_str());
     }
 
     void ProfileMenu::RenderMCMs()
@@ -765,7 +741,7 @@ namespace MCMMemory::Menu
 
         GUI::Spacing();
 
-        GUI::SetNextItemWidth(std::min(500.0F, GUI::GetContentRegionAvail().x));
+        GUI::SetNextItemWidth(std::min(500.0F, GUI::GetAvailableWidth()));
         GUI::InputTextWithHint("##MCM Search", Trans::Tr("Profile.MCM.SearchHint").c_str(), search.data(), search.size());
 
         GUI::Spacing();
@@ -784,7 +760,7 @@ namespace MCMMemory::Menu
 
         GUI::SameLine(0.0F, 14.0F);
         GUI::Checkbox(Trans::Tr("Profile.MCM.HideUnavailable").c_str(), std::addressof(hideUnavailable));
-        HelpMarker(Trans::Tr("Profile.MCM.HideUnavailable.Tooltip").c_str());
+        GUI::HelpMarker(Trans::Tr("Profile.MCM.HideUnavailable.Tooltip").c_str());
 
         const auto selectedMCMs = ReadSelectedMCMs();
         const bool selectedBackupAvailable = operationAvailable && !journalMenuOpen && !selectedMCMs.backup.empty();
@@ -794,7 +770,7 @@ namespace MCMMemory::Menu
 
         RenderMCMCounts(registeredMCMCount, selectedMCMs.selected.size());
 
-        GUI::SameLine(0.0F, 28.0F);
+        GUI::Spacing();
 
         if (IconCTAButton(backupLabel.c_str(), selectedBackupAvailable, Icons::kSave, Color::kBackupButtonColors)) {
             Backup::GetSingleton()->StartSelected(selectedMCMs.backup);
@@ -818,6 +794,8 @@ namespace MCMMemory::Menu
             forgetMCMsWindow.modIDs = selectedMCMs.forget;
         }
         GUI::WrappedTooltip(Trans::Tr("Profile.MCM.ForgetSelected.Tooltip").c_str());
+
+        GUI::HelpMarker(Trans::Tr("Profile.MCM.Column.Header.Tooltip").c_str());
 
         GUI::Spacing();
 

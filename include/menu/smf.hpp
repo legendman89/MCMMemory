@@ -10,6 +10,43 @@ namespace MCMMemory::GUI::SMF
     inline constexpr PushIDIntFunction PushIDInt = ImGuiMCP::PushID;
     inline constexpr EndWindowFunction EndWindow = ImGuiMCP::End;
     inline constexpr RadioButtonFunction RadioButton = ImGuiMCP::RadioButton;
+    inline constexpr TableSetupColumnFunction TableSetupColumn = ImGuiMCP::TableSetupColumn;
+
+    inline bool BeginTable(const char* a_id, int a_columns, int a_flags, float a_width, float a_height, float a_innerWidth)
+    {
+        return ImGuiMCP::BeginTable(a_id, a_columns, a_flags, ImGuiMCP::ImVec2{ a_width, a_height }, a_innerWidth);
+    }
+
+    inline void TableSetColumnIndex(int a_column)
+    {
+        ImGuiMCP::TableSetColumnIndex(a_column);
+    }
+
+    inline bool ReadTableSort(TableSort& a_sort, bool a_force)
+    {
+        return CopyTableSort(ImGuiMCP::TableGetSortSpecs(), a_sort, a_force, ImGuiMCP::ImGuiSortDirection_Descending);
+    }
+
+    inline float MeasureTableHeader(const char* a_label)
+    {
+        const auto* style = ImGuiMCP::GetStyle();
+        const float padding = style ? style->FramePadding.x + 2.0F * style->CellPadding.x : 12.0F;
+        return ImGuiMCP::CalcTextSize(a_label).x + ImGuiMCP::GetFontSize() + padding;
+    }
+
+    inline float GetAvailableWidth() { return ImGuiMCP::GetContentRegionAvail().x; }
+
+    inline float GetAvailableHeight() { return ImGuiMCP::GetContentRegionAvail().y; }
+
+    inline bool CollapsingHeader(const char* a_label, int a_flags)
+    {
+        return ImGuiMCP::CollapsingHeader(a_label, a_flags);
+    }
+
+    inline bool InputTextWithHint(const char* a_label, const char* a_hint, char* a_buffer, size_t a_size)
+    {
+        return ImGuiMCP::InputTextWithHint(a_label, a_hint, a_buffer, a_size);
+    }
 
     inline bool BeginWindow(const char* a_title, bool* a_open, float a_width, float a_height)
     {
@@ -75,6 +112,11 @@ namespace MCMMemory::GUI::SMF
     inline void BoldTextColored(const Color4& a_color, const char* a_text)
     {
         Menu::BoldTextColored(ToColor(a_color), a_text);
+    }
+
+    inline void ColoredText(const Color4& a_color, const char* a_text)
+    {
+        ImGuiMCP::TextColored(ToColor(a_color), "%s", a_text);
     }
 
     inline bool ColoredButton(const char* a_label, const ButtonColors& a_colors, bool a_enabled, float a_width, float a_height)

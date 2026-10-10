@@ -67,6 +67,11 @@ namespace MCMMemory::Menu
         }
     }
 
+    inline void ColoredText(const GUI::ImVec4& a_color, const char* a_text)
+    {
+        GUI::ColoredText({ a_color.x, a_color.y, a_color.z, a_color.w }, a_text);
+    }
+
     template <class Colors>
     inline void PushButtonColors(const Colors& a_colors)
     {

@@ -114,7 +114,15 @@ namespace MCMMemory::Menu
             profileNames = Profiles::ReadNames();
         }
 
+        inline void RenderMCMWindows()
+        {
+            RenderForgetMCMsWindow();
+            pagesWindow.Render();
+        }
+
         void Render();
+
+        void RenderMCMs();
 
         void RenderProfileSelector();
 
@@ -125,11 +133,6 @@ namespace MCMMemory::Menu
         void RenderDeleteProfileWindow();
 
     private:
-
-        inline bool IsEditingProfile() const
-        {
-            return createProfileWindow.open || deleteProfileWindow.open || forgetMCMsWindow.open || pagesWindow.IsOpen();
-        }
 
         void Refresh();
 
@@ -142,8 +145,6 @@ namespace MCMMemory::Menu
         bool RenderConfirmWindow(ConfirmWindow& a_window, std::string_view a_id, std::string_view a_titleKey, const std::string& a_message);
 
         void RenderForgetMCMsWindow();
-
-        void RenderMCMs();
 
         void RenderMCMTable(bool a_operationAvailable);
 
@@ -160,6 +161,11 @@ namespace MCMMemory::Menu
         inline bool IsVisible(const ProfileMCMRow& a_mcm) const
         {
             return MatchesSearch(a_mcm) && (!hideUnavailable || a_mcm.available);
+        }
+
+        inline bool IsEditingProfile() const
+        {
+            return createProfileWindow.open || deleteProfileWindow.open || forgetMCMsWindow.open || pagesWindow.IsOpen();
         }
 
         std::vector<ProfileMCMRow> mcms;

@@ -10,6 +10,16 @@
     F(EndWindow, void, ()) \
     F(MeasureText, TextSize, (const char*)) \
     F(MeasureButton, TextSize, (const char*, float, float)) \
+    F(MeasureTableHeader, float, (const char*)) \
+    F(GetAvailableWidth, float, ()) \
+    F(GetAvailableHeight, float, ()) \
+    F(ColoredText, void, (const Color4&, const char*)) \
+    F(CollapsingHeader, bool, (const char*, int)) \
+    F(InputTextWithHint, bool, (const char*, const char*, char*, size_t)) \
+    F(BeginTable, bool, (const char*, int, int, float, float, float)) \
+    F(TableSetupColumn, void, (const char*, int, float, uint32_t)) \
+    F(TableSetColumnIndex, void, (int)) \
+    F(ReadTableSort, bool, (TableSort&, bool)) \
     F(CenterNextItem, void, (float)) \
     F(Button, bool, (const char*, float, float)) \
     F(Combo, bool, (const char*, int*, const char* const*, int)) \
@@ -61,6 +71,12 @@
 
 namespace MCMMemory::GUI
 {
+    struct TableSort
+    {
+        int column{ -1 };
+        bool descending{};
+    };
+
     struct TextSize
     {
         float width, height;
@@ -108,6 +124,24 @@ namespace MCMMemory::GUI
 
     }
 
+    template <class Specs, class Direction>
+    inline bool CopyTableSort(Specs* a_specs, TableSort& a_sort, bool a_force, Direction a_descending)
+    {
+        if (!a_specs || (!a_specs->SpecsDirty && !a_force)) {
+            return false;
+        }
+
+        a_sort = {};
+        if (a_specs->SpecsCount > 0) {
+            a_sort.column = a_specs->Specs[0].ColumnIndex;
+            a_sort.descending = a_specs->Specs[0].SortDirection == a_descending;
+        }
+
+        a_specs->SpecsDirty = false;
+        
+        return true;
+    }
+
     inline bool Checkbox(const char* a_label, bool* a_value)
     {
         const auto checkbox = GetBE().memCheckbox;
@@ -144,6 +178,72 @@ namespace MCMMemory::GUI
     {
         const auto measureButton = GetBE().memMeasureButton;
         return measureButton ? measureButton(a_label, a_width, a_height) : TextSize{};
+    }
+
+    inline float MeasureTableHeader(const char* a_label)
+    {
+        const auto measureTableHeader = GetBE().memMeasureTableHeader;
+        return measureTableHeader ? measureTableHeader(a_label) : 0.0F;
+    }
+
+    inline float GetAvailableWidth()
+    {
+        const auto getAvailableWidth = GetBE().memGetAvailableWidth;
+        return getAvailableWidth ? getAvailableWidth() : 0.0F;
+    }
+
+    inline float GetAvailableHeight()
+    {
+        const auto getAvailableHeight = GetBE().memGetAvailableHeight;
+        return getAvailableHeight ? getAvailableHeight() : 0.0F;
+    }
+
+    inline void ColoredText(const Color4& a_color, const char* a_text)
+    {
+        const auto coloredText = GetBE().memColoredText;
+        if (coloredText) {
+            coloredText(a_color, a_text);
+        }
+    }
+
+    inline bool CollapsingHeader(const char* a_label, int a_flags = 0)
+    {
+        const auto collapsingHeader = GetBE().memCollapsingHeader;
+        return collapsingHeader && collapsingHeader(a_label, a_flags);
+    }
+
+    inline bool InputTextWithHint(const char* a_label, const char* a_hint, char* a_buffer, size_t a_size)
+    {
+        const auto inputTextWithHint = GetBE().memInputTextWithHint;
+        return inputTextWithHint && inputTextWithHint(a_label, a_hint, a_buffer, a_size);
+    }
+
+    inline bool BeginTable(const char* a_id, int a_columns, int a_flags = 0, float a_width = 0.0F, float a_height = 0.0F, float a_innerWidth = 0.0F)
+    {
+        const auto beginTable = GetBE().memBeginTable;
+        return beginTable && beginTable(a_id, a_columns, a_flags, a_width, a_height, a_innerWidth);
+    }
+
+    inline void TableSetupColumn(const char* a_label, int a_flags = 0, float a_width = 0.0F, uint32_t a_id = 0)
+    {
+        const auto tableSetupColumn = GetBE().memTableSetupColumn;
+        if (tableSetupColumn) {
+            tableSetupColumn(a_label, a_flags, a_width, a_id);
+        }
+    }
+
+    inline void TableSetColumnIndex(int a_column)
+    {
+        const auto tableSetColumnIndex = GetBE().memTableSetColumnIndex;
+        if (tableSetColumnIndex) {
+            tableSetColumnIndex(a_column);
+        }
+    }
+
+    inline bool ReadTableSort(TableSort& a_sort, bool a_force = false)
+    {
+        const auto readTableSort = GetBE().memReadTableSort;
+        return readTableSort && readTableSort(a_sort, a_force);
     }
 
     inline void CenterNextItem(float a_width)

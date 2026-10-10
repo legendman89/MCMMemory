@@ -6,7 +6,7 @@
 #define FOREACH_GUI_FUNCTIONS(F) \
     F(Checkbox, bool, (const char*, bool*)) \
     F(RadioButton, bool, (const char*, bool)) \
-    F(BeginWindow, bool, (const char*, bool*, float, float)) \
+    F(BeginWindow, bool, (const char*, bool*, float, float, bool)) \
     F(EndWindow, void, ()) \
     F(MeasureText, TextSize, (const char*)) \
     F(MeasureButton, TextSize, (const char*, float, float)) \
@@ -35,6 +35,8 @@
     F(SetNextItemWidth, void, (float)) \
     F(SetCursorPosX, void, (float)) \
     F(GetCursorPosX, float, ()) \
+    F(SetCursorPosY, void, (float)) \
+    F(GetCursorPosY, float, ()) \
     F(BeginDisabled, void, (bool)) \
     F(EndDisabled, void, ()) \
     F(PushIDString, void, (const char*)) \
@@ -154,10 +156,10 @@ namespace MCMMemory::GUI
         return radioButton && radioButton(a_label, a_selected);
     }
 
-    inline bool BeginWindow(const char* a_title, bool* a_open, float a_width, float a_height)
+    inline bool BeginWindow(const char* a_title, bool* a_open, float a_width, float a_height, bool a_opaque = false)
     {
         const auto beginWindow = GetBE().memBeginWindow;
-        return beginWindow && beginWindow(a_title, a_open, a_width, a_height);
+        return beginWindow && beginWindow(a_title, a_open, a_width, a_height, a_opaque);
     }
 
     inline void EndWindow()
@@ -354,6 +356,20 @@ namespace MCMMemory::GUI
     {
         const auto getCursorPosX = GetBE().memGetCursorPosX;
         return getCursorPosX ? getCursorPosX() : 0.0F;
+    }
+
+    inline void SetCursorPosY(float a_y)
+    {
+        const auto setCursorPosY = GetBE().memSetCursorPosY;
+        if (setCursorPosY) {
+            setCursorPosY(a_y);
+        }
+    }
+
+    inline float GetCursorPosY()
+    {
+        const auto getCursorPosY = GetBE().memGetCursorPosY;
+        return getCursorPosY ? getCursorPosY() : 0.0F;
     }
 
     inline void BeginDisabled(bool a_disabled = true)

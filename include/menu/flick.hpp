@@ -49,12 +49,21 @@ namespace MCMMemory::GUI::FLICK
         return FLK::Checkbox(a_label, &a_selected, false, false) && a_selected;
     }
 
-    inline bool BeginWindow(const char* a_title, bool* a_open, float a_width, float a_height)
+    inline bool BeginWindow(const char* a_title, bool* a_open, float a_width, float a_height, bool a_opaque)
     {
         const auto displaySize = FLK::GetDisplaySize();
         FLK::SetNextWindowSize(ImVec2{ a_width, a_height }, ImGuiCond_Appearing);
         FLK::SetNextWindowPos(ImVec2{ displaySize.x * 0.5F, displaySize.y * 0.5F }, ImGuiCond_Appearing, ImVec2{ 0.5F, 0.5F });
-        return FLK::BeginWindow(a_title, a_open, ImGuiWindowFlags_NoCollapse);
+        if (a_opaque) {
+            auto background = FLK::GetStyleColorVec4(ImGuiCol_WindowBg);
+            background.w = 1.0F;
+            FLK::PushStyleColor(ImGuiCol_WindowBg, background);
+        }
+        const bool visible = FLK::BeginWindow(a_title, a_open, ImGuiWindowFlags_NoCollapse);
+        if (a_opaque) {
+            FLK::PopStyleColor();
+        }
+        return visible;
     }
 
     inline TextSize MeasureText(const char* a_text)
@@ -110,6 +119,11 @@ namespace MCMMemory::GUI::FLICK
     inline float GetCursorPosX()
     {
         return FLK::GetCursorPos().x;
+    }
+
+    inline float GetCursorPosY()
+    {
+        return FLK::GetCursorPos().y;
     }
 
     inline std::string InlineFieldLabel(const char* a_label)
@@ -184,9 +198,19 @@ namespace MCMMemory::GUI::FLICK
 
     inline bool InputTextWithHint(const char* a_label, const char* a_hint, char* a_buffer, size_t a_size)
     {
-        FLK::PushID(a_label);
-        const bool changed = FLICK::InputText(a_hint, a_buffer, a_size);
-        FLK::PopID();
+        FLK::BeginGroup();
+        const bool changed = FLICK::InputText(a_label, a_buffer, a_size);
+        if (a_size > 0 && a_buffer[0] == '\0' && !FLK::IsItemActive()) {
+            const auto fieldMin = FLK::GetItemRectMin();
+            const auto fieldSize = FLK::GetItemRectSize();
+            const auto padding = FLK::GetStyleVarVec(ImGuiStyleVar_FramePadding);
+            const auto hintSize = FLK::CalcTextSize(a_hint);
+            if (hintSize.x <= fieldSize.x - padding.x * 2.0F) {
+                FLK::SetCursorScreenPos(ImVec2{ fieldMin.x + padding.x, fieldMin.y + std::max(0.0F, (fieldSize.y - hintSize.y) * 0.5F) });
+                FLK::TextDisabled("%s", a_hint);
+            }
+        }
+        FLK::EndGroup();
         return changed;
     }
 }

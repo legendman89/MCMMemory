@@ -146,7 +146,7 @@ namespace MCMMemory::Menu
 
         void RenderForgetMCMsWindow();
 
-        void RenderMCMTable(bool a_operationAvailable);
+        void RenderMCMTable(bool a_selectionAvailable);
 
         void RenderMCMCounts(size_t a_registeredMCMCount, size_t a_selectedMCMCount) const;
 

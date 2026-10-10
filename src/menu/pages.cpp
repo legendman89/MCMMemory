@@ -162,7 +162,7 @@ namespace MCMMemory::Menu
 
         const auto title = std::format("{} - {}###MCM Pages", Trans::Tr("Profile.Pages.Title"), GetDisplayModName(identity.modName));
         
-        if (GUI::BeginWindow(title.c_str(), std::addressof(open), 810.0F, 470.0F)) {
+        if (GUI::BeginWindow(title.c_str(), std::addressof(open), 810.0F, 470.0F, true)) {
             const bool busy = Backup::GetSingleton()->GetStatus() != OperationStatus::Idle || Restore::GetSingleton()->GetStatus() != OperationStatus::Idle;
            
             GUI::BeginDisabled(busy);
@@ -201,6 +201,7 @@ namespace MCMMemory::Menu
                     GUI::TableNextRow();
 
                     GUI::TableSetColumnIndex(0);
+                    GUI::AlignTextToFramePadding();
 
                     auto label = page.name.empty() ? Trans::Tr("Profile.Pages.Main") : GetDisplayText(page.name);
 
@@ -215,6 +216,7 @@ namespace MCMMemory::Menu
                     GUI::TextUnformatted(label.c_str());
 
                     GUI::TableSetColumnIndex(1);
+                    GUI::AlignTextToFramePadding();
 
                     GUI::TextUnformatted(Trans::Tr(page.available ? "Profile.Pages.Available" : "Profile.Pages.Saved").c_str());
 
@@ -243,13 +245,18 @@ namespace MCMMemory::Menu
                 GUI::TextWrapped("%s", Trans::Tr(error).c_str());
             }
 
-            if (CTAButton(Trans::Tr("Profile.Pages.Apply").c_str(), !busy, Color::kCreateButtonColors)) {
+            const auto applyLabel = Trans::Tr("Profile.Pages.Apply");
+            const auto cancelLabel = Trans::Tr("Common.Action.Cancel");
+            const float buttonHeight = std::max(GUI::MeasureButton(applyLabel.c_str()).height, GUI::MeasureButton(cancelLabel.c_str()).height);
+            GUI::SetCursorPosY(GUI::GetCursorPosY() + std::max(0.0F, GUI::GetAvailableHeight() - buttonHeight));
+
+            if (CTAButton(applyLabel.c_str(), !busy, Color::kCreateButtonColors)) {
                 Apply();
             }
 
             GUI::SameLine(0.0F, 10.0F);
 
-            if (CTAButton(Trans::Tr("Common.Action.Cancel").c_str(), true, Color::kNeutralButtonColors)) {
+            if (CTAButton(cancelLabel.c_str(), true, Color::kNeutralButtonColors)) {
                 open = false;
             }
         }

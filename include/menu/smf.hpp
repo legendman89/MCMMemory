@@ -48,10 +48,13 @@ namespace MCMMemory::GUI::SMF
         return ImGuiMCP::InputTextWithHint(a_label, a_hint, a_buffer, a_size);
     }
 
-    inline bool BeginWindow(const char* a_title, bool* a_open, float a_width, float a_height)
+    inline bool BeginWindow(const char* a_title, bool* a_open, float a_width, float a_height, bool a_opaque)
     {
-        ImGuiMCP::SetNextWindowSize(ImGuiMCP::ImVec2{ a_width, a_height }, ImGuiMCP::ImGuiCond_FirstUseEver);
+        ImGuiMCP::SetNextWindowSize(ImGuiMCP::ImVec2{ a_width, a_height }, ImGuiMCP::ImGuiCond_Appearing);
         Menu::CenterNextWindow();
+        if (a_opaque) {
+            return Menu::BeginOpaqueWindow(a_title, a_open);
+        }
         return ImGuiMCP::Begin(a_title, a_open, ImGuiMCP::ImGuiWindowFlags_NoCollapse);
     }
 

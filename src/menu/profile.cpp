@@ -479,8 +479,10 @@ namespace MCMMemory::Menu
 
         bool confirmed{};
         const auto title = std::format("{}###{}", Trans::Tr(a_titleKey), a_id);
-        if (GUI::BeginWindow(title.c_str(), std::addressof(a_window.open), 520.0F, 170.0F)) {
-            GUI::CenterNextItem(GUI::MeasureText(a_message.c_str()).width);
+        const float messageWidth = GUI::MeasureText(a_message.c_str()).width;
+        const float windowWidth = std::max(520.0F, messageWidth + 80.0F);
+        if (GUI::BeginWindow(title.c_str(), std::addressof(a_window.open), windowWidth, 170.0F, true)) {
+            GUI::CenterNextItem(messageWidth);
             GUI::TextUnformatted(a_message.c_str());
             GUI::Spacing();
 
@@ -563,7 +565,7 @@ namespace MCMMemory::Menu
         }
     }
 
-    void ProfileMenu::RenderMCMTable(bool a_operationAvailable)
+    void ProfileMenu::RenderMCMTable(bool a_selectionAvailable)
     {
         size_t visibleMCMCount{};
         for (const auto& mcm : mcms) {
@@ -584,11 +586,13 @@ namespace MCMMemory::Menu
         }
 
         const auto selectedLabel = Trans::Tr("Profile.MCM.Column.Selected");
+        const auto savedSettingsLabel = Trans::Tr("Profile.MCM.Column.SavedSettings");
+        const auto autoRestoreLabel = Trans::Tr("Profile.MCM.Column.AutoRestore");
         const float selectedWidth = std::max(GUI::GetFrameHeight(), GUI::MeasureTableHeader(selectedLabel.c_str()));
         GUI::TableSetupColumn(selectedLabel.c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, selectedWidth);
         GUI::TableSetupColumn(Trans::Tr("Common.MCM").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
-        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.SavedSettings").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, 160.0F);
-        GUI::TableSetupColumn(Trans::Tr("Profile.MCM.Column.AutoRestore").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_NoSort, 105.0F);
+        GUI::TableSetupColumn(savedSettingsLabel.c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_PreferSortDescending, std::max(160.0F, GUI::MeasureTableHeader(savedSettingsLabel.c_str())));
+        GUI::TableSetupColumn(autoRestoreLabel.c_str(), GUI::ImGuiTableColumnFlags_WidthFixed | GUI::ImGuiTableColumnFlags_NoSort, std::max(105.0F, GUI::MeasureTableHeader(autoRestoreLabel.c_str())));
         GUI::TableSetupScrollFreeze(0, 1);
         GUI::TableHeadersRow();
 
@@ -617,7 +621,7 @@ namespace MCMMemory::Menu
             GUI::TableNextRow();
 
             GUI::TableSetColumnIndex(0);
-            GUI::BeginDisabled((!mcm.CanSelect() && !mcm.CanForget()) || !a_operationAvailable);
+            GUI::BeginDisabled((!mcm.CanSelect() && !mcm.CanForget()) || !a_selectionAvailable);
 
             GUI::CenterNextItem(GUI::GetFrameHeight());
             if (GUI::Checkbox("##Selected", std::addressof(mcm.selected))) {
@@ -628,6 +632,7 @@ namespace MCMMemory::Menu
             GUI::WrappedTooltip(Trans::Tr("Profile.MCM.Column.Selected.Tooltip").c_str());
 
             GUI::TableSetColumnIndex(1);
+            GUI::AlignTextToFramePadding();
             const auto modName = GetDisplayModName(mcm.identity.modName);
             if (excluded) {
                 GUI::TextDisabled("%s (%s)", modName.c_str(), Trans::Tr("Profile.MCM.Excluded").c_str());
@@ -666,6 +671,7 @@ namespace MCMMemory::Menu
             }
 
             GUI::TableSetColumnIndex(2);
+            GUI::AlignTextToFramePadding();
             if (mcm.settingCount > 0) {
                 if (mcm.selected) {
                     ColoredText(Color::kCountNumber, std::to_string(mcm.settingCount).c_str());
@@ -704,6 +710,7 @@ namespace MCMMemory::Menu
 
     void ProfileMenu::RenderMCMCounts(size_t a_registeredMCMCount, size_t a_selectedMCMCount) const
     {
+        GUI::AlignTextToFramePadding();
         ColoredText(Color::kCountText, "(");
         GUI::SameLine(0.0F, 0.0F);
         ColoredText(Color::kCountNumber, std::to_string(a_registeredMCMCount).c_str());
@@ -740,66 +747,77 @@ namespace MCMMemory::Menu
         const bool operationRunning = backupStatus != OperationStatus::Idle || restoreStatus != OperationStatus::Idle;
 
         GUI::Spacing();
+        GUI::Spacing();
 
         GUI::SetNextItemWidth(std::min(500.0F, GUI::GetAvailableWidth()));
         GUI::InputTextWithHint("##MCM Search", Trans::Tr("Profile.MCM.SearchHint").c_str(), search.data(), search.size());
 
         GUI::Spacing();
+        GUI::Spacing();
 
-        if (GUI::Button(Trans::Tr("Profile.MCM.SelectAll").c_str())) {
-            SelectVisibleMCMs(true);
+        const auto toolbarFlags = GUI::ImGuiTableFlags_SizingFixedFit | GUI::ImGuiTableFlags_NoSavedSettings;
+        if (GUI::BeginTable("##MCMControls", 3, toolbarFlags)) {
+            GUI::TableSetupColumn("Selection", GUI::ImGuiTableColumnFlags_WidthFixed);
+            GUI::TableSetupColumn("Spacing", GUI::ImGuiTableColumnFlags_WidthStretch);
+            GUI::TableSetupColumn("Operations", GUI::ImGuiTableColumnFlags_WidthFixed);
+            GUI::TableNextRow();
+            GUI::TableSetColumnIndex(0);
+
+            if (GUI::Button(Trans::Tr("Profile.MCM.SelectAll").c_str())) {
+                SelectVisibleMCMs(true);
+            }
+            GUI::WrappedTooltip(Trans::Tr("Profile.MCM.SelectAll.Tooltip").c_str());
+
+            GUI::SameLine(0.0F, 14.0F);
+
+            if (GUI::Button(Trans::Tr("Common.Action.Clear").c_str())) {
+                SelectVisibleMCMs(false);
+            }
+            GUI::WrappedTooltip(Trans::Tr("Profile.MCM.Clear.Tooltip").c_str());
+
+            GUI::SameLine(0.0F, 14.0F);
+            GUI::Checkbox(Trans::Tr("Profile.MCM.HideUnavailable").c_str(), std::addressof(hideUnavailable));
+            GUI::HelpMarker(Trans::Tr("Profile.MCM.HideUnavailable.Tooltip").c_str());
+
+            const auto selectedMCMs = ReadSelectedMCMs();
+            const bool selectedBackupAvailable = operationAvailable && !journalMenuOpen && !selectedMCMs.backup.empty();
+            const bool selectedRestoreAvailable = operationAvailable && !journalMenuOpen && !selectedMCMs.restore.empty();
+
+            GUI::SameLine(0.0F, 18.0F);
+
+            RenderMCMCounts(registeredMCMCount, selectedMCMs.selected.size());
+
+            GUI::TableSetColumnIndex(2);
+
+            if (IconCTAButton(backupLabel.c_str(), selectedBackupAvailable, Icons::kSave, Color::kBackupButtonColors)) {
+                Backup::GetSingleton()->StartSelected(selectedMCMs.backup);
+            }
+            GUI::WrappedTooltip(Trans::Tr(journalBlocksOperation ? "Profile.Action.JournalMenuOpen.Tooltip" : "Profile.MCM.BackUpSelected.Tooltip").c_str());
+
+            GUI::SameLine(0.0F, 14.0F);
+
+            if (IconCTAButton(restoreLabel.c_str(), selectedRestoreAvailable, Icons::kRestore, Color::kRestoreButtonColors)) {
+                Restore::GetSingleton()->StartSelected(selectedMCMs.restore);
+            }
+            GUI::WrappedTooltip(Trans::Tr(journalBlocksOperation ? "Profile.Action.JournalMenuOpen.Tooltip" : "Profile.MCM.RestoreSelected.Tooltip").c_str());
+
+            GUI::SameLine(0.0F, 14.0F);
+
+            // Only the profile file is touched, so this does not wait for the Journal Menu to close.
+            if (IconCTAButton(forgetLabel.c_str(), !operationRunning && !IsEditingProfile() && !selectedMCMs.forget.empty(), Icons::kDelete, Color::kCancelButtonColors)) {
+                forgetMCMsWindow = {};
+                forgetMCMsWindow.open = true;
+                forgetMCMsWindow.profile = GetSettings().activeProfile;
+                forgetMCMsWindow.modIDs = selectedMCMs.forget;
+            }
+            GUI::WrappedTooltip(Trans::Tr("Profile.MCM.ForgetSelected.Tooltip").c_str());
+
+            GUI::EndTable();
         }
-        GUI::WrappedTooltip(Trans::Tr("Profile.MCM.SelectAll.Tooltip").c_str());
-
-        GUI::SameLine(0.0F, 14.0F);
-
-        if (GUI::Button(Trans::Tr("Common.Action.Clear").c_str())) {
-            SelectVisibleMCMs(false);
-        }
-        GUI::WrappedTooltip(Trans::Tr("Profile.MCM.Clear.Tooltip").c_str());
-
-        GUI::SameLine(0.0F, 14.0F);
-        GUI::Checkbox(Trans::Tr("Profile.MCM.HideUnavailable").c_str(), std::addressof(hideUnavailable));
-        GUI::HelpMarker(Trans::Tr("Profile.MCM.HideUnavailable.Tooltip").c_str());
-
-        const auto selectedMCMs = ReadSelectedMCMs();
-        const bool selectedBackupAvailable = operationAvailable && !journalMenuOpen && !selectedMCMs.backup.empty();
-        const bool selectedRestoreAvailable = operationAvailable && !journalMenuOpen && !selectedMCMs.restore.empty();
-
-        GUI::SameLine(0.0F, 18.0F);
-
-        RenderMCMCounts(registeredMCMCount, selectedMCMs.selected.size());
 
         GUI::Spacing();
 
-        if (IconCTAButton(backupLabel.c_str(), selectedBackupAvailable, Icons::kSave, Color::kBackupButtonColors)) {
-            Backup::GetSingleton()->StartSelected(selectedMCMs.backup);
-        }
-        GUI::WrappedTooltip(Trans::Tr(journalBlocksOperation ? "Profile.Action.JournalMenuOpen.Tooltip" : "Profile.MCM.BackUpSelected.Tooltip").c_str());
-
-        GUI::SameLine(0.0F, 14.0F);
-
-        if (IconCTAButton(restoreLabel.c_str(), selectedRestoreAvailable, Icons::kRestore, Color::kRestoreButtonColors)) {
-            Restore::GetSingleton()->StartSelected(selectedMCMs.restore);
-        }
-        GUI::WrappedTooltip(Trans::Tr(journalBlocksOperation ? "Profile.Action.JournalMenuOpen.Tooltip" : "Profile.MCM.RestoreSelected.Tooltip").c_str());
-
-        GUI::SameLine(0.0F, 14.0F);
-
-        // Only the profile file is touched, so this does not wait for the Journal Menu to close.
-        if (IconCTAButton(forgetLabel.c_str(), !operationRunning && !IsEditingProfile() && !selectedMCMs.forget.empty(), Icons::kDelete, Color::kCancelButtonColors)) {
-            forgetMCMsWindow = {};
-            forgetMCMsWindow.open = true;
-            forgetMCMsWindow.profile = GetSettings().activeProfile;
-            forgetMCMsWindow.modIDs = selectedMCMs.forget;
-        }
-        GUI::WrappedTooltip(Trans::Tr("Profile.MCM.ForgetSelected.Tooltip").c_str());
-
-        GUI::HelpMarker(Trans::Tr("Profile.MCM.Column.Header.Tooltip").c_str());
-
-        GUI::Spacing();
-
-        RenderMCMTable(operationAvailable);
+        RenderMCMTable(!operationRunning && !IsEditingProfile());
     }
 
     void ProfileMenu::Render()

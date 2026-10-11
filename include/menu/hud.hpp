@@ -3,7 +3,6 @@
 // HUD drawing is based on Log Watcher.
 
 #include "menu/hud_defs.hpp"
-#include "menu/ui.hpp"
 #include "profile/stats.hpp"
 #include "utils/helper.hpp"
 #include "utils/time.hpp"
@@ -11,7 +10,6 @@
 #include <deque>
 
 #define DECLARE_HUD_COLOR(name, red, green, blue, alpha) name,
-#define DECLARE_HUD_COLOR_VALUE(name, red, green, blue, alpha) GUI::ImVec4{ red, green, blue, alpha },
 
 namespace MCMMemory
 {
@@ -30,11 +28,6 @@ namespace MCMMemory
     {
         FOREACH_HUD_COLOR(DECLARE_HUD_COLOR)
         Count
-    };
-
-    inline constexpr std::array<GUI::ImVec4, ToIndex(HUDColor::Count)> HUDColors
-    {
-        FOREACH_HUD_COLOR(DECLARE_HUD_COLOR_VALUE)
     };
 
     enum class HUDMessageType
@@ -128,8 +121,10 @@ namespace MCMMemory
         float fadeSeconds{};
     };
 
+    using HUDMessageRenderer = void (*)(const HUDMessage&, const HUDOptions&, float);
+
     // Singleton class that manages the heads-up display for MCM backup and restore operations.
-    // I hand-crafted this to hvae a customizable appearance over Debug Notifications.
+    // I hand-crafted this to have a customizable appearance over Debug Notifications.
     class HUD
     {
     public:
@@ -150,9 +145,21 @@ namespace MCMMemory
             ShowOperationStarted("HUD.Operation.RestoreStarted");
         }
 
-        void Configure(const Settings& a_settings);
+        inline bool HasPreview()
+        {
+            std::lock_guard lock(hudMutex);
+            return enabled.load(std::memory_order_relaxed) && display.active && display.message.type == HUDMessageType::Preview;
+        }
 
-        void Reset();
+        inline void RenderPreview(HUDMessageRenderer a_renderer)
+        {
+            std::lock_guard lock(hudMutex);
+            if (a_renderer && enabled.load(std::memory_order_relaxed) && display.active && display.message.type == HUDMessageType::Preview) {
+                UpdateActiveMessage(std::chrono::steady_clock::now(), a_renderer);
+            }
+        }
+
+        void Configure(const Settings& a_settings);
 
         void ShowBackupMCM(std::string_view a_modName, const BackupStats& a_stats, OperationMode a_operationMode);
 
@@ -166,36 +173,29 @@ namespace MCMMemory
 
         void ShowRestoreCancelled(const RestoreStats& a_stats);
 
-        void ShowFailure(std::string_view a_titleKey, std::string_view a_detailKey);
-
         void ShowMenuWarning(std::string_view a_detailKey);
+
+        void ShowFailure(std::string_view a_titleKey, std::string_view a_detailKey);
 
         void HideMenuWarning();
 
-        void Preview();
-
         void KeepPreviewAlive();
+
+        void Preview();
 
         void Render();
 
+        void Reset();
+
     private:
 
-        void StartPreview(const TimePoint& a_now);
-
-        void StartMessage(HUDMessage a_message, const TimePoint& a_now)
+        inline void StartMessage(HUDMessage a_message, const TimePoint& a_now)
         {
             AppendBackupAge(a_message, a_now);
             display.message = std::move(a_message);
             display.startedAt = a_now;
             display.pausedAt = {};
             display.active = true;
-        }
-
-        inline GUI::ImVec4 GetColor(HUDColor a_color, float a_alpha) const
-        {
-            auto color = HUDColors[ToIndex(a_color)];
-            color.w *= a_alpha;
-            return color;
         }
 
         inline HUDMessageTiming GetTiming(HUDMessageType a_type) const
@@ -221,6 +221,10 @@ namespace MCMMemory
             return index < perModNotifications.size() && perModNotifications[index].load(std::memory_order_relaxed);
         }
 
+        void StartPreview(const TimePoint& a_now);
+
+        uint32_t GetColor(HUDColor a_color, float a_alpha) const;
+
         void ShowOperationStarted(std::string_view a_key);
 
         void BeginOperation(HUDMessage a_message);
@@ -231,7 +235,7 @@ namespace MCMMemory
 
         bool UpdateMenuDelay(bool a_blocked, const TimePoint& a_now);
 
-        bool UpdateActiveMessage(const TimePoint& a_now);
+        bool UpdateActiveMessage(const TimePoint& a_now, HUDMessageRenderer a_renderer = nullptr);
 
         bool StartNextMessage(const TimePoint& a_now);
 
@@ -270,4 +274,3 @@ namespace MCMMemory
 }
 
 #undef DECLARE_HUD_COLOR
-#undef DECLARE_HUD_COLOR_VALUE

@@ -1,7 +1,9 @@
+#include "menu/ui.hpp"
 #include "menu/hud.hpp"
 #include "menu/translate.hpp"
-#include "settings.hpp"
 #include "utils/helper.hpp"
+
+#include "settings.hpp"
 
 namespace MCMMemory
 {
@@ -334,7 +336,7 @@ namespace MCMMemory
         return false;
     }
 
-    bool HUD::UpdateActiveMessage(const TimePoint& a_now)
+    bool HUD::UpdateActiveMessage(const TimePoint& a_now, HUDMessageRenderer a_renderer)
     {
         if (!display.active) {
             return false;
@@ -348,7 +350,13 @@ namespace MCMMemory
             return true;
         }
 
-        DrawMessage(display.message, FadeAlpha(age, timing.fadeAtSeconds, timing.fadeSeconds));
+        const float alpha = FadeAlpha(age, timing.fadeAtSeconds, timing.fadeSeconds);
+        if (a_renderer) {
+            a_renderer(display.message, options, alpha);
+        }
+        else {
+            DrawMessage(display.message, alpha);
+        }
         return true;
     }
 
@@ -385,6 +393,16 @@ namespace MCMMemory
             const auto elapsedHours = elapsedMinutes / 60;
             a_message.segments.push_back({ Trans::Format("HUD.Backup.Age.HoursAgo", elapsedHours), HUDColor::Muted });
         }
+    }
+
+    uint32_t HUD::GetColor(HUDColor a_color, float a_alpha) const
+    {
+#define DECLARE_HUD_COLOR_VALUE(name, red, green, blue, alpha) GUI::ImVec4{ red, green, blue, alpha },
+        constexpr std::array<GUI::ImVec4, ToIndex(HUDColor::Count)> colors{ FOREACH_HUD_COLOR(DECLARE_HUD_COLOR_VALUE) };
+#undef DECLARE_HUD_COLOR_VALUE
+        auto color = colors[ToIndex(a_color)];
+        color.w *= a_alpha;
+        return GUI::ColorConvertFloat4ToU32(color);
     }
 
     void HUD::DrawMessage(const HUDMessage& a_message, float a_alpha) const
@@ -438,7 +456,7 @@ namespace MCMMemory
             const GUI::ImVec2 shadowPosition{ positionX + 1.0F, textY + 1.0F };
             const GUI::ImVec2 textPosition{ positionX, textY };
             const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.18F * a_alpha });
-            const auto textColor = GUI::ColorConvertFloat4ToU32(GetColor(segment.color, a_alpha));
+            const auto textColor = GetColor(segment.color, a_alpha);
             GUI::ImDrawListManager::AddText(drawList, font, scaledHeight, shadowPosition, shadowColor, segment.text.c_str());
             GUI::ImDrawListManager::AddText(drawList, font, scaledHeight, textPosition, textColor, segment.text.c_str());
             positionX += size.x * fontScale;
@@ -511,9 +529,9 @@ namespace MCMMemory
         const float titleY = cardMin.y + HUDWarningVerticalPadding;
         const float detailY = titleY + lineHeight + HUDWarningLineGap;
         const auto backgroundColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.96F, 0.96F, 0.96F, 0.86F * a_alpha });
-        const auto accentColor = GUI::ColorConvertFloat4ToU32(GetColor(HUDColor::Warning, a_alpha));
-        const auto titleColor = GUI::ColorConvertFloat4ToU32(GetColor(HUDColor::Warning, a_alpha));
-        const auto detailColor = GUI::ColorConvertFloat4ToU32(GetColor(HUDColor::Primary, a_alpha));
+        const auto accentColor = GetColor(HUDColor::Warning, a_alpha);
+        const auto titleColor = GetColor(HUDColor::Warning, a_alpha);
+        const auto detailColor = GetColor(HUDColor::Primary, a_alpha);
         const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.18F * a_alpha });
 
         GUI::ImDrawListManager::AddRectFilled(drawList, cardMin, cardMax, backgroundColor, 5.0F, 0);

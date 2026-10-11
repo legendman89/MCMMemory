@@ -2,6 +2,8 @@
 
 #include "plugin.hpp"
 #include "menu/backend.hpp"
+#include "menu/hud.hpp"
+#include "menu/profile.hpp"
 #include "menu/API/FUCK_API.h"
 #include "utils/helper.hpp"
 
@@ -218,18 +220,39 @@ namespace MCMMemory::GUI::FLICK
         FLK::EndGroup();
         return changed;
     }
-}
 
-namespace MCMMemory::Menu
-{
+    void DrawFLICKHUDMessage(const HUDMessage& a_message, const HUDOptions& a_options, float a_alpha);
+
+    class FLICKHUD final : public FLK::IWindow
+    {
+    public:
+
+        inline const char* Id() const override { return "MCMMemoryHUD"; }
+
+        inline const char* Title() const override { return BEAUTIFUL_NAME; }
+
+        inline bool IsOpen() const override { return HUD::GetSingleton()->HasPreview(); }
+
+        inline void SetOpen(bool) override {}
+
+        inline FLK::WindowFlags GetFlags() const override
+        {
+            return FLK::WindowFlags::kNoDecoration | FLK::WindowFlags::kNoBackground | FLK::WindowFlags::kAutoResize |
+                FLK::WindowFlags::kNoMove | FLK::WindowFlags::kCustomPosition | FLK::WindowFlags::kPassInputToGame;
+        }
+
+        inline void Draw() override { HUD::GetSingleton()->RenderPreview(DrawFLICKHUDMessage); }
+    };
+
     class FLICKTool final : public FLK::ITool
     {
     public:
 
-        const char* Name() const override { return BEAUTIFUL_NAME; }
+        inline const char* Name() const override { return BEAUTIFUL_NAME; }
 
-        void OnOpen() override;
+        inline void OnOpen() override { Menu::ProfileMenu::GetSingleton()->RefreshProfileNames(); }
 
         void Draw() override;
     };
+
 }

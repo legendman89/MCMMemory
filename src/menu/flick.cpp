@@ -1,10 +1,10 @@
 #include "menu/flick.hpp"
 #include "menu/backend.hpp"
-#include "menu/profile.hpp"
 #include "menu/activity.hpp"
 #include "menu/translate.hpp"
 #include "menu/frameworks.hpp"
 #include "menu/automation.hpp"
+#include "menu/notifications.hpp"
 
 namespace MCMMemory::Menu
 {
@@ -20,16 +20,50 @@ namespace MCMMemory::Menu
 #undef GUI_REGISTER_FLICK
 
         Trans::GetTranslator().Load();
-        static FLICKTool tool;
+
+        static GUI::FLICK::FLICKTool tool;
         FLK::RegisterTool(&tool);
+
+        static GUI::FLICK::FLICKHUD hud;
+        FLK::RegisterWindow(&hud);
+
         flickVersion = FLK::GetInterface()->version;
         logger::info("MCM Memory registered with FLICK {}", flickVersion);
+
         return true;
     }
+}
 
-    void FLICKTool::OnOpen()
+namespace MCMMemory::GUI::FLICK
+{
+    void DrawFLICKHUDMessage(const HUDMessage& a_message, const HUDOptions& a_options, float a_alpha)
     {
-        ProfileMenu::GetSingleton()->RefreshProfileNames();
+        FLK::PushFontScaled(nullptr, static_cast<float>(a_options.fontScale) / 100.0F);
+
+        float textWidth{};
+        for (const auto& segment : a_message.segments) {
+            textWidth += FLK::CalcTextSize(segment.text.c_str()).x;
+        }
+
+        const auto screen = FLK::GetDisplaySize();
+        const auto padding = FLK::GetStyleVarVec(ImGuiStyleVar_WindowPadding);
+        const float availableWidth = std::max(1.0F, screen.x - padding.x * 2.0F);
+        const float fontSize = FLK::GetTextLineHeight() * std::min(1.0F, availableWidth / std::max(1.0F, textWidth));
+        FLK::PopFont();
+        
+        FLK::PushFont(FLK::GetFont(FLK::Font::kRegular), fontSize);
+        const float maximumX = std::max(0.0F, screen.x - std::min(textWidth, availableWidth) - padding.x * 2.0F);
+        const float maximumY = std::max(0.0F, screen.y - fontSize - padding.y * 2.0F);
+        FLK::SetWindowPos(ImVec2{ std::clamp(static_cast<float>(a_options.horizontalOffset), 0.0F, maximumX), std::clamp(static_cast<float>(a_options.verticalOffset), 0.0F, maximumY) });
+        FLK::PushStyleColor(ImGuiCol_TextShadow, ImVec4{ 0.0F, 0.0F, 0.0F, 0.0F });
+        for (size_t index = 0; index < a_message.segments.size(); ++index) {
+            if (index > 0) {
+                FLK::SameLine(0.0F, 0.0F);
+            }
+            FLK::TextColored(ImVec4{ 1.0F, 1.0F, 1.0F, a_alpha }, "%s", a_message.segments[index].text.c_str());
+        }
+        FLK::PopStyleColor();
+        FLK::PopFont();
     }
 
     void FLICKTool::Draw()
@@ -43,7 +77,7 @@ namespace MCMMemory::Menu
 
             if (FLK::BeginTabItem(Trans::Tr("Menu.Tab.Profile").c_str())) {
 
-                auto* profileMenu = ProfileMenu::GetSingleton();
+                auto* profileMenu = Menu::ProfileMenu::GetSingleton();
                 if (FLK::BeginTable("##ProfileControls", 3, FLK::TableFlags::kSizingFixedFit | FLK::TableFlags::kNoSavedSettings)) {
                     FLK::TableSetupColumn("Profile", FLK::TableColumnFlags::kWidthFixed);
                     FLK::TableSetupColumn("Spacing", FLK::TableColumnFlags::kWidthStretch);
@@ -62,7 +96,7 @@ namespace MCMMemory::Menu
                 GUI::Spacing();
                 GUI::Spacing();
 
-                RenderAutomation();
+                Menu::RenderAutomation();
 
                 GUI::Spacing();
                 GUI::Spacing();
@@ -74,7 +108,12 @@ namespace MCMMemory::Menu
             }
 
             if (FLK::BeginTabItem(Trans::Tr("Menu.Tab.Activity").c_str())) {
-                ActivityMenu::GetSingleton()->Render();
+                Menu::ActivityMenu::GetSingleton()->Render();
+                FLK::EndTabItem();
+            }
+
+            if (FLK::BeginTabItem(Trans::Tr("Menu.Tab.Notifications").c_str())) {
+                Menu::RenderNotifications();
                 FLK::EndTabItem();
             }
 

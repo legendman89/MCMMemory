@@ -1,8 +1,9 @@
-#include "menu/notifications.hpp"
-
 #include "menu/hud.hpp"
+#include "menu/menu.hpp"
 #include "menu/icons.hpp"
 #include "menu/translate.hpp"
+#include "menu/notifications.hpp"
+
 #include "settings.hpp"
 
 namespace MCMMemory::Menu
@@ -20,7 +21,7 @@ namespace MCMMemory::Menu
             settingsChanged = true;
             settingsSaveRequested = true;
         }
-        HelpMarker(Trans::Tr("Notifications.Enable.Tooltip").c_str());
+        GUI::HelpMarker(Trans::Tr("Notifications.Enable.Tooltip").c_str());
 
         GUI::BeginDisabled(!settings.notifications);
 
@@ -28,7 +29,7 @@ namespace MCMMemory::Menu
             settingsChanged = true;
             settingsSaveRequested = true;
         }
-        HelpMarker(Trans::Tr("Notifications.PerMod.Automatic.Tooltip").c_str());
+        GUI::HelpMarker(Trans::Tr("Notifications.PerMod.Automatic.Tooltip").c_str());
 
         GUI::SameLine(0.0F, 18.0F);
 
@@ -36,7 +37,7 @@ namespace MCMMemory::Menu
             settingsChanged = true;
             settingsSaveRequested = true;
         }
-        HelpMarker(Trans::Tr("Notifications.PerMod.Manual.Tooltip").c_str());
+        GUI::HelpMarker(Trans::Tr("Notifications.PerMod.Manual.Tooltip").c_str());
 
         GUI::SeparatorText(Trans::Tr("Notifications.Appearance.Header").c_str());
 
@@ -54,7 +55,7 @@ namespace MCMMemory::Menu
         } \
         settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
         appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive(); \
-        HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
+        GUI::HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
         FOREACH_HUD_FONT_SETTING(DRAW_HUD_FONT_SETTING)
 #undef DRAW_HUD_FONT_SETTING
 
@@ -68,7 +69,7 @@ namespace MCMMemory::Menu
             } \
             settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
             appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive(); \
-            HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
+            GUI::HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
             FOREACH_HUD_OFFSET_SETTING(DRAW_HUD_OFFSET_SETTING)
 #undef DRAW_HUD_OFFSET_SETTING
             GUI::EndTable();
@@ -83,7 +84,7 @@ namespace MCMMemory::Menu
                 settingsChanged = true; \
             } \
             settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
-            HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
+            GUI::HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
             FOREACH_HUD_TIMING_SETTING(DRAW_HUD_TIMING_SETTING)
 #undef DRAW_HUD_TIMING_SETTING
             GUI::EndTable();
@@ -99,7 +100,7 @@ namespace MCMMemory::Menu
             settingsChanged = true; \
         } \
         settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
-        HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
+        GUI::HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
         FOREACH_HUD_WARNING_SETTING(DRAW_HUD_WARNING_SETTING)
 #undef DRAW_HUD_WARNING_SETTING
 

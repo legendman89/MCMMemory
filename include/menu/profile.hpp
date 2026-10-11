@@ -190,6 +190,8 @@ namespace MCMMemory::Menu
 
         uint64_t unavailableGeneration{};
 
+        float mcmRowHeight{};
+
         std::array<char, 128> search{};
 
         bool sortPending{ true };

@@ -146,6 +146,11 @@ namespace MCMMemory::GUI::FLICK
         return std::format("##{}", a_label);
     }
 
+    inline bool Selectable(const char* a_label, bool a_selected, int a_flags, float a_width, float a_height)
+    {
+        return FLK::Selectable(a_label, a_selected, a_flags, ImVec2{ a_width, a_height });
+    }
+
     inline bool Combo(const char* a_label, int* a_selected, const char* const* a_items, int a_count)
     {
         const auto id = InlineFieldLabel(a_label);

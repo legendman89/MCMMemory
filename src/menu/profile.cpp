@@ -579,7 +579,8 @@ namespace MCMMemory::Menu
         }
 
         constexpr size_t maximumVisibleRows{ 10 };
-        const float tableHeight = GUI::GetFrameHeightWithSpacing() * static_cast<float>(std::min(visibleMCMCount, maximumVisibleRows) + 1);
+        const float rowHeight = std::max(GUI::GetFrameHeightWithSpacing(), mcmRowHeight);
+        const float tableHeight = GUI::GetFrameHeightWithSpacing() + rowHeight * static_cast<float>(std::min(visibleMCMCount, maximumVisibleRows));
         const auto tableFlags = GUI::ImGuiTableFlags_RowBg | GUI::ImGuiTableFlags_BordersInnerH | GUI::ImGuiTableFlags_BordersOuterH | GUI::ImGuiTableFlags_ScrollY | GUI::ImGuiTableFlags_Sortable | GUI::ImGuiTableFlags_SortTristate;
         if (!GUI::BeginTable("Profile MCMs", 4, tableFlags, GUI::ImVec2{ 0.0F, tableHeight })) {
             return;
@@ -609,6 +610,10 @@ namespace MCMMemory::Menu
 
         auto& settings = GetSettings();
         bool settingsChanged{};
+
+        float previousRowY{}, measuredRowHeight{};
+        bool hasPreviousRow{};
+
         for (auto& mcm : mcms) {
             if (!IsVisible(mcm)) {
                 continue;
@@ -621,6 +626,14 @@ namespace MCMMemory::Menu
             GUI::TableNextRow();
 
             GUI::TableSetColumnIndex(0);
+
+            const float rowY = GUI::GetCursorPosY();
+            if (hasPreviousRow) {
+                measuredRowHeight = std::max(measuredRowHeight, rowY - previousRowY);
+            }
+            previousRowY = rowY;
+            hasPreviousRow = true;
+            
             GUI::BeginDisabled((!mcm.CanSelect() && !mcm.CanForget()) || !a_selectionAvailable);
 
             GUI::CenterNextItem(GUI::GetFrameHeight());
@@ -702,6 +715,10 @@ namespace MCMMemory::Menu
             GUI::PopID();
         }
         GUI::EndTable();
+
+        if (measuredRowHeight > 0.0F) {
+            mcmRowHeight = measuredRowHeight;
+        }
 
         if (settingsChanged && !SettingsStorage::Save()) {
             logger::error("MCM Memory menu could not save per-MCM automatic restore settings");

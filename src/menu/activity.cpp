@@ -102,10 +102,10 @@ namespace MCMMemory::Menu
         }
 
         const auto flags = GUI::ImGuiTableFlags_RowBg | GUI::ImGuiTableFlags_BordersInnerH | GUI::ImGuiTableFlags_Resizable | GUI::ImGuiTableFlags_ScrollY;
-        if (GUI::BeginTable("MCM Memory Activity", 2, flags, GUI::ImVec2(0.0F, 320.0F))) {
+        if (GUI::BeginTable("MCM Memory Activity", 2, flags, GUI::ImVec2(0.0F, std::max(GUI::GetFrameHeightWithSpacing() * 2.0F, GUI::GetAvailableHeight())))) {
 
             GUI::TableSetupColumn(Trans::Tr("Activity.Column.Result").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
-            GUI::TableSetupColumn(Trans::Tr("Activity.Column.When").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 150.0F);
+            GUI::TableSetupColumn(Trans::Tr("Activity.Column.When").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 180.0F);
 
             GUI::TableHeadersRow();
 
@@ -153,10 +153,8 @@ namespace MCMMemory::Menu
             return;
         }
 
-        GUI::SetNextWindowSize(GUI::ImVec2(780.0F, 430.0F), GUI::ImGuiCond_FirstUseEver);
-        CenterNextWindow();
         const auto windowTitle = std::format("{}###MCM Memory Activity Details", Trans::Tr("Activity.Details.Title"));
-        const bool windowOpen = BeginOpaqueWindow(windowTitle.c_str(), std::addressof(detailsOpen));
+        const bool windowOpen = GUI::BeginWindow(windowTitle.c_str(), std::addressof(detailsOpen), 820.0F, 450.0F, true);
         if (windowOpen) {
             const auto summary = FormatSummary(*selected);
             const auto exactTime = FormatExactTime(*selected);
@@ -172,7 +170,7 @@ namespace MCMMemory::Menu
                 RenderRestoreMods(*selected);
             }
         }
-        GUI::End();
+        GUI::EndWindow();
     }
 
     bool ActivityMenu::BeginModTable(const ActivityEntry& a_entry, const char* a_id, const ActivityColumn* a_columns, size_t a_columnCount) const

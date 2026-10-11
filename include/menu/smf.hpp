@@ -99,6 +99,11 @@ namespace MCMMemory::GUI::SMF
         return ImGuiMCP::Button(a_label, ImGuiMCP::ImVec2{ a_width, a_height });
     }
 
+    inline bool Selectable(const char* a_label, bool a_selected, int a_flags, float a_width, float a_height)
+    {
+        return ImGuiMCP::Selectable(a_label, a_selected, a_flags, ImGuiMCP::ImVec2{ a_width, a_height });
+    }
+
     inline bool Combo(const char* a_label, int* a_selected, const char* const* a_items, int a_count)
     {
         ImGuiMCP::PushStyleColor(ImGuiMCP::ImGuiCol_PopupBg, Menu::Color::kOpaqueBackground);

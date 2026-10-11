@@ -162,7 +162,7 @@ namespace MCMMemory::Menu
 
         const auto title = std::format("{} - {}###MCM Pages", Trans::Tr("Profile.Pages.Title"), GetDisplayModName(identity.modName));
         
-        if (GUI::BeginWindow(title.c_str(), std::addressof(open), 810.0F, 470.0F, true)) {
+        if (GUI::BeginWindow(title.c_str(), std::addressof(open), 820.0F, 470.0F, true)) {
             const bool busy = Backup::GetSingleton()->GetStatus() != OperationStatus::Idle || Restore::GetSingleton()->GetStatus() != OperationStatus::Idle;
            
             GUI::BeginDisabled(busy);
@@ -187,7 +187,7 @@ namespace MCMMemory::Menu
             if (GUI::BeginTable("MCM Pages", 3, flags, GUI::ImVec2{ 0.0F, height })) {
 
                 GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Name").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
-                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Status").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 170.0F);
+                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Status").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 190.0F);
                 GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Mode").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 290.0F);
 
                 GUI::TableSetupScrollFreeze(0, 1);

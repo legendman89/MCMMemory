@@ -1,9 +1,10 @@
 #include "menu/flick.hpp"
 #include "menu/backend.hpp"
+#include "menu/profile.hpp"
+#include "menu/activity.hpp"
+#include "menu/translate.hpp"
 #include "menu/frameworks.hpp"
 #include "menu/automation.hpp"
-#include "menu/profile.hpp"
-#include "menu/translate.hpp"
 
 namespace MCMMemory::Menu
 {
@@ -38,32 +39,47 @@ namespace MCMMemory::Menu
 
         GUI::Spacing();
 
-        auto* profileMenu = ProfileMenu::GetSingleton();
-        if (FLK::BeginTable("##ProfileControls", 3, FLK::TableFlags::kSizingFixedFit | FLK::TableFlags::kNoSavedSettings)) {
-            FLK::TableSetupColumn("Profile", FLK::TableColumnFlags::kWidthFixed);
-            FLK::TableSetupColumn("Spacing", FLK::TableColumnFlags::kWidthStretch);
-            FLK::TableSetupColumn("Operations", FLK::TableColumnFlags::kWidthFixed);
-            FLK::TableNextRow();
-            FLK::TableSetColumnIndex(0);
-            profileMenu->RenderProfileSelector();
-            FLK::TableSetColumnIndex(2);
-            profileMenu->RenderOperationButtons();
-            FLK::EndTable();
+        if (FLK::BeginTabBar("##MCMMemoryTabs")) {
+
+            if (FLK::BeginTabItem(Trans::Tr("Menu.Tab.Profile").c_str())) {
+
+                auto* profileMenu = ProfileMenu::GetSingleton();
+                if (FLK::BeginTable("##ProfileControls", 3, FLK::TableFlags::kSizingFixedFit | FLK::TableFlags::kNoSavedSettings)) {
+                    FLK::TableSetupColumn("Profile", FLK::TableColumnFlags::kWidthFixed);
+                    FLK::TableSetupColumn("Spacing", FLK::TableColumnFlags::kWidthStretch);
+                    FLK::TableSetupColumn("Operations", FLK::TableColumnFlags::kWidthFixed);
+                    FLK::TableNextRow();
+                    FLK::TableSetColumnIndex(0);
+                    profileMenu->RenderProfileSelector();
+                    FLK::TableSetColumnIndex(2);
+                    profileMenu->RenderOperationButtons();
+                    FLK::EndTable();
+                }
+
+                profileMenu->RenderCreateProfileWindow();
+                profileMenu->RenderDeleteProfileWindow();
+
+                GUI::Spacing();
+                GUI::Spacing();
+
+                RenderAutomation();
+
+                GUI::Spacing();
+                GUI::Spacing();
+
+                profileMenu->RenderMCMs();
+                profileMenu->RenderMCMWindows();
+                
+                FLK::EndTabItem();
+            }
+
+            if (FLK::BeginTabItem(Trans::Tr("Menu.Tab.Activity").c_str())) {
+                ActivityMenu::GetSingleton()->Render();
+                FLK::EndTabItem();
+            }
+
+            FLK::EndTabBar();
         }
-
-        profileMenu->RenderCreateProfileWindow();
-        profileMenu->RenderDeleteProfileWindow();
-
-        GUI::Spacing();
-        GUI::Spacing();
-
-        RenderAutomation();
-
-        GUI::Spacing();
-        GUI::Spacing();
-
-        profileMenu->RenderMCMs();
-        profileMenu->RenderMCMWindows();
         
         FLK::PopStyleColor(2);
     }

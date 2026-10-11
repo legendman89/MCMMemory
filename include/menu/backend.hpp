@@ -22,6 +22,7 @@
     F(ReadTableSort, bool, (TableSort&, bool)) \
     F(CenterNextItem, void, (float)) \
     F(Button, bool, (const char*, float, float)) \
+    F(Selectable, bool, (const char*, bool, int, float, float)) \
     F(Combo, bool, (const char*, int*, const char* const*, int)) \
     F(ColoredButton, bool, (const char*, const ButtonColors&, bool, float, float)) \
     F(IconButton, bool, (const char*, uint32_t, const ButtonColors&, bool, const char*, float, float)) \
@@ -260,6 +261,12 @@ namespace MCMMemory::GUI
     {
         const auto button = GetBE().memButton;
         return button && button(a_label, a_width, a_height);
+    }
+
+    inline bool Selectable(const char* a_label, bool a_selected = false, int a_flags = 0, float a_width = 0.0F, float a_height = 0.0F)
+    {
+        const auto selectable = GetBE().memSelectable;
+        return selectable && selectable(a_label, a_selected, a_flags, a_width, a_height);
     }
 
     inline bool Combo(const char* a_label, int* a_selected, const char* const* a_items, int a_count)

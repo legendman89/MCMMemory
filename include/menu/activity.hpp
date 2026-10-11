@@ -1,6 +1,5 @@
 #pragma once
 
-#include "menu/ui.hpp"
 #include "profile/activity.hpp"
 
 namespace MCMMemory::Menu

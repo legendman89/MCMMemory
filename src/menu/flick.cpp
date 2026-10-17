@@ -85,7 +85,7 @@ namespace MCMMemory::GUI::FLICK
 
         ImVec4 hudColor = ToColor(kHUDBackground);
         hudColor.w *= a_alpha;
-        FLK::DrawRectFilled(backgroundMin, backgroundMax, hudColor, 14.0F);
+        FLK::DrawRectFilled(backgroundMin, backgroundMax, hudColor, 18.0F);
         FLK::SetCursorPos(padding);
         hudColor = ToColor(kHUDShadow);
         hudColor.w *= a_alpha;
@@ -132,8 +132,8 @@ namespace MCMMemory::GUI::FLICK
         accent.w *= a_alpha;
         auto text = ToColor(HUDColors[ToIndex(HUDColor::Primary)]);
         text.w *= a_alpha;
-        FLK::DrawRectFilled(cardMin, cardMax, background, 5.0F);
-        FLK::DrawRectFilled(cardMin, ImVec2{ cardMin.x + HUDWarningAccentWidth, cardMax.y }, accent, 5.0F);
+        FLK::DrawRectFilled(cardMin, cardMax, background, 10.0F);
+        FLK::DrawRectFilled(cardMin, ImVec2{ cardMin.x + HUDWarningAccentWidth, cardMax.y }, accent, 10.0F);
         auto shadow = ToColor(kHUDShadow);
         shadow.w *= a_alpha;
         FLK::PushStyleColor(ImGuiCol_TextShadow, shadow);

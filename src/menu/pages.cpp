@@ -187,7 +187,7 @@ namespace MCMMemory::Menu
             if (GUI::BeginTable("MCM Pages", 3, flags, GUI::ImVec2{ 0.0F, height })) {
 
                 GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Name").c_str(), GUI::ImGuiTableColumnFlags_WidthStretch);
-                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Status").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 190.0F);
+                GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Status").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 195.0F);
                 GUI::TableSetupColumn(Trans::Tr("Profile.Pages.Mode").c_str(), GUI::ImGuiTableColumnFlags_WidthFixed, 290.0F);
 
                 GUI::TableSetupScrollFreeze(0, 1);

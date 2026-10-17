@@ -1,7 +1,10 @@
 #pragma once
 #include <imgui.h>
 
-#define FUCK_API_VERSION 5
+#define FUCK_API_VERSION 6
+
+// Optional extras:
+//   FUCK_ColorPalette.h - Recent/fixed colour swatch grid (v6+)
 
 // ==================================================
 // [ OPTIONAL ] SIMPLEINI HELPERS
@@ -104,7 +107,12 @@ namespace FUCK
 		kIgnoreUserScale     = 1 << 14,  // Ignores global UI scaling slider
 		kCustomPosition      = 1 << 15,  // Opts out of Host-managed pos saving/loading
 		kRenderDuringTM      = 1 << 16,  // Renders when 'tm' (Toggle Menus) is set
-		kCloseOnClickOutside = 1 << 17   // Closes the window when the user clicks anywhere outside of its bounds
+		kCloseOnClickOutside = 1 << 17,  // Closes the window when the user clicks anywhere outside of its bounds
+		kEditable            = 1 << 18,  // Host-managed moving and saving while the FUCK menu is open
+		kScalable            = 1 << 19,  // With kEditable: corner handles scale the window. Read it with GetWindowScale()
+		kAnchorRight         = 1 << 20,  // With kEditable: keeps the right edge fixed. GetDefaultPos() is then the top-right corner
+		kRotatable           = 1 << 21,  // With kEditable: a handle rotates the window's drawn content. Read it with GetWindowRotation()
+		kHideWithHUD         = 1 << 22   // A HUD widget: hides while the game hides its own HUD (intro, cutscenes, dialogue), and HUD managers may fade it. See IsGameHUDHidden(), EnumerateHUDWidgets()
 	};
 
 	enum class TableFlags
@@ -185,6 +193,34 @@ namespace FUCK
 		kAnyPopup      = kAnyPopupId | kAnyPopupLevel
 	};
 
+	enum class ColorEditFlags
+	{
+		kNone             = 0,
+		kNoAlpha          = 1 << 1,
+		kNoPicker         = 1 << 2,
+		kNoOptions        = 1 << 3,
+		kNoSmallPreview   = 1 << 4,
+		kNoInputs         = 1 << 5,
+		kNoTooltip        = 1 << 6,
+		kNoLabel          = 1 << 7,
+		kNoSidePreview    = 1 << 8,
+		kNoDragDrop       = 1 << 9,
+		kNoBorder         = 1 << 10,  // ColorButton: also hides the FUCK border
+		kAlphaOpaque      = 1 << 12,
+		kAlphaNoBg        = 1 << 13,
+		kAlphaPreviewHalf = 1 << 14,
+		kHDR              = 1 << 19,
+		kDisplayRGB       = 1 << 20,
+		kDisplayHSV       = 1 << 21,
+		kDisplayHex       = 1 << 22,
+		kUint8            = 1 << 23,
+		kFloat            = 1 << 24,
+		kPickerHueBar     = 1 << 25,
+		kPickerHueWheel   = 1 << 26,
+		kInputRGB         = 1 << 27,
+		kInputHSV         = 1 << 28
+	};
+
 	enum class HotkeyFlags : int
 	{
 		kNone            = 0,
@@ -217,6 +253,7 @@ namespace FUCK
 	FUCK_DEFINE_ENUM_BITWISE_OPERATORS(ItemFlags)
 	FUCK_DEFINE_ENUM_BITWISE_OPERATORS(PopupFlags)
 	FUCK_DEFINE_ENUM_BITWISE_OPERATORS(HotkeyFlags)
+	FUCK_DEFINE_ENUM_BITWISE_OPERATORS(ColorEditFlags)
 
 #undef FUCK_DEFINE_ENUM_BITWISE_OPERATORS
 
@@ -252,13 +289,30 @@ namespace FUCK
 		/// @note Defaults to the name passed into FUCK::Connect().
 		virtual const char* PluginName() const { return FUCK::g_pluginName; }
 
+		/// @brief The tool's name in the sidebar.
+		/// @note With PluginName(), it's what the user's settings for the tool are saved under (its group, place, name,
+		/// favourite and hidden state), so keep it the same between sessions or they won't find it again.
 		virtual const char* Name() const = 0;
+
+		/// @brief The sidebar group this tool sits in, or nullptr for the top level.
+		/// @note "::" nests groups, up to 4 deep, e.g. "Camera::Presets". Tools naming the same group share it,
+		/// in registration order. The string must stay alive, so build it once if it's put together at runtime.
+		/// @note Read when the tool registers. Call FUCK::RefreshTools() if it changes. Where the user has moved it wins.
 		virtual const char* Group() const { return nullptr; }
 		virtual void        Draw() = 0;
+
+		/// @brief Called every frame the host draws, for every tool, not just the open one. Check your own state before drawing.
 		virtual void        RenderOverlay() {}
+
+		/// @brief Called when the tool is selected or deselected, and when the menu opens or closes while it's selected.
 		virtual void        OnOpen() {}
 		virtual void        OnClose() {}
+
+		/// @brief The event is a const RE::InputEvent* const*. Called as the game dispatches input, outside the frame, so
+		/// don't draw here. Every tool gets it, the open one first. Return true to consume it and stop later handlers.
 		virtual bool        OnAsyncInput(const void*) { return false; }
+
+		/// @brief Whether the tool is listed in the sidebar. Read like Group(), so call FUCK::RefreshTools() after it changes.
 		virtual bool        ShowInSidebar() const { return true; }
 	};
 
@@ -276,7 +330,8 @@ namespace FUCK
 		/// @note Defaults to the name passed into FUCK::Connect().
 		virtual const char* PluginName() const { return FUCK::g_pluginName; }
 
-		/// @brief Display title shown on the Window chrome. Translates natively if a localized string key is passed.
+		/// @brief Display title shown on the Window chrome. Not translated, so return "$Key"_T for a localised one.
+		/// @note May be called from any thread. Return a stable string, not one rebuilt in Draw().
 		virtual const char* Title() const = 0;
 
 		virtual void        Draw() = 0;
@@ -609,13 +664,29 @@ struct FUCK_Interface
 
 	bool (*SliderAngle)(const char*, float*, float, float, const char*);
 	bool (*VSliderFloat)(const char*, const ImVec2&, float*, float, float, const char*);
-	bool (*VSliderButton)(const char*, const ImVec2&, float*, float, float, const char*, bool, bool, bool*, bool*);
+	bool (*VSliderButton)(const char*, const ImVec2&, float*, float, float, const char*, const char*, const char*, bool*, bool*);
 
 	// Version 5
 	void (*PushGamepadTweakFastDisabled)();
 	void (*PopGamepadTweakFastDisabled)();
 	void (*PushGamepadTweakSlowDisabled)();
 	void (*PopGamepadTweakSlowDisabled)();
+
+	// Version 6
+	bool (*ColorButton)(const char*, const ImVec4&, int, const ImVec2&, bool);
+	bool (*ColorPicker3)(const char*, float[3], int);
+	bool (*ColorPicker4)(const char*, float[4], int, const float*);
+	bool (*IsItemActivated)();
+	bool (*IsHotkeyEnabled)();
+	float (*GetWindowScale)();
+	float (*GetWindowRotation)();
+	void (*BeginStickyList)(const char*, float, float, bool);
+	void (*EndStickyList)();
+	bool (*StickyHeader)(const char*, bool*, int, int);
+	void (*RefreshTools)();
+	bool (*IsGameHUDHidden)();
+	void (*EnumerateHUDWidgets)(void* userdata, void (*callback)(const char* pluginName, const char* windowId, const char* title, void* userdata));
+	void (*SetWindowAlphaOverride)(const char* pluginName, const char* windowId, float alpha);
 };
 #pragma pack(pop)
 
@@ -637,6 +708,7 @@ namespace FUCK
 
 	/// @brief Connects to the FUCK Host Framework.
 	/// @param pluginName The exact name of your SKSE plugin. Used automatically for translations and settings directories.
+	/// @note The pointer is kept, not copied, so pass a literal.
 	inline bool Connect(const char* pluginName)
 	{
 		if (!pluginName || pluginName[0] == '\0') {
@@ -668,11 +740,15 @@ namespace FUCK
 		return true;
 	}
 
+	/// @brief The host keeps the pointer for the session, so the tool must outlive it. Tools can't be unregistered.
+	/// @note A second tool with the same PluginName() and Name() is ignored.
 	inline void RegisterTool(ITool* tool)
 	{
 		if (auto i = GetInterface())
 			i->RegisterTool(tool);
 	}
+	/// @brief The host keeps the pointer until UnregisterWindow(), so the window must outlive it.
+	/// @note A second window with the same PluginName() and Id() is ignored.
 	inline void RegisterWindow(IWindow* window)
 	{
 		if (auto i = GetInterface())
@@ -1536,6 +1612,7 @@ namespace FUCK
 	// Strings & Utilities
 	// --------------------------------------------------
 
+	/// @brief Translates a "$Key". The result stays valid for the session, or is the key itself if it has no translation.
 	inline const char* Translate(const char* key) { return GetInterface() ? GetInterface()->GetTranslation(key) : key; }
 	inline void        LoadTranslation(const char* pluginName)
 	{
@@ -1553,6 +1630,14 @@ namespace FUCK
 			i->GetPluginConfigPath(pluginName, dest, size);
 	}
 
+	/// @brief Absolute path to a plugin's config folder, defaulting to this plugin. Needs no INI support.
+	inline std::string GetConfigDirectory(const char* pluginName = g_pluginName)
+	{
+		char buf[512] = { 0 };
+		GetPluginConfigPath(pluginName, buf, sizeof(buf));
+		return std::string(buf);
+	}
+
 	inline void AddMenuListener(void* userdata, void (*callback)(const char* menuName, bool opening, void* userdata))
 	{
 		if (auto i = GetInterface())
@@ -1568,7 +1653,35 @@ namespace FUCK
 	// [ SECTION 4 ] SMART WRAPPERS & UTILITIES
 	// ==================================================
 
+	/// @brief A tool that's just a name, a group and a draw function, for pages that need nothing more.
+	/// @note The name and group are copied, so they can be built at runtime. Create it after Connect() so "$Key"_T
+	/// names are translated. It can't be copied or moved, so it stays where the host's pointer expects it.
+	class SimpleTool : public ITool
+	{
+	public:
+		SimpleTool(std::string a_name, std::string a_group, std::function<void()> a_draw) :
+			_name(std::move(a_name)), _group(std::move(a_group)), _draw(std::move(a_draw))
+		{}
+
+		SimpleTool(const SimpleTool&)            = delete;
+		SimpleTool& operator=(const SimpleTool&) = delete;
+
+		const char* Name() const override { return _name.c_str(); }
+		const char* Group() const override { return _group.empty() ? nullptr : _group.c_str(); }
+		void        Draw() override
+		{
+			if (_draw)
+				_draw();
+		}
+
+	private:
+		std::string           _name;
+		std::string           _group;
+		std::function<void()> _draw;
+	};
+
 	/// @brief RAII wrapper for custom images.
+	/// @note The handle is the host's, not a texture ImGui can draw. Only pass it to FUCK's image functions.
 	class Image
 	{
 	public:
@@ -1630,6 +1743,27 @@ namespace FUCK
 		float _width  = 0.0f;
 		float _height = 0.0f;
 	};
+
+	/// @brief Draws an image rotated about its centre, in screen space.
+	/// @param angleDegrees Rotation angle in degrees (clockwise).
+	inline void DrawImageRotated(ImTextureID textureId, const ImVec2& pos, const ImVec2& size, float angleDegrees, const ImVec4& tint_col = ImVec4(1, 1, 1, 1))
+	{
+		ImVec2 center = { pos.x + size.x * 0.5f, pos.y + size.y * 0.5f };
+		float  rad    = angleDegrees * (3.14159265f / 180.0f);
+		float  cosA   = std::cos(rad);
+		float  sinA   = std::sin(rad);
+
+		float halfW = size.x * 0.5f;
+		float halfH = size.y * 0.5f;
+
+		// Rotate each corner's offset from the centre
+		ImVec2 p1 = { center.x - halfW * cosA + halfH * sinA, center.y - halfW * sinA - halfH * cosA };  // Top Left
+		ImVec2 p2 = { center.x + halfW * cosA + halfH * sinA, center.y + halfW * sinA - halfH * cosA };  // Top Right
+		ImVec2 p3 = { center.x + halfW * cosA - halfH * sinA, center.y + halfW * sinA + halfH * cosA };  // Bottom Right
+		ImVec2 p4 = { center.x - halfW * cosA - halfH * sinA, center.y - halfW * sinA + halfH * cosA };  // Bottom Left
+
+		DrawImageQuad(textureId, p1, p2, p3, p4, { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 }, tint_col);
+	}
 
 	/// @brief String copy utility.
 	template <size_t N>
@@ -1710,13 +1844,7 @@ namespace FUCK
 		}
 
 		/// @brief Returns the absolute path string pointing to this plugin's dedicated config folder.
-		std::string GetConfigDirectory() const
-		{
-			char buf[512] = { 0 };
-			if (auto* i = GetInterface())
-				i->GetPluginConfigPath(_pluginName, buf, sizeof(buf));
-			return std::string(buf);
-		}
+		std::string GetConfigDirectory() const { return FUCK::GetConfigDirectory(_pluginName); }
 
 	private:
 		const char* _pluginName;
@@ -1931,27 +2059,55 @@ namespace FUCK
 		PushFont(font, baseSize * GetGlobalScale() * scale);
 	}
 
-	/// @brief Visual for UI widget editing. Handles Screen-Space and Window-Space.
-	inline void DrawEditorBounds(const ImVec2& min, const ImVec2& max, EditorBoundsState state = EditorBoundsState::kNormal, float thickness = 2.0f, bool screenSpace = false, const ImVec2* customAnchor = nullptr)
+	/// @brief Colour for an editor state, shared by the bounds and resize handles.
+	inline ImU32 GetEditorBoundsColor(EditorBoundsState state)
 	{
-		ImU32 boundsColor;
 		switch (state) {
 		case EditorBoundsState::kLocked:
-			boundsColor = IM_COL32(150, 150, 150, 150);  // Grey
-			break;
+			return IM_COL32(150, 150, 150, 150);  // Grey
 		case EditorBoundsState::kSelected:
-			boundsColor = IM_COL32(51, 204, 51, 255);  // Green
-			break;
+			return IM_COL32(51, 204, 51, 255);  // Green
 		case EditorBoundsState::kHovered:
-			boundsColor = IM_COL32(0, 255, 0, 255);  // Bright Green
-			break;
+			return IM_COL32(0, 255, 0, 255);  // Bright Green
 		case EditorBoundsState::kNormal:
 		default:
-			boundsColor = IM_COL32(204, 51, 255, 255);  // Purple
-			break;
+			return IM_COL32(204, 51, 255, 255);  // Purple
 		}
+	}
 
-		if (screenSpace) {
+	/// @brief Rotates a point about a centre, clockwise in screen space.
+	inline ImVec2 RotatePoint(const ImVec2& a_point, const ImVec2& a_center, float a_degrees)
+	{
+		float rad = a_degrees * (3.14159265f / 180.0f);
+		float c   = std::cos(rad);
+		float s   = std::sin(rad);
+		float dx  = a_point.x - a_center.x;
+		float dy  = a_point.y - a_center.y;
+		return { a_center.x + dx * c - dy * s, a_center.y + dx * s + dy * c };
+	}
+
+	/// @brief Visual for UI widget editing. Handles Screen-Space and Window-Space.
+	/// @note With rotation, the outline turns about its centre clockwise, in degrees.
+	inline void DrawEditorBounds(const ImVec2& min, const ImVec2& max, EditorBoundsState state = EditorBoundsState::kNormal, float thickness = 2.0f, bool screenSpace = false, const ImVec2* customAnchor = nullptr, float rotation = 0.0f)
+	{
+		ImU32 boundsColor = GetEditorBoundsColor(state);
+
+		if (rotation != 0.0f) {
+			ImVec2 center    = { (min.x + max.x) * 0.5f, (min.y + max.y) * 0.5f };
+			ImVec2 corners[] = {
+				RotatePoint(min, center, rotation),
+				RotatePoint({ max.x, min.y }, center, rotation),
+				RotatePoint(max, center, rotation),
+				RotatePoint({ min.x, max.y }, center, rotation)
+			};
+			ImVec4 colV4 = ImGui::ColorConvertU32ToFloat4(boundsColor);
+			for (int i = 0; i < 4; ++i) {
+				if (screenSpace)
+					DrawScreenLine(corners[i], corners[(i + 1) % 4], boundsColor, thickness);
+				else
+					DrawLine(corners[i], corners[(i + 1) % 4], colV4, thickness);
+			}
+		} else if (screenSpace) {
 			DrawScreenRect(min, max, boundsColor, 0.0f, thickness);
 		} else {
 			ImVec4 colV4 = ImGui::ColorConvertU32ToFloat4(boundsColor);
@@ -1970,6 +2126,202 @@ namespace FUCK
 			DrawLine({ anchor.x - crossSize, anchor.y }, { anchor.x + crossSize, anchor.y }, anchorV4, 2.0f);
 			DrawLine({ anchor.x, anchor.y - crossSize }, { anchor.x, anchor.y + crossSize }, anchorV4, 2.0f);
 		}
+	}
+
+	/// @brief Drag state for EditorResizeHandles. Keep one per widget, between frames.
+	struct EditorResizeState
+	{
+		int    corner  = -1;         // 0-3 clockwise from top-left, -1 = idle
+		bool   hovered = false;      // skip starting a move while true
+		ImVec2 scale{ 1.0f, 1.0f };  // size against the rect at drag start, equal when aspect is locked
+		ImVec2 pivot;                // fixed opposite corner, in screen space
+		ImVec2 startMin;
+		ImVec2 startMax;
+		ImVec2 startMouse;
+
+		bool IsActive() const { return corner >= 0; }
+	};
+
+	/// @brief Result of an editor handle for this frame.
+	enum class EditorHandleResult
+	{
+		kNone,
+		kStarted,
+		kDragging,
+		kFinished
+	};
+
+	/// @brief Corner drag-to-resize handles for an editor outline (screen space). Outputs the resized rect.
+	/// Note: a_windowHovered says whether the handles may take the mouse, e.g. IsWindowHovered() for handles drawn in a window.
+	/// With a_rotation, the box turns about its centre and the output rect is unrotated, so use scale and pivot instead.
+	/// Each corner is a button, so grabbing one doesn't also drag the window. Call after your content, as the cursor is left after the handles.
+	/// @note For more than one in the same window, wrap each in PushID()/PopID() so their handles don't clash.
+	inline EditorHandleResult EditorResizeHandles(const ImVec2& a_min, const ImVec2& a_max, EditorResizeState& a_state, ImVec2& a_outMin, ImVec2& a_outMax,
+		bool a_windowHovered, bool a_lockAspect = true, const ImVec2& a_minSize = { 50.0f, 50.0f }, const ImVec2& a_maxSize = { 100000.0f, 100000.0f }, float a_rotation = 0.0f)
+	{
+		auto cornerOf = [](const ImVec2& a_lo, const ImVec2& a_hi, int a_index) {
+			return ImVec2(a_index == 1 || a_index == 2 ? a_hi.x : a_lo.x, a_index >= 2 ? a_hi.y : a_lo.y);
+		};
+
+		const float  half   = Scale(6.0f);
+		const ImVec2 mouse  = GetMousePos();
+		const ImVec2 center = { (a_min.x + a_max.x) * 0.5f, (a_min.y + a_max.y) * 0.5f };
+
+		a_outMin = a_min;
+		a_outMax = a_max;
+
+		// An invisible button on each corner, so pressing one doesn't also drag the window it's drawn in.
+		// The cursor isn't moved back afterwards, as ImGui errors when a moved cursor has no item after it
+		static const char* const buttonIds[4] = { "##FUCK_EditorResize0", "##FUCK_EditorResize1", "##FUCK_EditorResize2", "##FUCK_EditorResize3" };
+		for (int i = 0; i < 4; ++i) {
+			ImVec2 c = RotatePoint(cornerOf(a_min, a_max, i), center, a_rotation);
+			SetCursorScreenPos({ c.x - half, c.y - half });
+			InvisibleButton(buttonIds[i], { half * 2.0f, half * 2.0f });
+		}
+
+		int hoveredCorner = -1;
+		if (!a_state.IsActive() && a_windowHovered) {
+			for (int i = 0; i < 4; ++i) {
+				ImVec2 c = RotatePoint(cornerOf(a_min, a_max, i), center, a_rotation);
+				if (std::abs(mouse.x - c.x) <= half && std::abs(mouse.y - c.y) <= half) {
+					hoveredCorner = i;
+					break;
+				}
+			}
+		}
+		a_state.hovered = hoveredCorner >= 0;
+
+		auto result = EditorHandleResult::kNone;
+
+		if (a_state.IsActive() && !IsMouseDown(0)) {
+			a_state.corner = -1;
+			result         = EditorHandleResult::kFinished;
+		} else if (hoveredCorner >= 0 && IsMouseClicked(0)) {
+			a_state.corner     = hoveredCorner;
+			a_state.pivot      = RotatePoint(cornerOf(a_min, a_max, (hoveredCorner + 2) % 4), center, a_rotation);
+			a_state.startMin   = a_min;
+			a_state.startMax   = a_max;
+			a_state.startMouse = mouse;
+			a_state.scale      = { 1.0f, 1.0f };
+			result             = EditorHandleResult::kStarted;
+		}
+
+		if (a_state.IsActive()) {
+			ImVec2 size(a_state.startMax.x - a_state.startMin.x, a_state.startMax.y - a_state.startMin.y);
+			ImVec2 grabbed = cornerOf(a_state.startMin, a_state.startMax, a_state.corner);
+			ImVec2 pivot   = cornerOf(a_state.startMin, a_state.startMax, (a_state.corner + 2) % 4);
+
+			// Turn the drag back into the box's own unrotated axes
+			ImVec2 drag = RotatePoint({ mouse.x - a_state.startMouse.x, mouse.y - a_state.startMouse.y }, { 0.0f, 0.0f }, -a_rotation);
+
+			// Moving away from the pivot grows the rect
+			float dirX = grabbed.x > pivot.x ? 1.0f : -1.0f;
+			float dirY = grabbed.y > pivot.y ? 1.0f : -1.0f;
+			float dx   = drag.x * dirX;
+			float dy   = drag.y * dirY;
+
+			float newW, newH;
+			if (a_lockAspect && size.x > 0.0f && size.y > 0.0f) {
+				// Project onto the diagonal so both axes scale together
+				float diag     = std::sqrt(size.x * size.x + size.y * size.y);
+				float scale    = (diag + (dx * size.x + dy * size.y) / diag) / diag;
+				float minScale = std::max(a_minSize.x / size.x, a_minSize.y / size.y);
+				float maxScale = std::max(std::min(a_maxSize.x / size.x, a_maxSize.y / size.y), minScale);
+				scale          = std::clamp(scale, minScale, maxScale);
+				newW           = size.x * scale;
+				newH           = size.y * scale;
+			} else {
+				newW = std::clamp(size.x + dx, a_minSize.x, a_maxSize.x);
+				newH = std::clamp(size.y + dy, a_minSize.y, a_maxSize.y);
+			}
+			a_state.scale = { size.x > 0.0f ? newW / size.x : 1.0f, size.y > 0.0f ? newH / size.y : 1.0f };
+
+			a_outMin.x = dirX > 0.0f ? pivot.x : pivot.x - newW;
+			a_outMin.y = dirY > 0.0f ? pivot.y : pivot.y - newH;
+			a_outMax.x = a_outMin.x + newW;
+			a_outMax.y = a_outMin.y + newH;
+
+			if (result == EditorHandleResult::kNone)
+				result = EditorHandleResult::kDragging;
+		}
+
+		for (int i = 0; i < 4; ++i) {
+			ImVec2 c     = RotatePoint(cornerOf(a_min, a_max, i), center, a_rotation);
+			auto   state = a_state.corner == i ? EditorBoundsState::kSelected :
+			               hoveredCorner == i  ? EditorBoundsState::kHovered :
+			                                     EditorBoundsState::kNormal;
+			ImU32  col   = GetEditorBoundsColor(state);
+			DrawScreenRectFilled({ c.x - half, c.y - half }, { c.x + half, c.y + half }, col);
+		}
+
+		return result;
+	}
+
+	/// @brief Drag state for EditorRotateHandle. Keep one per widget, between frames.
+	struct EditorRotateState
+	{
+		bool  active     = false;
+		bool  hovered    = false;  // skip starting a move while true
+		float angle      = 0.0f;   // degrees turned clockwise since the drag started
+		float startAngle = 0.0f;
+	};
+
+	/// @brief Rotation handle above an editor outline (screen space), turning about a_pivot. Hold Shift to snap.
+	/// Note: a_windowHovered says whether the handle may take the mouse, e.g. IsWindowHovered() for a handle drawn in a window.
+	/// With a_rotation, the handle turns with the box. Call last in the window, as the cursor is left after the handle.
+	/// @note For more than one in the same window, wrap each in PushID()/PopID() so their handles don't clash..
+	inline EditorHandleResult EditorRotateHandle(const ImVec2& a_min, const ImVec2& a_max, const ImVec2& a_pivot, EditorRotateState& a_state, bool a_windowHovered,
+		float a_snapDegrees = 15.0f, float a_rotation = 0.0f)
+	{
+		constexpr float RAD2DEG = 180.0f / 3.14159265f;
+
+		const float  radius = Scale(6.0f);
+		const ImVec2 center = { (a_min.x + a_max.x) * 0.5f, (a_min.y + a_max.y) * 0.5f };
+		const ImVec2 stem   = RotatePoint({ center.x, a_min.y }, center, a_rotation);
+		const ImVec2 handle = RotatePoint({ center.x, a_min.y - Scale(24.0f) }, center, a_rotation);
+		const ImVec2 mouse  = GetMousePos();
+
+		// An invisible button on the handle, so pressing it doesn't also drag the window it's drawn in.
+		// The cursor isn't moved back afterwards, as ImGui errors when a moved cursor has no item after it
+		SetCursorScreenPos({ handle.x - radius, handle.y - radius });
+		InvisibleButton("##FUCK_EditorRotate", { radius * 2.0f, radius * 2.0f });
+
+		float dx        = mouse.x - handle.x;
+		float dy        = mouse.y - handle.y;
+		a_state.hovered = !a_state.active && a_windowHovered && (dx * dx + dy * dy) <= radius * radius;
+
+		// Screen Y points down, so atan2 already increases clockwise
+		float mouseAngle = std::atan2(mouse.y - a_pivot.y, mouse.x - a_pivot.x) * RAD2DEG;
+
+		auto result = EditorHandleResult::kNone;
+		if (a_state.active && !IsMouseDown(0)) {
+			a_state.active = false;
+			result         = EditorHandleResult::kFinished;
+		} else if (a_state.hovered && IsMouseClicked(0)) {
+			a_state.active     = true;
+			a_state.startAngle = mouseAngle;
+			a_state.angle      = 0.0f;
+			result             = EditorHandleResult::kStarted;
+		}
+
+		if (a_state.active) {
+			float angle = std::remainder(mouseAngle - a_state.startAngle, 360.0f);
+			if (IsKeyDown(ImGuiMod_Shift) && a_snapDegrees > 0.0f)
+				angle = std::round(angle / a_snapDegrees) * a_snapDegrees;
+			a_state.angle = angle;
+
+			if (result == EditorHandleResult::kNone)
+				result = EditorHandleResult::kDragging;
+		}
+
+		auto  state = a_state.active  ? EditorBoundsState::kSelected :
+		              a_state.hovered ? EditorBoundsState::kHovered :
+		                                EditorBoundsState::kNormal;
+		ImU32 col   = GetEditorBoundsColor(state);
+		DrawScreenLine(stem, handle, col, 2.0f);
+		DrawScreenRectFilled({ handle.x - radius, handle.y - radius }, { handle.x + radius, handle.y + radius }, col, radius);
+
+		return result;
 	}
 
 	/// @brief Clamps a window or widget position to the screen bounds if it strays too far off-screen.
@@ -2174,6 +2526,8 @@ namespace FUCK
 	// Version 3
 	// --------------------------------------------------
 
+	/// @brief Enables or disables the hotkey that toggles the FUCK menu. Plugins' own hotkeys are unaffected.
+	/// @note Shared by all plugins, so re-enable it when you're done.
 	inline void SetHotkeyEnabled(bool enabled)
 	{
 		if (auto i = GetInterface())
@@ -2357,13 +2711,17 @@ namespace FUCK
 	{
 		return GetInterface() ? GetInterface()->SliderAngle(label, v_rad, v_degrees_min, v_degrees_max, format) : false;
 	}
+	/// @brief Vertical slider, sized to just the slider.
 	inline bool VSliderFloat(const char* label, const ImVec2& size, float* v, float v_min, float v_max, const char* format = "%.3f")
 	{
 		return GetInterface() ? GetInterface()->VSliderFloat(label, size, v, v_min, v_max, format) : false;
 	}
-	inline bool VSliderButton(const char* label, const ImVec2& slider_size, float* v, float v_min, float v_max, const char* format = "%.3f", bool draw_top_button = false, bool draw_bottom_button = true, bool* out_top_pressed = nullptr, bool* out_bottom_pressed = nullptr)
+	/// @brief Vertical slider with optional buttons above and below. A button is drawn when its label is set.
+	/// @note A button without a label keeps its space, so a row of these with the same slider size lines up,
+	/// including one with no buttons. For a lone slider without that space, use VSliderFloat.
+	inline bool VSliderButton(const char* str_id, const ImVec2& slider_size, float* v, float v_min, float v_max, const char* format = "%.3f", const char* top_label = nullptr, const char* bottom_label = nullptr, bool* out_top_pressed = nullptr, bool* out_bottom_pressed = nullptr)
 	{
-		return GetInterface() ? GetInterface()->VSliderButton(label, slider_size, v, v_min, v_max, format, draw_top_button, draw_bottom_button, out_top_pressed, out_bottom_pressed) : false;
+		return GetInterface() ? GetInterface()->VSliderButton(str_id, slider_size, v, v_min, v_max, format, top_label, bottom_label, out_top_pressed, out_bottom_pressed) : false;
 	}
 
 	// --------------------------------------------------
@@ -2403,26 +2761,60 @@ namespace FUCK
 			i->PopGamepadTweakSlowDisabled();
 	}
 
-	/// @brief Pushes a temporary scale multiplier for both Font Size and UI Padding/Spacing.
-	/// Note: Do not nest PushScale calls. Pop the previous scale before pushing a new one.
+	namespace detail
+	{
+		// The style before the outermost PushScale()
+		struct ScaleBase
+		{
+			ImVec2 framePadding;
+			ImVec2 itemSpacing;
+			ImVec2 itemInnerSpacing;
+			float  frameRounding;
+			float  grabRounding;
+		};
+
+		inline std::vector<ScaleBase>& ScaleStack()
+		{
+			static thread_local std::vector<ScaleBase> s_stack;
+			return s_stack;
+		}
+	}
+
+	/// @brief Scales the font, padding, spacing and rounding until PopScale(). Nested calls replace the scale, they don't compound.
+	/// @param font Defaults to the regular font.
 	inline void PushScale(float scaleMultiplier, ImFont* font = nullptr)
 	{
+		auto& stack = detail::ScaleStack();
+
+		const detail::ScaleBase base = stack.empty() ?
+		                                   detail::ScaleBase{
+											   GetStyleVarVec(ImGuiStyleVar_FramePadding),
+											   GetStyleVarVec(ImGuiStyleVar_ItemSpacing),
+											   GetStyleVarVec(ImGuiStyleVar_ItemInnerSpacing),
+											   GetStyleVar(ImGuiStyleVar_FrameRounding),
+											   GetStyleVar(ImGuiStyleVar_GrabRounding)
+										   } :
+		                                   stack.front();
+		stack.push_back(base);
+
 		PushFontScaled(font, scaleMultiplier);
 
-		ImVec2 pad        = GetStyleVarVec(ImGuiStyleVar_FramePadding);
-		ImVec2 space      = GetStyleVarVec(ImGuiStyleVar_ItemSpacing);
-		ImVec2 innerSpace = GetStyleVarVec(ImGuiStyleVar_ItemInnerSpacing);
-
-		PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(pad.x * scaleMultiplier, pad.y * scaleMultiplier));
-		PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(space.x * scaleMultiplier, space.y * scaleMultiplier));
-		PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(innerSpace.x * scaleMultiplier, innerSpace.y * scaleMultiplier));
+		PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(base.framePadding.x * scaleMultiplier, base.framePadding.y * scaleMultiplier));
+		PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(base.itemSpacing.x * scaleMultiplier, base.itemSpacing.y * scaleMultiplier));
+		PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(base.itemInnerSpacing.x * scaleMultiplier, base.itemInnerSpacing.y * scaleMultiplier));
+		PushStyleVar(ImGuiStyleVar_FrameRounding, base.frameRounding * scaleMultiplier);
+		PushStyleVar(ImGuiStyleVar_GrabRounding, base.grabRounding * scaleMultiplier);
 	}
 
 	/// @brief Pops the styling pushed by PushScale.
 	inline void PopScale()
 	{
-		PopStyleVar(3);
+		PopStyleVar(5);
 		PopFont();
+
+		auto& stack = detail::ScaleStack();
+		if (!stack.empty())
+			stack.pop_back();
 	}
 
 	/// @brief A slider that displays values scaled by a multiplier (e.g., displaying 1.5 as "150").
@@ -2448,15 +2840,147 @@ namespace FUCK
 		return false;
 	}
 
-	/// @brief A vertical slider with optional +/- buttons that displays values scaled by a multiplier.
-	inline bool ScaledVSliderButton(const char* label, const ImVec2& slider_size, float* v, float v_min, float v_max, float visualScaleMultiplier, const char* format = "%.0f", bool draw_top_button = false, bool draw_bottom_button = true, bool* out_top_pressed = nullptr, bool* out_bottom_pressed = nullptr)
+	/// @brief VSliderButton that displays values scaled by a multiplier.
+	inline bool ScaledVSliderButton(const char* str_id, const ImVec2& slider_size, float* v, float v_min, float v_max, float visualScaleMultiplier, const char* format = "%.0f", const char* top_label = nullptr, const char* bottom_label = nullptr, bool* out_top_pressed = nullptr, bool* out_bottom_pressed = nullptr)
 	{
 		float display = *v * visualScaleMultiplier;
-		if (VSliderButton(label, slider_size, &display, v_min * visualScaleMultiplier, v_max * visualScaleMultiplier, format, draw_top_button, draw_bottom_button, out_top_pressed, out_bottom_pressed)) {
+		if (VSliderButton(str_id, slider_size, &display, v_min * visualScaleMultiplier, v_max * visualScaleMultiplier, format, top_label, bottom_label, out_top_pressed, out_bottom_pressed)) {
 			*v = display / visualScaleMultiplier;
 			return true;
 		}
 		return false;
+	}
+
+	// --------------------------------------------------
+	// Version 6
+	// --------------------------------------------------
+
+	// Typed flag overloads of the existing ColorEdit functions
+	inline bool ColorEdit3(const char* label, float col[3], ColorEditFlags flags) { return ColorEdit3(label, col, static_cast<int>(flags)); }
+	inline bool ColorEdit4(const char* label, float col[4], ColorEditFlags flags) { return ColorEdit4(label, col, static_cast<int>(flags)); }
+
+	/// @brief A clickable colour swatch. Zero size defaults to frame height.
+	/// @param selected Draws the active border, e.g. for the current palette entry.
+	inline bool ColorButton(const char* desc_id, const ImVec4& col, ColorEditFlags flags = ColorEditFlags::kNone, const ImVec2& size = ImVec2(0, 0), bool selected = false)
+	{
+		return GetInterface() ? GetInterface()->ColorButton(desc_id, col, static_cast<int>(flags), size, selected) : false;
+	}
+
+	/// @brief An inline colour picker (no popup).
+	inline bool ColorPicker3(const char* label, float col[3], ColorEditFlags flags = ColorEditFlags::kNone)
+	{
+		return GetInterface() ? GetInterface()->ColorPicker3(label, col, static_cast<int>(flags)) : false;
+	}
+
+	/// @brief An inline colour picker (no popup).
+	/// @note Alpha bar is always shown, unless kNoAlpha is passed.
+	inline bool ColorPicker4(const char* label, float col[4], ColorEditFlags flags = ColorEditFlags::kNone, const float* ref_col = nullptr)
+	{
+		return GetInterface() ? GetInterface()->ColorPicker4(label, col, static_cast<int>(flags), ref_col) : false;
+	}
+
+	/// @brief Returns true on the frame the last item became active. Pair with IsItemDeactivatedAfterEdit() to capture values before an edit (e.g. for undo).
+	inline bool IsItemActivated() { return GetInterface() ? GetInterface()->IsItemActivated() : false; }
+
+	/// @brief Whether the hotkey that toggles the FUCK menu is enabled. See SetHotkeyEnabled.
+	inline bool IsHotkeyEnabled() { return GetInterface() ? GetInterface()->IsHotkeyEnabled() : true; }
+
+	/// @brief Scale of the current kScalable window, set by its corner handles. 1 otherwise.
+	inline float GetWindowScale() { return GetInterface() ? GetInterface()->GetWindowScale() : 1.0f; }
+
+	/// @brief Clockwise degrees of the current kRotatable window, set by its rotation handle. 0 otherwise.
+	/// @note Only drawn content can turn, e.g. with DrawImageRotated. FUCK doesn't clip it to the window.
+	inline float GetWindowRotation() { return GetInterface() ? GetInterface()->GetWindowRotation() : 0.0f; }
+
+	/// @brief TextDisabled that wraps at the edge of the available space.
+	inline void TextDisabledWrapped(const char* fmt, ...)
+	{
+		auto i = GetInterface();
+		if (!i)
+			return;
+		va_list args;
+		va_start(args, fmt);
+		char buf[1024];
+		vsnprintf(buf, 1024, fmt, args);
+		va_end(args);
+		i->TextColoredWrapped(GetStyleColorVec4(ImGuiCol_TextDisabled), buf);
+	}
+
+	/// @brief Joins an icon glyph and text into one label, for any widget that takes a label.
+	/// e.g. FUCK::Button(FUCK::IconText(ICON_FA_GEAR, "$MyPlugin_Settings"_T))
+	/// @note Use the result straight away. To keep it, copy it into a std::string.
+	inline const char* IconText(const char* icon, const char* text)
+	{
+		static thread_local char buffers[8][256];
+		static thread_local int  next = 0;
+
+		char* buf = buffers[next];
+		next      = (next + 1) % 8;
+		snprintf(buf, sizeof(buffers[0]), "%s %s", icon ? icon : "", text ? text : "");
+		return buf;
+	}
+
+	/// @brief Begins a scrolling list whose section headers stick to the top as you scroll.
+	/// @note Always pair with EndStickyList().
+	inline void BeginStickyList(const char* str_id, const ImVec2& size = ImVec2(0, 0), bool border = true)
+	{
+		if (auto i = GetInterface())
+			i->BeginStickyList(str_id, size.x, size.y, border);
+	}
+
+	/// @brief A section header in a sticky list. Draw the section's rows when it returns true.
+	/// @param open Optional. Your own bool for the open state, e.g. for an Expand All button.
+	/// @param count Optional. Shown on the right of the header.
+	inline bool StickyHeader(const char* label, bool* open = nullptr, int count = -1, int flags = 0)
+	{
+		return GetInterface() ? GetInterface()->StickyHeader(label, open, count, flags) : false;
+	}
+
+	/// @brief Ends a sticky list.
+	inline void EndStickyList()
+	{
+		if (auto i = GetInterface())
+			i->EndStickyList();
+	}
+
+	/// @brief Tells the sidebar your tools have changed what they return from Name(), Group() or ShowInSidebar().
+	/// They're read again on the next frame. Call it once after a batch of changes, not per tool. Safe from any thread.
+	/// @note The objects and strings the old values pointed to must stay alive until then.
+	inline void RefreshTools()
+	{
+		if (auto i = GetInterface())
+			i->RefreshTools();
+	}
+
+	/// @brief Whether the game has hidden its own HUD: the intro cart ride, cutscenes, dialogue and the like.
+	/// @note What kHideWithHUD windows follow. Updated once a frame. FUCK hiding the HUD under its own menu doesn't count.
+	inline bool IsGameHUDHidden() { return GetInterface() ? GetInterface()->IsGameHUDHidden() : false; }
+
+	/// @brief Calls a_func(pluginName, windowId, title) for each window flagged kHideWithHUD, open or not.
+	/// @note The strings are only valid during the call.
+	template <class F>
+	inline void EnumerateHUDWidgets(F a_func)
+	{
+		if (auto i = GetInterface()) {
+			i->EnumerateHUDWidgets(&a_func, [](const char* a_plugin, const char* a_id, const char* a_title, void* a_ud) {
+				(*static_cast<F*>(a_ud))(a_plugin, a_id, a_title);
+			});
+		}
+	}
+
+	/// @brief Fades a kHideWithHUD window by a_alpha (0-1). At 0 it's hidden and takes no input. Safe from any thread.
+	/// @note Lasts until cleared. Ignored while the FUCK menu is open if the window is kEditable.
+	/// Doesn't affect IsOpen(), DrawScreen* or RenderOverlay().
+	inline void SetWindowAlphaOverride(const char* pluginName, const char* windowId, float alpha)
+	{
+		if (auto i = GetInterface())
+			i->SetWindowAlphaOverride(pluginName, windowId, alpha);
+	}
+
+	/// @brief Removes a SetWindowAlphaOverride().
+	inline void ClearWindowAlphaOverride(const char* pluginName, const char* windowId)
+	{
+		SetWindowAlphaOverride(pluginName, windowId, -1.0f);
 	}
 }
 

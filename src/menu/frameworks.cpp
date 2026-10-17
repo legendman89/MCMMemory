@@ -6,7 +6,9 @@
 #include "menu/translate.hpp"
 #include "menu/frameworks.hpp"
 #include "menu/notifications.hpp"
+#include "utils/helper.hpp"
 
+#include <SimpleIni.h>
 #include <cstring>
 
 namespace MCMMemory::Menu
@@ -21,14 +23,14 @@ namespace MCMMemory::Menu
             Detect();
         }
 
-        if (HasSKSEMenuFramework()) {
+        if (HasSKSEMenuFramework() && (preferSMF || !flickLoaded)) {
             if (HasFLICK()) {
                 logger::info("Both menu frameworks detected; using SKSE Menu Framework for the in-game menu");
             }
             RegisterSKSEMenuFramework();
         }
         else if (flickLoaded) {
-            logger::info("FLICK detected; MCM Memory will connect after game data loads");
+            logger::info("FLICK selected; MCM Memory will connect after game data loads");
         }
         else {
             logger::info("No available menu framework detected; the in-game menu is disabled");
@@ -47,7 +49,24 @@ namespace MCMMemory::Menu
 
         if (!registered && flickLoaded) {
             registered = RegisterFLICK();
+            if (!registered && HasSKSEMenuFramework()) {
+                logger::warn("FLICK connection failed; falling back to SKSE Menu Framework");
+                RegisterSKSEMenuFramework();
+            }
         }
+    }
+
+    void Frameworks::LoadPreferences()
+    {
+        const auto path = GetPluginDataPath() / "Preferences.ini";
+        CSimpleIniA ini(true);
+        if (ini.LoadFile(path.c_str()) < 0) {
+            logger::info("Preferences unavailable at {}; using preferSMF = 1", ToUTF8(path));
+            return;
+        }
+
+        preferSMF = ini.GetBoolValue("", "preferSMF", true);
+        logger::info("Menu preference: preferSMF = {}", preferSMF ? 1 : 0);
     }
 
     void Frameworks::RegisterSKSEMenuFramework()
@@ -69,6 +88,8 @@ namespace MCMMemory::Menu
     void Frameworks::Detect()
     {
         detected = true;
+        
+        LoadPreferences();
 
         skseVersion = SKSEMenuFramework::GetMenuFrameworkVersion();
 

@@ -12,7 +12,7 @@ namespace MCMMemory::Menu
             return std::addressof(singleton);
         }
 
-        // Detects available frameworks and registers SKSE Menu Framework at post-load.
+        // Detects available frameworks and registers the preferred one when ready.
         void Register();
 
         // FLICK connects after game data loads.
@@ -28,6 +28,8 @@ namespace MCMMemory::Menu
 
         void Detect();
 
+        void LoadPreferences();
+
         void RegisterSKSEMenuFramework();
 
         bool RegisterFLICK();
@@ -41,5 +43,6 @@ namespace MCMMemory::Menu
         bool registered{};
         
         bool flickLoaded{};
+        bool preferSMF{ true };
     };
 }

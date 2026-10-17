@@ -48,18 +48,22 @@ namespace MCMMemory::Menu
 
         GUI::Spacing();
 
-#define DRAW_HUD_FONT_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, displayFormat) \
-        GUI::SetNextItemWidth(hudSliderWidth); \
-        if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
-            settingsChanged = true; \
-        } \
-        settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
-        appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive(); \
-        GUI::HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
-        FOREACH_HUD_FONT_SETTING(DRAW_HUD_FONT_SETTING)
-#undef DRAW_HUD_FONT_SETTING
-
         const auto compactTableFlags = GUI::ImGuiTableFlags_SizingStretchSame;
+        if (GUI::BeginTable("HUD notification font", 2, compactTableFlags)) {
+#define DRAW_HUD_FONT_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, displayFormat) \
+            GUI::TableNextColumn(); \
+            GUI::SetNextItemWidth(hudSliderWidth); \
+            if (GUI::SliderInt(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
+                settingsChanged = true; \
+            } \
+            settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
+            appearanceSettingActive = appearanceSettingActive || GUI::IsItemActive(); \
+            GUI::HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
+            FOREACH_HUD_FONT_SETTING(DRAW_HUD_FONT_SETTING)
+#undef DRAW_HUD_FONT_SETTING
+            GUI::EndTable();
+        }
+
         if (GUI::BeginTable("HUD notification offsets", 2, compactTableFlags)) {
 #define DRAW_HUD_OFFSET_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, displayFormat) \
             GUI::TableNextColumn(); \
@@ -94,15 +98,19 @@ namespace MCMMemory::Menu
         GUI::SeparatorText(Trans::Tr("Notifications.Warning.Header").c_str());
 
         // The restore warning remains available when normal notifications are disabled.
+        if (GUI::BeginTable("HUD notification warning", 2, compactTableFlags)) {
 #define DRAW_HUD_WARNING_SETTING(type, settingName, defaultValue, optionName, minimum, maximum, label, displayFormat) \
-        GUI::SetNextItemWidth(hudSliderWidth); \
-        if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
-            settingsChanged = true; \
-        } \
-        settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
-        GUI::HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
-        FOREACH_HUD_WARNING_SETTING(DRAW_HUD_WARNING_SETTING)
+            GUI::TableNextColumn(); \
+            GUI::SetNextItemWidth(hudSliderWidth); \
+            if (GUI::SliderFloat(Trans::Tr(label).c_str(), std::addressof(settings.settingName), minimum, maximum, displayFormat)) { \
+                settingsChanged = true; \
+            } \
+            settingsSaveRequested = settingsSaveRequested || GUI::IsItemDeactivatedAfterEdit(); \
+            GUI::HelpMarker(Trans::Tr(std::format("{}.Tooltip", label)).c_str());
+            FOREACH_HUD_WARNING_SETTING(DRAW_HUD_WARNING_SETTING)
 #undef DRAW_HUD_WARNING_SETTING
+            GUI::EndTable();
+        }
 
         GUI::Spacing();
         GUI::Spacing();

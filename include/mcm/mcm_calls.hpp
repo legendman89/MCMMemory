@@ -1,7 +1,7 @@
 #pragma once
 
 #include "mcm/mcm_script.hpp"
-#include "bridge/host_bridge.hpp"
+#include "mcm/host_bridge.hpp"
 #include "utils/time.hpp"
 
 namespace MCMMemory

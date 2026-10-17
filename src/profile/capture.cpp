@@ -22,7 +22,13 @@ namespace MCMMemory
         }
 
         if (GetModuleHandleW(L"MCMBridge.dll")) {
+#if WITH_BRIDGE
             return InstallHostCapture();
+#else
+            hostPresent = true;
+            logger::error("MCMBridge is loaded, but this build has no Bridge support; recording is disabled");
+            return false;
+#endif
         }
 
         auto modEvents = SKSE::GetModCallbackEventSource();

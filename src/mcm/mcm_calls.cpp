@@ -82,6 +82,7 @@ namespace MCMMemory
         }
         RE::BSTSmartPointer<RE::BSScript::IStackCallbackFunctor> result(new MCMCallResult(std::move(a_task), pending));
         pending->callback = result.get();
+#if WITH_BRIDGE
         // If the host bridge is present, use it to call the MCM function. Otherwise, call it directly through the Papyrus VM.
         if (host.Active()) {
             const auto state = pending;
@@ -99,6 +100,7 @@ namespace MCMMemory
             }
             return submitted;
         }
+#endif
         MCMMessages::Track(pending);
         logger::debug("Watching MCM call '{}' on '{}' (timeout {}s)", a_functionName, a_modID, timeoutSeconds);
         if (!a_script.Call(a_functionName, a_arguments, std::move(result))) {

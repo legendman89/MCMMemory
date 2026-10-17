@@ -11,7 +11,9 @@
 #include "utils/scheduler.hpp"
 
 #include "settings.hpp"
+#if WITH_BRIDGE
 #include "bridge/MCMBridgeHost.h"
+#endif
 
 namespace MCMMemory
 {
@@ -277,6 +279,7 @@ namespace MCMMemory
         // Saves the callback as a raw record before its menu reads are queued.
         uint64_t RecordEvent(EventType a_type, const SKSE::ModCallbackEvent& a_event);
 
+#if WITH_BRIDGE
         bool InstallHostCapture();
 
         void HostEvent(const MCMHostEvent& a_event);
@@ -284,6 +287,7 @@ namespace MCMMemory
         void BeginHostCapture(const MCMHostEvent& a_event);
 
         void FinishHostCapture(const MCMHostEvent& a_event);
+#endif
 
         // Stops capture events and delayed tasks from changing data at the same time.
         std::mutex captureMutex;

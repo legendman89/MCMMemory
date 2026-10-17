@@ -26,6 +26,11 @@ get_target_property(COMMONLIB_SRC_DIR CommonLibSSE SOURCE_DIR)
 
 find_package(imgui CONFIG REQUIRED)
 
+set(WITH_BRIDGE OFF)
+if(IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bridge")
+    set(WITH_BRIDGE ON)
+endif()
+
 file(GLOB_RECURSE headers CONFIGURE_DEPENDS include/*.h include/*.hpp bridge/*.h bridge/*.hpp)
 file(GLOB_RECURSE sources CONFIGURE_DEPENDS src/*.cpp bridge/*.cpp)
 
@@ -46,6 +51,7 @@ target_compile_definitions(
     PRIVATE
         BEAUTIFUL_NAME="${BEAUTIFUL_NAME}"
         CURR_VERSION="${CURR_VERSION}"
+        WITH_BRIDGE=$<BOOL:${WITH_BRIDGE}>
         AUTHOR_NAME="${AUTHOR_NAME}"
         NOMINMAX
         PRODUCT_NAME="${PRODUCT_NAME}"

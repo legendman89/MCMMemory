@@ -7,7 +7,7 @@ endif()
 set(AUTHOR_NAME "Legendman")
 set(PRODUCT_NAME "MCMMemory")
 set(BEAUTIFUL_NAME "MCM Memory")
-set(CURR_VERSION "1.5.7.0")
+set(CURR_VERSION "1.6.0.0")
 
 project(${PRODUCT_NAME} VERSION ${CURR_VERSION} LANGUAGES CXX)
 

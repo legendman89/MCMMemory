@@ -27,6 +27,9 @@ namespace MCMMemory::Menu
         static GUI::FLICK::FLICKHUD hud;
         FLK::RegisterWindow(&hud);
 
+        static GUI::FLICK::FLICKHUD warning(true);
+        FLK::RegisterWindow(&warning);
+
         flickVersion = FLK::GetInterface()->version;
         logger::info("MCM Memory registered with FLICK {}", flickVersion);
 
@@ -38,6 +41,18 @@ namespace MCMMemory::GUI::FLICK
 {
     using ::ImVec2;
     using ::ImVec4;
+
+    void FLICKHUD::Draw()
+    {
+        auto* ui = RE::UI::GetSingleton();
+        const bool blocked = !FLK::IsMenuOpen() && ui && (ui->GameIsPaused() || ui->IsMenuOpen(RE::JournalMenu::MENU_NAME) || ui->IsMenuOpen(RE::RaceSexMenu::MENU_NAME));
+        if (warningWindow) {
+            HUD::GetSingleton()->RenderWarning(blocked, DrawFLICKHUDWarning);
+        }
+        else {
+            HUD::GetSingleton()->RenderNotifications(blocked, DrawFLICKHUDMessage);
+        }
+    }
 
     void DrawFLICKHUDMessage(const HUDMessage& a_message, const HUDOptions& a_options, float a_alpha)
     {
@@ -84,6 +99,48 @@ namespace MCMMemory::GUI::FLICK
             color.w *= a_alpha;
             FLK::TextColored(color, "%s", segment.text.c_str());
         }
+        FLK::PopStyleColor();
+        FLK::PopFont();
+    }
+
+    void DrawFLICKHUDWarning(const char* a_detailKey, const HUDOptions& a_options, float a_alpha)
+    {
+        const auto screen = FLK::GetDisplaySize();
+        const float availableWidth = screen.x - 2.0F * HUDMargin - 2.0F * HUDWarningHorizontalPadding - HUDWarningAccentWidth;
+        if (a_alpha <= 0.0F || availableWidth <= 0.0F || screen.y <= 0.0F) {
+            return;
+        }
+
+        const auto title = Trans::Tr("HUD.Warning.Title");
+        const auto detail = Trans::Tr(a_detailKey);
+        FLK::PushFontScaled(nullptr, static_cast<float>(a_options.fontScale) / 100.0F * HUDWarningScale);
+        const float textWidth = std::max(FLK::CalcTextSize(title.c_str()).x, FLK::CalcTextSize(detail.c_str()).x);
+        const float lineHeight = FLK::GetTextLineHeight() * std::min(1.0F, availableWidth / std::max(1.0F, textWidth));
+        FLK::PopFont();
+        FLK::PushFont(FLK::GetFont(FLK::Font::kRegular), lineHeight);
+
+        const ImVec2 cardSize{ std::min(textWidth, availableWidth) + 2.0F * HUDWarningHorizontalPadding + HUDWarningAccentWidth, 2.0F * lineHeight + HUDWarningLineGap + 2.0F * HUDWarningVerticalPadding };
+        FLK::SetWindowPos(ImVec2{ (screen.x - cardSize.x) * 0.5F, (screen.y - cardSize.y) * 0.5F });
+        FLK::SetCursorPos(ImVec2{ 0.0F, 0.0F });
+        const auto cardMin = FLK::GetCursorScreenPos();
+        const ImVec2 cardMax{ cardMin.x + cardSize.x, cardMin.y + cardSize.y };
+        FLK::Dummy(cardSize);
+
+        auto background = ToColor(kHUDBackground);
+        background.w = 0.86F * a_alpha;
+        auto accent = ToColor(HUDColors[ToIndex(HUDColor::Warning)]);
+        accent.w *= a_alpha;
+        auto text = ToColor(HUDColors[ToIndex(HUDColor::Primary)]);
+        text.w *= a_alpha;
+        FLK::DrawRectFilled(cardMin, cardMax, background, 5.0F);
+        FLK::DrawRectFilled(cardMin, ImVec2{ cardMin.x + HUDWarningAccentWidth, cardMax.y }, accent, 5.0F);
+        auto shadow = ToColor(kHUDShadow);
+        shadow.w *= a_alpha;
+        FLK::PushStyleColor(ImGuiCol_TextShadow, shadow);
+        FLK::SetCursorPos(ImVec2{ HUDWarningAccentWidth + HUDWarningHorizontalPadding, HUDWarningVerticalPadding });
+        FLK::TextColored(accent, "%s", title.c_str());
+        FLK::SetCursorPos(ImVec2{ HUDWarningAccentWidth + HUDWarningHorizontalPadding, HUDWarningVerticalPadding + lineHeight + HUDWarningLineGap });
+        FLK::TextColored(text, "%s", detail.c_str());
         FLK::PopStyleColor();
         FLK::PopFont();
     }

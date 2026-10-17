@@ -16,6 +16,12 @@ namespace MCMMemory
 {
     inline constexpr float HUDHorizontalPadding{ 12.0F };
     inline constexpr float HUDVerticalPadding{ 7.0F };
+    inline constexpr float HUDMargin{ 30.0F };
+    inline constexpr float HUDWarningAccentWidth{ 6.0F };
+    inline constexpr float HUDWarningHorizontalPadding{ 20.0F };
+    inline constexpr float HUDWarningVerticalPadding{ 12.0F };
+    inline constexpr float HUDWarningLineGap{ 7.0F };
+    inline constexpr float HUDWarningScale{ 1.35F };
 
     inline constexpr GUI::Color4 kHUDBackground{ 0.96F, 0.96F, 0.96F, 0.75F };
     inline constexpr GUI::Color4 kHUDShadow{ 0.0F, 0.0F, 0.0F, 0.1F };
@@ -133,6 +139,7 @@ namespace MCMMemory
     };
 
     using HUDMessageRenderer = void (*)(const HUDMessage&, const HUDOptions&, float);
+    using HUDWarningRenderer = void (*)(const char*, const HUDOptions&, float);
 
     // Singleton class that manages the heads-up display for MCM backup and restore operations.
     // I hand-crafted this to have a customizable appearance over Debug Notifications.
@@ -156,18 +163,16 @@ namespace MCMMemory
             ShowOperationStarted("HUD.Operation.RestoreStarted");
         }
 
-        inline bool HasPreview()
+        inline bool HasNotifications()
         {
             std::lock_guard lock(hudMutex);
-            return enabled.load(std::memory_order_relaxed) && display.active && display.message.type == HUDMessageType::Preview;
+            return enabled.load(std::memory_order_relaxed) && (display.active || !notificationQueue.empty());
         }
 
-        inline void RenderPreview(HUDMessageRenderer a_renderer)
+        inline bool HasWarning()
         {
             std::lock_guard lock(hudMutex);
-            if (a_renderer && enabled.load(std::memory_order_relaxed) && display.active && display.message.type == HUDMessageType::Preview) {
-                UpdateActiveMessage(std::chrono::steady_clock::now(), a_renderer);
-            }
+            return warning.active;
         }
 
         void Configure(const Settings& a_settings);
@@ -195,6 +200,10 @@ namespace MCMMemory
         void Preview();
 
         void Render();
+
+        void RenderNotifications(bool a_blocked, HUDMessageRenderer a_renderer = nullptr);
+
+        void RenderWarning(bool a_blocked, HUDWarningRenderer a_renderer = nullptr);
 
         void Reset();
 
@@ -248,15 +257,15 @@ namespace MCMMemory
 
         bool UpdateActiveMessage(const TimePoint& a_now, HUDMessageRenderer a_renderer = nullptr);
 
-        bool StartNextMessage(const TimePoint& a_now);
+        bool StartNextMessage(const TimePoint& a_now, HUDMessageRenderer a_renderer = nullptr);
 
         void AppendBackupAge(HUDMessage& a_message, const TimePoint& a_now) const;
 
-        void DrawMessage(const HUDMessage& a_message, float a_alpha) const;
+        void DrawMessage(const HUDMessage& a_message, float a_alpha, HUDMessageRenderer a_renderer = nullptr) const;
 
-        void UpdateMenuWarning(bool a_blocked, const TimePoint& a_now);
+        void UpdateMenuWarning(bool a_blocked, const TimePoint& a_now, HUDWarningRenderer a_renderer = nullptr);
 
-        void DrawMenuWarning(float a_alpha) const;
+        void DrawMenuWarning(float a_alpha, HUDWarningRenderer a_renderer = nullptr) const;
 
         std::mutex hudMutex;
 

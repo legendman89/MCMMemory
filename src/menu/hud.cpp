@@ -7,13 +7,6 @@
 
 namespace MCMMemory
 {
-    inline constexpr float HUDMargin{ 30.0F };
-    inline constexpr float HUDWarningAccentWidth{ 6.0F };
-    inline constexpr float HUDWarningHorizontalPadding{ 20.0F };
-    inline constexpr float HUDWarningVerticalPadding{ 12.0F };
-    inline constexpr float HUDWarningLineGap{ 7.0F };
-    inline constexpr float HUDWarningScale{ 1.35F };
-
     void HUD::Configure(const Settings& a_settings)
     {
         enabled.store(a_settings.notifications, std::memory_order_relaxed);
@@ -349,16 +342,11 @@ namespace MCMMemory
         }
 
         const float alpha = FadeAlpha(age, timing.fadeAtSeconds, timing.fadeSeconds);
-        if (a_renderer) {
-            a_renderer(display.message, options, alpha);
-        }
-        else {
-            DrawMessage(display.message, alpha);
-        }
+        DrawMessage(display.message, alpha, a_renderer);
         return true;
     }
 
-    bool HUD::StartNextMessage(const TimePoint& a_now)
+    bool HUD::StartNextMessage(const TimePoint& a_now, HUDMessageRenderer a_renderer)
     {
         if (IsTimeSet(display.nextAt) && a_now < display.nextAt) {
             return false;
@@ -370,7 +358,7 @@ namespace MCMMemory
         auto message = std::move(notificationQueue.front());
         notificationQueue.pop_front();
         StartMessage(std::move(message), a_now);
-        DrawMessage(display.message, 1.0F);
+        DrawMessage(display.message, 1.0F, a_renderer);
         return true;
     }
 
@@ -399,8 +387,13 @@ namespace MCMMemory
         return GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ color.r, color.g, color.b, color.a * a_alpha });
     }
 
-    void HUD::DrawMessage(const HUDMessage& a_message, float a_alpha) const
+    void HUD::DrawMessage(const HUDMessage& a_message, float a_alpha, HUDMessageRenderer a_renderer) const
     {
+        if (a_renderer) {
+            a_renderer(a_message, options, a_alpha);
+            return;
+        }
+
         if (a_message.segments.empty() || a_alpha <= 0.0F) {
             return;
         }
@@ -460,7 +453,7 @@ namespace MCMMemory
         }
     }
 
-    void HUD::UpdateMenuWarning(bool a_blocked, const TimePoint& a_now)
+    void HUD::UpdateMenuWarning(bool a_blocked, const TimePoint& a_now, HUDWarningRenderer a_renderer)
     {
         if (!warning.active) {
             return;
@@ -487,11 +480,16 @@ namespace MCMMemory
 
         const float fadeSeconds = std::min(options.fadeSeconds, options.warningDurationSeconds);
         const float fadeAt = options.warningDurationSeconds - fadeSeconds;
-        DrawMenuWarning(FadeAlpha(age, fadeAt, fadeSeconds));
+        DrawMenuWarning(FadeAlpha(age, fadeAt, fadeSeconds), a_renderer);
     }
 
-    void HUD::DrawMenuWarning(float a_alpha) const
+    void HUD::DrawMenuWarning(float a_alpha, HUDWarningRenderer a_renderer) const
     {
+        if (a_renderer) {
+            a_renderer(warning.detailKey.c_str(), options, a_alpha);
+            return;
+        }
+
         if (a_alpha <= 0.0F) {
             return;
         }
@@ -529,7 +527,7 @@ namespace MCMMemory
         const auto accentColor = GetColor(HUDColor::Warning, a_alpha);
         const auto titleColor = GetColor(HUDColor::Warning, a_alpha);
         const auto detailColor = GetColor(HUDColor::Primary, a_alpha);
-        const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.18F * a_alpha });
+        const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ kHUDShadow.r, kHUDShadow.g, kHUDShadow.b, kHUDShadow.a * a_alpha });
 
         GUI::ImDrawListManager::AddRectFilled(drawList, cardMin, cardMax, backgroundColor, 5.0F, 0);
         GUI::ImDrawListManager::AddRectFilled(drawList, cardMin, accentMax, accentColor, 5.0F, 0);
@@ -541,23 +539,34 @@ namespace MCMMemory
 
     void HUD::Render()
     {
-        const auto now = std::chrono::steady_clock::now();
         const bool blocked = SKSEMenuFramework::IsAnyBlockingWindowOpened();
         const auto* menuWindow = SKSEMenuFramework::GetMainWindow();
         const bool menuOpen = menuWindow && menuWindow->IsOpen.load(std::memory_order_relaxed);
 
+        RenderWarning(blocked && !menuOpen);
+        RenderNotifications(blocked && !menuOpen);
+    }
+
+    void HUD::RenderWarning(bool a_blocked, HUDWarningRenderer a_renderer)
+    {
         std::lock_guard lock(hudMutex);
-        UpdateMenuWarning(blocked && !menuOpen, now);
+        UpdateMenuWarning(a_blocked, std::chrono::steady_clock::now(), a_renderer);
+    }
+
+    void HUD::RenderNotifications(bool a_blocked, HUDMessageRenderer a_renderer)
+    {
+        const auto now = std::chrono::steady_clock::now();
+        std::lock_guard lock(hudMutex);
         if (!enabled.load(std::memory_order_relaxed)) {
             return;
         }
-        if (UpdateMenuDelay(blocked && !menuOpen, now)) {
+        if (UpdateMenuDelay(a_blocked, now)) {
             return;
         }
-        if (UpdateActiveMessage(now)) {
+        if (UpdateActiveMessage(now, a_renderer)) {
             return;
         }
-        StartNextMessage(now);
+        StartNextMessage(now, a_renderer);
     }
 
 }

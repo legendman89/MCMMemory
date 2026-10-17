@@ -223,15 +223,19 @@ namespace MCMMemory::GUI::FLICK
 
     void DrawFLICKHUDMessage(const HUDMessage& a_message, const HUDOptions& a_options, float a_alpha);
 
+    void DrawFLICKHUDWarning(const char* a_detailKey, const HUDOptions& a_options, float a_alpha);
+
     class FLICKHUD final : public FLK::IWindow
     {
     public:
 
-        inline const char* Id() const override { return "MCMMemoryHUD"; }
+        explicit FLICKHUD(bool a_warning = false) : warningWindow(a_warning) {}
+
+        inline const char* Id() const override { return warningWindow ? "MCMMemoryHUDWarning" : "MCMMemoryHUD"; }
 
         inline const char* Title() const override { return BEAUTIFUL_NAME; }
 
-        inline bool IsOpen() const override { return HUD::GetSingleton()->HasPreview(); }
+        inline bool IsOpen() const override { return warningWindow ? HUD::GetSingleton()->HasWarning() : HUD::GetSingleton()->HasNotifications(); }
 
         inline void SetOpen(bool) override {}
 
@@ -241,7 +245,11 @@ namespace MCMMemory::GUI::FLICK
                 FLK::WindowFlags::kNoMove | FLK::WindowFlags::kCustomPosition | FLK::WindowFlags::kPassInputToGame;
         }
 
-        inline void Draw() override { HUD::GetSingleton()->RenderPreview(DrawFLICKHUDMessage); }
+        void Draw() override;
+
+    private:
+
+        bool warningWindow{};
     };
 
     class FLICKTool final : public FLK::ITool

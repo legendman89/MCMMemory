@@ -8,8 +8,6 @@
 namespace MCMMemory
 {
     inline constexpr float HUDMargin{ 30.0F };
-    inline constexpr float HUDHorizontalPadding{ 12.0F };
-    inline constexpr float HUDVerticalPadding{ 7.0F };
     inline constexpr float HUDWarningAccentWidth{ 6.0F };
     inline constexpr float HUDWarningHorizontalPadding{ 20.0F };
     inline constexpr float HUDWarningVerticalPadding{ 12.0F };
@@ -397,12 +395,8 @@ namespace MCMMemory
 
     uint32_t HUD::GetColor(HUDColor a_color, float a_alpha) const
     {
-#define DECLARE_HUD_COLOR_VALUE(name, red, green, blue, alpha) GUI::ImVec4{ red, green, blue, alpha },
-        constexpr std::array<GUI::ImVec4, ToIndex(HUDColor::Count)> colors{ FOREACH_HUD_COLOR(DECLARE_HUD_COLOR_VALUE) };
-#undef DECLARE_HUD_COLOR_VALUE
-        auto color = colors[ToIndex(a_color)];
-        color.w *= a_alpha;
-        return GUI::ColorConvertFloat4ToU32(color);
+        const auto& color = HUDColors[ToIndex(a_color)];
+        return GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ color.r, color.g, color.b, color.a * a_alpha });
     }
 
     void HUD::DrawMessage(const HUDMessage& a_message, float a_alpha) const
@@ -447,15 +441,18 @@ namespace MCMMemory
         const float textY = backgroundY + HUDVerticalPadding;
 
         // The light translucent surface keeps the text readable without hiding the scene.
-        const auto backgroundColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.96F, 0.96F, 0.96F, 0.75F * a_alpha });
-        GUI::ImDrawListManager::AddRectFilled(drawList, backgroundMin, backgroundMax, backgroundColor, 7.0F, 0);
+        GUI::ImVec4 hudColor{ kHUDBackground.r, kHUDBackground.g, kHUDBackground.b, kHUDBackground.a };
+        hudColor.w *= a_alpha;
+        GUI::ImDrawListManager::AddRectFilled(drawList, backgroundMin, backgroundMax, GUI::ColorConvertFloat4ToU32(hudColor), 7.0F, 0);
 
         float positionX = textX;
+        hudColor = GUI::ImVec4{ kHUDShadow.r, kHUDShadow.g, kHUDShadow.b, kHUDShadow.a };
+        hudColor.w *= a_alpha;
+        const auto shadowColor = GUI::ColorConvertFloat4ToU32(hudColor);
         for (const auto& segment : a_message.segments) {
             const GUI::ImVec2 size = GUI::CalcTextSize(segment.text.c_str(), nullptr, false, 0.0F);
             const GUI::ImVec2 shadowPosition{ positionX + 1.0F, textY + 1.0F };
             const GUI::ImVec2 textPosition{ positionX, textY };
-            const auto shadowColor = GUI::ColorConvertFloat4ToU32(GUI::ImVec4{ 0.0F, 0.0F, 0.0F, 0.18F * a_alpha });
             const auto textColor = GetColor(segment.color, a_alpha);
             GUI::ImDrawListManager::AddText(drawList, font, scaledHeight, shadowPosition, shadowColor, segment.text.c_str());
             GUI::ImDrawListManager::AddText(drawList, font, scaledHeight, textPosition, textColor, segment.text.c_str());

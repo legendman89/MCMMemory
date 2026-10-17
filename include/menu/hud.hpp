@@ -3,6 +3,7 @@
 // HUD drawing is based on Log Watcher.
 
 #include "menu/hud_defs.hpp"
+#include "menu/backend.hpp"
 #include "profile/stats.hpp"
 #include "utils/helper.hpp"
 #include "utils/time.hpp"
@@ -13,6 +14,12 @@
 
 namespace MCMMemory
 {
+    inline constexpr float HUDHorizontalPadding{ 12.0F };
+    inline constexpr float HUDVerticalPadding{ 7.0F };
+
+    inline constexpr GUI::Color4 kHUDBackground{ 0.96F, 0.96F, 0.96F, 0.75F };
+    inline constexpr GUI::Color4 kHUDShadow{ 0.0F, 0.0F, 0.0F, 0.1F };
+
     struct Settings;
 
     inline float FadeAlpha(float a_ageSeconds, float a_fadeAtSeconds, float a_fadeSeconds)
@@ -29,6 +36,10 @@ namespace MCMMemory
         FOREACH_HUD_COLOR(DECLARE_HUD_COLOR)
         Count
     };
+
+#define DECLARE_HUD_COLOR_VALUE(name, red, green, blue, alpha) GUI::Color4{ red, green, blue, alpha },
+    inline constexpr std::array<GUI::Color4, ToIndex(HUDColor::Count)> HUDColors{ FOREACH_HUD_COLOR(DECLARE_HUD_COLOR_VALUE) };
+#undef DECLARE_HUD_COLOR_VALUE
 
     enum class HUDMessageType
     {

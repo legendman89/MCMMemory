@@ -36,8 +36,15 @@ namespace MCMMemory::Menu
 
 namespace MCMMemory::GUI::FLICK
 {
+    using ::ImVec2;
+    using ::ImVec4;
+
     void DrawFLICKHUDMessage(const HUDMessage& a_message, const HUDOptions& a_options, float a_alpha)
     {
+        if (a_message.segments.empty() || a_alpha <= 0.0F) {
+            return;
+        }
+
         FLK::PushFontScaled(nullptr, static_cast<float>(a_options.fontScale) / 100.0F);
 
         float textWidth{};
@@ -46,21 +53,36 @@ namespace MCMMemory::GUI::FLICK
         }
 
         const auto screen = FLK::GetDisplaySize();
-        const auto padding = FLK::GetStyleVarVec(ImGuiStyleVar_WindowPadding);
+        const ImVec2 padding{ HUDHorizontalPadding, HUDVerticalPadding };
         const float availableWidth = std::max(1.0F, screen.x - padding.x * 2.0F);
         const float fontSize = FLK::GetTextLineHeight() * std::min(1.0F, availableWidth / std::max(1.0F, textWidth));
         FLK::PopFont();
         
         FLK::PushFont(FLK::GetFont(FLK::Font::kRegular), fontSize);
-        const float maximumX = std::max(0.0F, screen.x - std::min(textWidth, availableWidth) - padding.x * 2.0F);
-        const float maximumY = std::max(0.0F, screen.y - fontSize - padding.y * 2.0F);
+        const ImVec2 backgroundSize{ std::min(textWidth, availableWidth) + padding.x * 2.0F, fontSize + padding.y * 2.0F };
+        const float maximumX = std::max(0.0F, screen.x - backgroundSize.x);
+        const float maximumY = std::max(0.0F, screen.y - backgroundSize.y);
         FLK::SetWindowPos(ImVec2{ std::clamp(static_cast<float>(a_options.horizontalOffset), 0.0F, maximumX), std::clamp(static_cast<float>(a_options.verticalOffset), 0.0F, maximumY) });
-        FLK::PushStyleColor(ImGuiCol_TextShadow, ImVec4{ 0.0F, 0.0F, 0.0F, 0.0F });
+        FLK::SetCursorPos(ImVec2{ 0.0F, 0.0F });
+        const auto backgroundMin = FLK::GetCursorScreenPos();
+        const ImVec2 backgroundMax{ backgroundMin.x + backgroundSize.x, backgroundMin.y + backgroundSize.y };
+        FLK::Dummy(backgroundSize);
+
+        ImVec4 hudColor = ToColor(kHUDBackground);
+        hudColor.w *= a_alpha;
+        FLK::DrawRectFilled(backgroundMin, backgroundMax, hudColor, 14.0F);
+        FLK::SetCursorPos(padding);
+        hudColor = ToColor(kHUDShadow);
+        hudColor.w *= a_alpha;
+        FLK::PushStyleColor(ImGuiCol_TextShadow, hudColor);
         for (size_t index = 0; index < a_message.segments.size(); ++index) {
             if (index > 0) {
                 FLK::SameLine(0.0F, 0.0F);
             }
-            FLK::TextColored(ImVec4{ 1.0F, 1.0F, 1.0F, a_alpha }, "%s", a_message.segments[index].text.c_str());
+            const auto& segment = a_message.segments[index];
+            auto color = ToColor(HUDColors[ToIndex(segment.color)]);
+            color.w *= a_alpha;
+            FLK::TextColored(color, "%s", segment.text.c_str());
         }
         FLK::PopStyleColor();
         FLK::PopFont();
